@@ -391,7 +391,7 @@
 .composeAuthorLine:has(> span) + .composeBody { margin-top:0; }
 .composeBody:has(+ .composeQuote) { min-height:98px; }
 .composeBody:has(+ .composeQuote) textarea { height:85px; }
-.composePage .cameraRail { padding-left:35px; }
+.composePage .cameraRail { padding-left:0; }
 .composePage .replyPermission { border-top:0; }
 
 /* Connect each secondary avatar to the center axis of its own main avatar. */

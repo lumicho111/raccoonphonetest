@@ -1912,9 +1912,12 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                 <ChevronLeft size={20} />
               </button>
               <strong style={{ position: "absolute", left: "50%", bottom: "20px", transform: "translateX(-50%)", fontSize: "calc(16px*var(--app-text-scale,1))", color: "#222", fontWeight: 600 }}>Product Details</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                <button type="button" aria-label="加入现有分类" onClick={() => setCategorizing(selectedProduct)} style={{ background: "#fff", width: 34, height: 34, borderRadius: "50%", display: "grid", placeItems: "center", color: "#333", border: "1px solid #eee", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}><Plus size={17} /></button>
               <button type="button" aria-label={savedIds.has(selectedProduct.id) ? "取消收藏" : "收藏"} onClick={() => toggleSave(selectedProduct)} style={{ background: savedIds.has(selectedProduct.id) ? "#ff6b00" : "#fff", width: "34px", height: "34px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: savedIds.has(selectedProduct.id) ? "#fff" : "#333", border: "1px solid #eee", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
                 <Heart size={17} fill={savedIds.has(selectedProduct.id) ? "white" : "none"} />
               </button>
+              </div>
             </header>
             <div style={{ position: "relative", width: "100%", height: "220px", background: "#f8f9fa", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "calc(72px*var(--app-text-scale,1))" }}>
               {/(?:https?:\/\/|www\.)/i.test(selectedProduct.previewIcon || "") ? (selectedProduct.mode === "food" ? "🥡" : "🛍️") : selectedProduct.previewIcon || (selectedProduct.mode === "food" ? "🥡" : "🛍️")}
@@ -2470,7 +2473,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
         <button type="button" disabled={!selectedRefreshIds.length || loading} onClick={() => void handleRefresh(selectedRefreshIds, currentMode)} style={{ width: "100%", border: 0, borderRadius: 14, background: "#ff6b00", color: "white", padding: 12, marginTop: 18, opacity: selectedRefreshIds.length ? 1 : .5 }}>刷新选中的 {selectedRefreshIds.length} 类</button>
       </div></div>}
 
-      {categorizing&&<div className="cp-shopping-translation-overlay" onClick={()=>setCategorizing(null)}><div className="cp-shopping-translation-sheet" onClick={e=>e.stopPropagation()}><div className="cp-shopping-translation-head"><span>加入现有分类</span><button onClick={()=>setCategorizing(null)}>关闭</button></div>{catalogCategoryDefinitions(categorizing.mode||"shop",categorizing.regionId||state.region,state.customCategories).map(c=><button key={c.id} onClick={()=>addToCategory(categorizing,c.id)} style={{padding:12,margin:5,borderRadius:12,border:"1px solid #ddd",background:"white"}}>{c.title}</button>)}</div></div>}
+      {categorizing&&<div className="cp-shopping-translation-overlay" style={{zIndex:120}} onClick={()=>setCategorizing(null)}><div className="cp-shopping-translation-sheet" onClick={e=>e.stopPropagation()}><div className="cp-shopping-translation-head"><span>加入现有分类</span><button onClick={()=>setCategorizing(null)}>关闭</button></div>{catalogCategoryDefinitions(categorizing.mode||"shop",categorizing.regionId||state.region,state.customCategories).map(c=><button key={c.id} onClick={()=>addToCategory(categorizing,c.id)} style={{padding:12,margin:5,borderRadius:12,border:"1px solid #ddd",background:"white"}}>{c.title}</button>)}</div></div>}
       {categoryEditorOpen && <div className="cp-shopping-translation-overlay" role="presentation" onClick={() => setCategoryEditorOpen(false)} style={{ zIndex: 101 }}><div className="cp-shopping-translation-sheet" role="dialog" aria-modal="true" aria-label="自定义分类" onClick={event => event.stopPropagation()}>
         <div className="cp-shopping-translation-head"><span>{editingCategoryId ? "编辑分类" : "添加分类"}</span><button type="button" onClick={() => setCategoryEditorOpen(false)}>关闭</button></div>
         <input className="ui-input" aria-label="分类名称" placeholder="例如 APPLE、星巴克、丝芙兰" value={categoryName} onChange={event => setCategoryName(event.target.value)} maxLength={32} />

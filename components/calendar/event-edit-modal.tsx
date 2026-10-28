@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronLeft, Trash2 } from "lucide-react";
-import { Input } from "../ui/form";
+import { Input, Select } from "../ui/form";
 import type { CalendarBusyLevel, CalendarColorKey } from "@/lib/calendar-types";
 import { CALENDAR_COLOR_KEYS } from "@/lib/calendar-utils";
 
@@ -72,9 +72,26 @@ export function CalendarEventEditModal({
         </div>
 
         <div className="modal-body hide-scrollbar flex flex-col gap-3 pb-10" data-ui="modal-body">
-          <label>可见范围<select value={draft.visibility||"private"} onChange={e=>onChange({...draft,visibility:e.target.value as "public"|"private"})}><option value="private">私人／内部安排</option><option value="public">公开</option></select></label>
-          <label>类型<select value={draft.kind||"event"} onChange={e=>onChange({...draft,kind:e.target.value as "event"|"milestone"})}><option value="event">实际行程 · 占用时间</option><option value="milestone">公开节点 · 不占用时间</option></select></label>
-          {draft.visibility==="public"&&<label>消息公开时间（可不填，默认立即公开）<input type="datetime-local" value={draft.publicAt||""} onChange={e=>onChange({...draft,publicAt:e.target.value||undefined})}/></label>}
+          <div className="flex flex-col gap-1">
+            <label className="menu-desc ml-1" htmlFor="calendar-visibility">可见范围</label>
+            <Select id="calendar-visibility" value={draft.visibility || "private"} onChange={e => onChange({ ...draft, visibility: e.target.value as "public" | "private" })}>
+              <option value="private">私人／内部安排</option><option value="public">公开</option>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="menu-desc ml-1" htmlFor="calendar-kind">类型</label>
+            <Select id="calendar-kind" value={draft.kind || "event"} onChange={e => onChange({ ...draft, kind: e.target.value as "event" | "milestone" })}>
+              <option value="event">实际行程 · 占用时间</option><option value="milestone">公开节点 · 不占用时间</option>
+            </Select>
+          </div>
+          {draft.visibility === "public" && <div className="flex flex-col gap-1">
+            <span className="menu-desc ml-1">消息公开时间</span>
+            <div className="grid grid-cols-2 gap-3">
+              <Input aria-label="消息公开日期" type="date" value={draft.publicAt?.slice(0, 10) || ""} onChange={e => onChange({ ...draft, publicAt: e.target.value ? `${e.target.value}T${draft.publicAt?.slice(11, 16) || "00:00"}` : undefined })} />
+              <Input aria-label="消息公开时刻" type="time" value={draft.publicAt?.slice(11, 16) || ""} onChange={e => onChange({ ...draft, publicAt: e.target.value ? `${draft.publicAt?.slice(0, 10) || draft.date}T${e.target.value}` : undefined })} />
+            </div>
+            <span className="menu-desc ml-1">留空则立即公开</span>
+          </div>}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="menu-desc ml-1">开始日期</label>
