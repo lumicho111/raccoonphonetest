@@ -1,3 +1,4 @@
+import { worldlineContextForApp } from "./worldline-storage";
 import { isPublicCalendarItem } from "./calendar-master";
 import { photoStoryReplyContext } from "./photo-story-data";
 import { translateContentTexts } from "./content-translation";
@@ -80,6 +81,7 @@ export type GeneratedWeverseScheduleItem = {
   location?: string;
   memberCharacterIds: string[];
   calendarSync: boolean;
+  busyLevel?: 1 | 2 | 3 | 4;
 };
 
 type ResolvedGeneration = {
@@ -536,7 +538,7 @@ export async function generateWeverseScheduleBatch(
   const resolved = await resolveCommunityApi(community);
   const now = options?.now ?? new Date();
   const characters = loadCharacters().filter((item) => community.memberCharacterIds.includes(item.id));
-  const memberRows = characters.map((item) => `${item.id} = ${item.name}`).join("\n");
+  const memberRows = characters.map((item) => `${item.id} = ${item.name}：${(item.persona||"").slice(0,1200)}`).join("\n").slice(0,6000);
   const existingRows = existing
     .filter((item) => item.communityId === community.id)
     .sort((a,b) => a.startsAt-b.startsAt)
@@ -547,19 +549,16 @@ export async function generateWeverseScheduleBatch(
     {
       role: "system",
       content: [
-        `你只生成公开行程及公开发布节点，禁止生成私人或内部行程。你在维护 Weverse「${community.name}」Community 的完整 Schedule。这里同时包含粉丝可见公开日程与仅内部可见的真实工作安排。`,
-        `当前参考时间：${now.toISOString()}`,
-        `可用成员 ID：\n${memberRows || "无"}`,
-        options?.startDate && options?.endDate ? `这是历史日程回填，只在 ${options.startDate} 至 ${options.endDate} 之间生成 ${options.count || 6} 条可信的日程。不能使用目标日期之后才发生的事实；visibility 只能为 public。` : "请生成接下来约 4~6 周内少量、可信、不过密的日程，并给每条标 visibility：public。",
-        "public 是粉丝可以在 WVS Schedule 看到的公开节点，只使用这五类：performance=舞台/现场活动，brand=品牌/时尚公开，anniversary=纪念日，release=作品/回归发布，media=节目/媒体公开。节目更新、团综上线、综艺播出、Behind/Performance/Dance Practice/采访公开都属于 media；MV/Teaser/Concept Photo/专辑/单曲/OST 等公开节点属于 release。",
-        "私人及内部工作只在手机日历生成，本次不得生成。",
-        "绝对不要提前生成成员个人 LIVE。成员 Live 是临时发生后才作为历史记录挂进 WVS 日历，不能被预判。",
-        "calendarSync：真正占用时间的公开活动为true；作品上线、节目更新等公开节点为false，但两种都同步到手机日历统一管理。",
-        "不要制造严重事故、获奖、解散、结婚等重大事实。若现有手机日历已有明确安排，尽量沿用/补充而不是冲突。",
+        `为 Weverse「${community.name}」补充公开工作日程与作品节点。结合成员职业阶段、现有项目和手机日历，把工作细化为可信的公开活动、宣传与物料发布；已有项目优先衔接后续内容，适合角色的新项目也可自然出现。`,
+        `参考时间：${now.toISOString()}。成员 ID：\n${memberRows || "无"}`,
+        options?.startDate && options?.endDate ? `补充 ${options.startDate} 至 ${options.endDate} 的历史公开日程，参考当时的职业阶段。数量约 ${options.count || 6} 条。` : "补充未来4至6周的少量具体事项，节奏随工作推进自然疏密。",
+        "分类：performance舞台/活动，brand品牌/时尚活动，media节目播出/幕后/采访公开，release作品/预告/专辑发布，anniversary纪念节点。visibility统一public。",
+        "实际参加的工作calendarSync=true，安排合理准备与通勤，并参考已有占用时段；上线或播出节点calendarSync=false。busyLevel按手机可用程度填1随时回复、2短暂回复、3忙时等待、4无法看手机；发布节点填1。内部工作和私人生活由手机日历管理，个人LIVE沿用实际发生记录。",
+        worldlineContextForApp("weverse", {publicEvents:true}).slice(0,2400),
         `现有 WVS Schedule：\n${existingRows}`,
         `成员手机日历参考：\n${communityCalendarContext(community, now)}`,
         "memberCharacterIds 只能使用上面提供的真实 ID；团体共同活动可填多个。",
-        `只输出 JSON，不要 Markdown。格式：{"items":[{"visibility":"public","type":"performance","title":"...","date":"YYYY-MM-DD","startTime":"HH:MM","endTime":"HH:MM","location":"...或空","memberCharacterIds":["真实ID"],"calendarSync":true}]}。数量建议 6~12 条，只生成公开内容，但不要为了凑数虚构。`,
+        `只输出 JSON，不要 Markdown。格式：{"items":[{"visibility":"public","type":"performance","title":"...","date":"YYYY-MM-DD","startTime":"HH:MM","endTime":"HH:MM","location":"...或空","memberCharacterIds":["真实ID"],"calendarSync":true,"busyLevel":3}]}。只返回有依据的具体事项。`,
       ].join("\n"),
     },
     { role: "user", content: "刷新生成这段时间的 Community Schedule。" },
@@ -578,7 +577,7 @@ export async function generateWeverseScheduleBatch(
     const type = scheduleType(item.type);
     const visibility: "internal" | "public" = "public";
     const normalizedType: WeverseScheduleType = ["performance", "brand", "anniversary", "release", "media"].includes(type) ? type : "media";
-    const calendarSync = item.calendarSync === true && !["media", "release", "anniversary"].includes(normalizedType);
+    const calendarSync = item.calendarSync === true;
     return {
       type: normalizedType,
       visibility,
@@ -589,6 +588,7 @@ export async function generateWeverseScheduleBatch(
       location: String(item.location ?? "").trim() || undefined,
       memberCharacterIds: members.length ? Array.from(new Set(members)) : community.memberCharacterIds.slice(),
       calendarSync,
+      busyLevel: calendarSync ? ([1,2,3,4].includes(Number(item.busyLevel)) ? Number(item.busyLevel) as 1|2|3|4 : 3) : 1,
     };
   }).filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && /^\d{2}:\d{2}$/.test(item.startTime) && /^\d{2}:\d{2}$/.test(item.endTime) && Boolean(item.title));
 }

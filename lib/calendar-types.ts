@@ -14,6 +14,7 @@ export type CalendarColorKey =
 export type CalendarBusyLevel = 1 | 2 | 3 | 4;
 
 export type CalendarScheduleItem = {
+  encounterScene?: string;
   visibility?: "private" | "public";
   kind?: "event" | "milestone";
   publicAt?: string;

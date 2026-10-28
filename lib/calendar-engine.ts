@@ -318,7 +318,7 @@ function parseRangeScheduleResponse(
     const busyLevel = busyLevelValue === 1 || busyLevelValue === 2 || busyLevelValue === 3 || busyLevelValue === 4
       ? busyLevelValue as 1 | 2 | 3 | 4
       : undefined;
-    return [{ visibility: row.visibility === "public" ? "public" as const : "private" as const, kind: row.kind === "milestone" ? "milestone" as const : "event" as const, publicAt: typeof row.publicAt === "string" ? row.publicAt : undefined, date, startTime, endTime, location: String(row.location || ""), title, emoji: String(row.emoji || ""), ...(busyLevel ? { busyLevel } : {}) }];
+    return [{ encounterScene: typeof row.encounterScene === "string" ? row.encounterScene.slice(0,100) : undefined, visibility: row.visibility === "public" ? "public" as const : "private" as const, kind: row.kind === "milestone" ? "milestone" as const : "event" as const, publicAt: typeof row.publicAt === "string" ? row.publicAt : undefined, date, startTime, endTime, location: String(row.location || ""), title, emoji: String(row.emoji || ""), ...(busyLevel ? { busyLevel } : {}) }];
   }));
   const responseCharacters = Array.isArray(root.characters) ? root.characters : [];
   for (const entry of responseCharacters) {
@@ -431,7 +431,7 @@ export async function generateCalendarScheduleRange(
       modeInstruction,
       sharedInstruction,
       request.existingMode === "replan" ? "本次重新安排：只保留列出的手动与WVS固定事项，待替换的旧AI安排不作日期和活动模板。" : "本次补充安排：已有事项全部保留，只新增有依据且不重叠的事项。",
-      "JSON 格式：{\"characters\":[{\"characterId\":\"角色ID\",\"items\":[{\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"publicAt\":\"\",\"busyLevel\":1}]}],\"sharedItems\":[{\"participantIds\":[\"角色ID\",\"角色ID\"],\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"publicAt\":\"\",\"busyLevel\":1}]}",
+      "JSON 格式：{\"characters\":[{\"characterId\":\"角色ID\",\"items\":[{\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}],\"sharedItems\":[{\"participantIds\":[\"角色ID\",\"角色ID\"],\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}",
       "只返回一个JSON对象。characters为每位所选角色各提供一项；无新增事项时items为空数组。共同事项只放sharedItems，不能再放入个人items。所有日期在请求范围内；未安排的日子不写占位项。",
       "角色背景：\n" + personaContext,
       worldBookContext,

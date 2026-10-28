@@ -6,6 +6,7 @@ import type { CalendarBusyLevel, CalendarColorKey } from "@/lib/calendar-types";
 import { CALENDAR_COLOR_KEYS } from "@/lib/calendar-utils";
 
 export type CalendarEventDraft = {
+  encounterScene?: string;
   visibility?: "public"|"private"; kind?: "event"|"milestone"; publicAt?:string;
   id?: string;
   date: string;

@@ -314,7 +314,7 @@ export function PhoneCalendarApp({
 
   const openEditItem = (item: CalendarScheduleItem) => {
     setEditingItem({
-      visibility:item.visibility,kind:item.kind,publicAt:item.publicAt,
+      encounterScene:item.encounterScene,visibility:item.visibility,kind:item.kind,publicAt:item.publicAt,
       id: item.id,
       date: item.date,
       endDate: item.date,
@@ -380,7 +380,7 @@ export function PhoneCalendarApp({
         location: editingItem.location,
         title: editingItem.title,
         emoji: sanitizeScheduleEmoji(editingItem.emoji),
-        visibility:editingItem.visibility||"private",kind:editingItem.kind||"event",publicAt:editingItem.publicAt,
+        encounterScene:editingItem.encounterScene,visibility:editingItem.visibility||"private",kind:editingItem.kind||"event",publicAt:editingItem.publicAt,
         source: editingItem.externalSource === "weverse" ? "weverse" : "manual",
         externalSource: editingItem.externalSource,
         externalId: editingItem.externalId,

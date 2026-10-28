@@ -1,3 +1,4 @@
+import { calendarPublicClues } from "./calendar-public-clues";
 import { isPublicCalendarItem } from "./calendar-master";
 import { theqooPostLanguage } from "./theqoo-storage";
 import { boundSocialWorldBooks, migrateSocialWorldBooks } from "./social-worldbook-bindings";
@@ -90,6 +91,7 @@ function scheduleContext(settings: TheqooSourceSettings): string {
       lines.push(`WVS公开日程(${community?.name || "社区"}) ${new Date(item.startsAt).toISOString().slice(0, 10)}: ${item.title.slice(0, 80)}`);
     }
   }
+  if(settings.includeCalendar || settings.includeWeverseSchedule) for(const char of loadCharacters().filter(c=>settings.includeCalendar || loadWeverseState().communities.some(w=>w.memberCharacterIds.includes(c.id))).slice(0,12)) lines.unshift(...calendarPublicClues(char.id,now));
   return lines.slice(0, 18).join("；");
 }
 

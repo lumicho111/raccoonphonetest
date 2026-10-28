@@ -1,3 +1,6 @@
+import { calendarWallTimeToInstant } from "./calendar-time";
+import {loadCharacters} from "./character-storage";
+import {getSystemTimeZone} from "./character-time";
 import { kvGet, kvSet } from "./kv-db";
 import type { CalendarScheduleItem, CalendarWeekPlan } from "./calendar-types";
 import type { WeverseState, WeverseScheduleItem } from "./weverse-storage";
@@ -32,7 +35,7 @@ export function reconcileCalendarMaster(){
     const identity=item.externalId||item.sharedGroupId||item.id;
     const id=item.externalId||`cal_${community.id}_${identity}`;
     const existing=schedules.find(s=>s.id===id);if(existing){existing.memberCharacterIds.push(plan.ownerId);continue;}
-    schedules.push({id,communityId:community.id,title:item.title,type:item.wvsType||(item.kind==="milestone"?"release":"performance"),visibility:"public",calendarSync:item.kind!=="milestone",startsAt:new Date(`${item.date}T${item.startTime}:00`).getTime(),endsAt:new Date(`${item.date}T${item.endTime}:00`).getTime(),location:item.location,memberCharacterIds:[plan.ownerId],source:"manual",createdAt:new Date(item.createdAt).getTime(),updatedAt:new Date(item.updatedAt).getTime()});
+    schedules.push({id,communityId:community.id,title:item.title,type:item.wvsType||(item.kind==="milestone"?"release":"performance"),visibility:"public",calendarSync:item.kind!=="milestone",busyLevel:item.kind==="milestone"?1:(item.busyLevel||3),startsAt:calendarWallTimeToInstant(item.date,item.startTime,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()),endsAt:calendarWallTimeToInstant(item.date,item.endTime,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()),location:item.location,memberCharacterIds:[plan.ownerId],source:"manual",createdAt:new Date(item.createdAt).getTime(),updatedAt:new Date(item.updatedAt).getTime()});
    }
   }
   // Only public projections are exposed by WVS; private originals now live in Calendar.

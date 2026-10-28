@@ -773,15 +773,17 @@ export function WeverseApp({ onClose, onNotice }: Props) {
       source: "manual",
       visibility: scheduleEditor.visibility,
       calendarSync: scheduleEditor.visibility === "internal" ? true : scheduleEditor.calendarSync,
+      busyLevel: scheduleEditor.calendarSync ? (previous?.calendarSync ? previous.busyLevel||3 : 3) : 1,
       createdAt: previous?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
     setState(upsertWeverseScheduleItem(item));
-    syncWeverseScheduleItemToCalendar(item);
+    const applied = syncWeverseScheduleItemToCalendar(item);
+    setState(loadWeverseState());
     setScheduleEditor(null);
     setSelectedScheduleDate(scheduleDateKey(item.startsAt));
     setScheduleMonth(`${scheduleDateKey(item.startsAt).slice(0, 7)}-01`);
-    onNotice?.(item.visibility === "internal" ? "内部行程已保存，并同步到角色手机日历" : item.calendarSync ? "公开日程已保存，并同步到手机日历" : "公开日程已保存到 WVS Calendar");
+    onNotice?.(applied.pending ? "时间有冲突，已存入日历待调整行程" : item.visibility === "internal" ? "内部行程已保存，并同步到角色手机日历" : item.calendarSync ? "公开日程已保存，并同步到手机日历" : "公开日程已保存到 WVS Calendar");
   };
 
   const removeScheduleItem = (item: WeverseScheduleItem) => {
@@ -798,12 +800,10 @@ export function WeverseApp({ onClose, onNotice }: Props) {
     onNotice?.(`正在刷新 ${community.name} Schedule…`);
     try {
       const current = loadWeverseState();
-      const replaceAfter = Date.now() - 7 * 86400000;
-      const oldGenerated = current.schedules.filter((item) => item.communityId === community.id && item.source === "generated" && item.startsAt >= replaceAfter);
-      const retainedSchedule = current.schedules.filter((item) => !oldGenerated.some((generatedItem) => generatedItem.id === item.id));
-      const generated = await generateWeverseScheduleBatch(community, retainedSchedule, { now: new Date() });
+      let savedCount = 0, pendingCount = 0;
+      const generated = await generateWeverseScheduleBatch(community, current.schedules, { now: new Date() });
       if (!generated.length) { onNotice?.("这次没有生成新的日程"); return; }
-      for (const item of oldGenerated) removeWeverseScheduleItemEverywhere(item.id);
+
       for (const row of generated) {
         const startsAt = scheduleDateTime(row.date, row.startTime);
         let endsAt = scheduleDateTime(row.date, row.endTime);
@@ -820,15 +820,16 @@ export function WeverseApp({ onClose, onNotice }: Props) {
           memberCharacterIds: row.memberCharacterIds,
           source: "generated",
           visibility: row.visibility,
-          calendarSync: row.calendarSync,
+          calendarSync: row.calendarSync, busyLevel: row.busyLevel,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
         upsertWeverseScheduleItem(item);
-        syncWeverseScheduleItemToCalendar(item);
+        const applied = syncWeverseScheduleItemToCalendar(item);
+        savedCount += applied.saved; pendingCount += applied.pending;
       }
       setState(loadWeverseState());
-      onNotice?.("Schedule 已刷新；个人 Live 不会被提前生成");
+      onNotice?.(`已添加 ${savedCount} 条，${pendingCount} 条时间冲突已存入日历待调整`);
     } catch (error) {
       onNotice?.(`Schedule 生成失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -1542,7 +1543,7 @@ export function WeverseApp({ onClose, onNotice }: Props) {
           if (!Number.isFinite(startsAt) || startsAt < start || startsAt > end) continue;
           if (loadWeverseState().schedules.some(item => item.communityId === community.id && item.title === row.title && item.startsAt === startsAt)) continue;
           const endsAtRaw = scheduleDateTime(row.date, row.endTime);
-          const item: WeverseScheduleItem = { id: createWeverseId("wvs_schedule"), communityId: community.id, type: row.type, title: row.title, startsAt, endsAt: Number.isFinite(endsAtRaw) && endsAtRaw > startsAt ? endsAtRaw : startsAt + 3600000, location: row.location, memberCharacterIds: row.memberCharacterIds, visibility: row.visibility, calendarSync: row.calendarSync, source: "generated", createdAt: Date.now(), updatedAt: Date.now() };
+          const item: WeverseScheduleItem = { id: createWeverseId("wvs_schedule"), communityId: community.id, type: row.type, title: row.title, startsAt, endsAt: Number.isFinite(endsAtRaw) && endsAtRaw > startsAt ? endsAtRaw : startsAt + 3600000, location: row.location, memberCharacterIds: row.memberCharacterIds, visibility: row.visibility, calendarSync: row.calendarSync, busyLevel: row.busyLevel, source: "generated", createdAt: Date.now(), updatedAt: Date.now() };
           upsertWeverseScheduleItem(item); syncWeverseScheduleItemToCalendar(item); saved++;
         }
         setHistoryProgress(`已补充 ${saved} 条历史日程`);

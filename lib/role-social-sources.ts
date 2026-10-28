@@ -1,3 +1,4 @@
+import { calendarPublicClues } from "./calendar-public-clues";
 import { isPublicCalendarItem } from "./calendar-master";
 import { loadOwnerCalendarPlans } from "./calendar-storage";
 import { loadWeverseState } from "./weverse-storage";
@@ -32,5 +33,6 @@ export function roleSocialContext(characterId: string, setting?: RoleSocialSourc
       lines.push(`WVS公开动态 ${new Date(post.createdAt).toISOString().slice(0, 16)} ${post.body.slice(0, 150)}`);
     }
   }
+  if(characterId!=="user") lines.unshift(...calendarPublicClues(characterId,now));
   return lines.slice(0, 14).join("；").slice(0, 1800);
 }

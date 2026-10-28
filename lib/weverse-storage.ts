@@ -64,6 +64,7 @@ export type WeverseScheduleItem = {
   visibility: WeverseScheduleVisibility;
   /** 现实工作/出行类日程同步到角色手机日历；平台内 Live 不走这里。 */
   calendarSync: boolean;
+  busyLevel?: 1 | 2 | 3 | 4;
   createdAt: number;
   updatedAt: number;
 };
@@ -279,6 +280,7 @@ function normalizeSchedule(raw: unknown): WeverseScheduleItem | null {
         ? "public"
         : (["recording", "shoot", "other"].includes(type) ? "internal" : "public"),
     calendarSync: item.calendarSync === true,
+    busyLevel: [1,2,3,4].includes(Number(item.busyLevel)) ? Number(item.busyLevel) as 1|2|3|4 : (item.calendarSync ? 3 : 1),
     createdAt: typeof item.createdAt === "number" && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
     updatedAt: typeof item.updatedAt === "number" && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
   };
