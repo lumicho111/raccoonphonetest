@@ -633,9 +633,10 @@ export function PhoneCalendarApp({
     <div className="calendar-app-shell" data-calendar-theme={config.theme}>
       {generationFeedback}
       {appliedCalendarCss && <SessionCustomCSS css={appliedCalendarCss} scope=".calendar-app-shell" />}
-      <div className="calendar-app"><PendingCalendarEvents/>
+      <div className="calendar-app">
         {view === "month" ? (
           <CalendarMonthPage
+            headerActions={<PendingCalendarEvents/>}
             todayIso={todayIso}
             itemsByDate={itemsByDate}
             cycleMap={cycleMap}
@@ -646,6 +647,7 @@ export function PhoneCalendarApp({
           />
         ) : (
           <CalendarDetailPage
+            headerActions={<PendingCalendarEvents/>}
             key={detailKey}
             initialDate={selectedDate}
             todayIso={todayIso}

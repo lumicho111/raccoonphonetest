@@ -66,6 +66,7 @@ export function CalendarMonthPage({
   onPickDay,
   onClose,
   onOpenTheme,
+  headerActions,
 }: {
   todayIso: string;
   itemsByDate: Map<string, CalendarScheduleItem[]>;
@@ -74,6 +75,7 @@ export function CalendarMonthPage({
   onPickDay: (iso: string) => void;
   onClose: () => void;
   onOpenTheme: () => void;
+  headerActions?: ReactNode;
 }) {
   const months = useMemo(() => buildMonths(todayIso), [todayIso]);
   const todayYm = useMemo(() => {
@@ -187,6 +189,7 @@ export function CalendarMonthPage({
             {titleYear}年
           </button>
           <span className="calendar-topbar-space" />
+          {headerActions}
           <button type="button" className="calendar-icon-btn" onClick={onOpenTheme} aria-label="主题与自定义">
             <Palette size={17} />
           </button>

@@ -86,6 +86,7 @@ export function CalendarDetailPage({
   cyclePanel,
   daysPerPage,
   onOpenDaysPicker,
+  headerActions,
   onOpenCycleSettings,
   onBack,
   onSelectedChange,
@@ -101,6 +102,7 @@ export function CalendarDetailPage({
   daysPerPage: number;
   /** 打开“每页天数”选择弹窗 */
   onOpenDaysPicker: () => void;
+  headerActions?: ReactNode;
   /** 周期设置入口（仅用户视图传入），渲染在右上角 */
   onOpenCycleSettings: (() => void) | null;
   onBack: () => void;
@@ -322,6 +324,7 @@ export function CalendarDetailPage({
           <span aria-hidden="true">‹</span> {backLabel}
         </button>
         <span className="calendar-topbar-space" />
+          {headerActions}
         <button type="button" className="calendar-icon-btn" onClick={onOpenDaysPicker} aria-label="每页天数">
           <Columns2 size={17} />
         </button>

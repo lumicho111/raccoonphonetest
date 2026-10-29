@@ -1581,3 +1581,15 @@
 .calendar-generate-mode-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 .calendar-generate-person span{min-width:0}
 .calendar-sync-target{min-width:0;overflow-wrap:anywhere}
+
+/* Pending schedules live beside the palette, inside the safe toolbar. */
+.calendar-pending-trigger{position:relative;padding:0;width:38px;flex:none}
+.calendar-pending-count{position:absolute;right:-4px;top:-4px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border-radius:10px;background:var(--c-calendar-today,#d43e37);color:#fff;font-size:9px;line-height:1;font-weight:700;pointer-events:none}
+.calendar-pending-overlay{position:absolute;inset:0;z-index:10060;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
+.calendar-pending-dialog{display:flex;flex-direction:column;width:min(440px,100%);max-height:82%;border-radius:22px;overflow:hidden;background:var(--c-calendar-bg,#fff);color:var(--c-calendar-ink,#29292d);box-shadow:0 16px 60px #0003}
+.calendar-pending-dialog>header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--c-calendar-hair,#ddd)}
+.calendar-pending-dialog>header strong{font-size:16px}.calendar-pending-dialog>header small{display:block;margin-top:5px;font-size:11px;opacity:.6}
+.calendar-pending-scroll{min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:16px}
+.calendar-pending-item{padding:14px;border:1px solid var(--c-calendar-hair,#ddd);border-radius:15px;margin-bottom:12px}.calendar-pending-item>strong{font-size:14px}.calendar-pending-item p{margin:7px 0;font-size:12px}.calendar-pending-item>small{font-size:11px;line-height:1.5;opacity:.65;overflow-wrap:anywhere}
+.calendar-pending-fields{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.calendar-pending-fields label:first-child{grid-column:1/-1}.calendar-pending-fields label{display:grid;gap:5px;font-size:11px;min-width:0}.calendar-pending-fields input{width:100%;min-width:0;box-sizing:border-box;padding:9px;border-radius:10px;border:1px solid var(--c-calendar-hair,#ddd);background:var(--c-calendar-surface,#f6f6f8);color:inherit;font:inherit}
+.calendar-pending-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.calendar-pending-actions button{padding:9px 12px;border:1px solid var(--c-calendar-hair,#ddd);border-radius:10px;background:var(--c-calendar-surface,#f6f6f8);color:inherit;font-size:12px;cursor:pointer}.calendar-pending-notice{font-size:12px;line-height:1.6;background:var(--c-calendar-surface,#f6f6f8);padding:10px;border-radius:10px}
