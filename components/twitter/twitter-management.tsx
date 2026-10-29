@@ -153,6 +153,7 @@ export function TwitterManagement({ state, characters, onChange, onClose, onUser
       <label>昵称<input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
       {editAccount === "user" && <label>网友对你的称呼（可选）<input value={draft.publicAddress || ""} onChange={e => setDraft({ ...draft, publicAddress: e.target.value })} placeholder={draft.name || "默认使用 X 昵称"} /><small>留空时按 X 昵称称呼；想使用本名，可以在这里填写。</small></label>}
       <label>账号名 @<input value={draft.handle} onChange={e => setDraft({ ...draft, handle: e.target.value })} /></label>
+      <label>运营与发言方式<textarea value={draft.operationStyle || ""} onChange={e => setDraft({ ...draft, operationStyle: e.target.value })} placeholder="例如：本人运营，分享正常日常；或团队运营，以工作公告与宣传为主" /><small>留空按角色本人习惯使用；大小号分别设置。</small></label>
       <label>简介<textarea value={draft.bio} onChange={e => setDraft({ ...draft, bio: e.target.value })} /></label>
       <label>生日（可选）<input type="date" value={draft.birthday || ""} onChange={e => setDraft({ ...draft, birthday: e.target.value || undefined })} /></label>
       <label>加入时间（可选）<input type="month" value={draft.createdAt ? new Date(draft.createdAt).toISOString().slice(0, 7) : ""} onChange={e => setDraft({ ...draft, createdAt: e.target.value ? new Date(`${e.target.value}-01T00:00:00`).getTime() : undefined })} /></label>

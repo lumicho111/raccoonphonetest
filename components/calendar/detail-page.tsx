@@ -212,7 +212,7 @@ export function CalendarDetailPage({
     const idx = daysRef.current.indexOf(iso);
     if (idx < 0) return;
     suppressRef.current = true;
-    tl.scrollTo({ left: idx * (tl.clientWidth / dppRef.current), behavior: smooth ? "smooth" : "auto" });
+    tl.scrollTo({ left: idx * ((tl.clientWidth - 48) / dppRef.current), behavior: smooth ? "smooth" : "auto" });
     window.setTimeout(() => { suppressRef.current = false; }, smooth ? 420 : 60);
   };
 
@@ -269,7 +269,7 @@ export function CalendarDetailPage({
     const tl = tlHRef.current;
     if (!tl) return;
     if (tlHeadRef.current) tlHeadRef.current.scrollLeft = tl.scrollLeft;
-    const colW = tl.clientWidth / dppRef.current;
+    const colW = (tl.clientWidth - 48) / dppRef.current;
     if (colW <= 0) return;
     const fIdx = tl.scrollLeft / colW;
     updateRangePill(fIdx);
@@ -400,8 +400,12 @@ export function CalendarDetailPage({
         </div>
       </div>
 
-      <div className="calendar-tl-vscroll hide-scrollbar" ref={tlVRef}>
-        <div className="calendar-tl-row">
+      <div
+        className="calendar-tl-vscroll hide-scrollbar"
+        ref={node => { tlVRef.current = node; tlHRef.current = node; }}
+        onScroll={handleTimelineScroll}
+      >
+        <div className="calendar-tl-row" style={{ width: `calc((100% - 48px) * ${days.length / daysPerPage} + 48px)` }}>
           <div className="calendar-tl-gutter" aria-hidden="true">
             {Array.from({ length: 24 }, (_, h) => (
               <span key={h}>{String(h).padStart(2, "0")}:00</span>
@@ -410,9 +414,7 @@ export function CalendarDetailPage({
           </div>
           <div
             className="calendar-tl-hscroll hide-scrollbar"
-            ref={tlHRef}
-            onScroll={handleTimelineScroll}
-            style={{ "--tl-day-w": `${100 / daysPerPage}%` } as CSSProperties}
+            style={{ "--tl-day-w": `${100 / days.length}%` } as CSSProperties}
           >
             {days.map(iso => {
               const positioned = layoutDayEvents(itemsByDate.get(iso) ?? []);

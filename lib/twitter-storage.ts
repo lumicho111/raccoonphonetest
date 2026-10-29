@@ -12,6 +12,7 @@ export type TwitterProfile = {
   name: string; handle: string; bio: string; avatarUrl?: string; bannerUrl?: string;
   publicAddress?: string; // Optional public form of address; defaults to the X nickname.
   followers?: number; followingCount?: number; visibility?: "public" | "protected";
+  operationStyle?: string; // Account-specific operator and public voice.
   identity?: string; // Public identity of an alternate account, not its private owner.
   createdAt?: number;
   birthday?: string;

@@ -1124,6 +1124,8 @@ export async function generateXiaohongshuNpcFeed(
     ),
     formatNpcFeedUserContext(userIpLocation),
     formatFollowedAccountsForPrompt(followedAccounts),
+    "这次内容流以网友自己的生活、经验分享和兴趣为主，近期公开进展可自然融入相关笔记，涉及历史时衔接最新状态。",
+    `最近笔记主题供避重：${loadXiaohongshuState().notes.slice(-24).map(note=>`${note.title}：${note.body.slice(0,70)}`).join("；").slice(0,2200)||"无"}`,
   ].filter(Boolean).join("\n\n");
   const raw = await sendLLMRequest(
     apiConfig,

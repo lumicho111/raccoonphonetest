@@ -1,4 +1,5 @@
 "use client";
+import { weverseLiveAvailability, claimWeverseLiveOpportunity } from "@/lib/weverse-live-availability";
 import { preparePhotoStoryCaption } from "@/lib/photo-story-caption";
 
 import { translateContentTexts } from "@/lib/content-translation";
@@ -928,6 +929,43 @@ export function WeverseApp({ onClose, onNotice }: Props) {
     }
   };
 
+  const persistLiveOpening = (community: WeverseCommunity, characterId: string, generated: Awaited<ReturnType<typeof generateWeverseLiveOpening>>, options: {theme?:string;liveType?:"visual"|"voice"|"auto";official?:boolean;coverUrl?:string}) => {
+      const available=weverseLiveAvailability(characterId);
+      if(!available.free)throw new Error(available.reason);
+      const member = resolveMember(community, characterId);
+      const viewerBase = Math.max(1000, community.fanCount || 100000);
+      const viewerCount = Math.max(320, Math.round(viewerBase * (0.018 + Math.random() * 0.05)));
+      // 关键：LLM 返回后才开始排播放时间，避免生成耗时把整轮内容“提前播完”。
+      const playbackStart = Date.now() + 250;
+      const segments = scheduleLiveSegments(characterId, generated.segments, playbackStart);
+      const comments = scheduleLiveFanComments(generated.comments, playbackStart);
+      const live: WeverseLive = {
+        id: createWeverseId("wvs_live"), communityId: community.id, hostCharacterIds: [characterId], activeCharacterIds: [characterId],
+        participantPresence: [{ characterId: characterId, joinedAt: playbackStart }], viewerPresence: [], liveType: generated.liveType || (options.liveType === "voice" ? "voice" : "visual"), orientation: "landscape",
+        status: "live", title: generated.title || `${options.official ? community.official.displayName : member.displayName} LIVE`, theme: options.theme?.trim() || undefined,
+        coverUrl: options.coverUrl || (options.official ? community.coverUrl || community.official.avatarUrl : member.liveCoverUrl) || undefined, startedAt: playbackStart, official: options.official === true,
+        viewerCount, peakViewerCount: viewerCount, heartCount: Math.max(120, Math.round(viewerCount * (1.5 + Math.random() * 3.5))), roundCount: 0,
+        lastConsumedUserCommentAt: playbackStart - 1, segments, comments,
+      };
+      setState(addWeverseLive(live));
+      const liveActorName = live.official ? community.official.displayName : member.displayName;
+      const liveAvatar = live.official ? community.official.avatarUrl : member.avatarUrl;
+      pushNotification({ kind: "live", communityId: community.id, title: `${liveActorName} 开始了 ${live.liveType === "voice" ? "Voice Live" : "Video Live"}`, body: live.title, avatarUrl: liveAvatar, targetType: "live", targetId: live.id, characterId: live.official ? undefined : characterId, createdAt: live.startedAt });
+      return live;
+  };
+
+  const maybeStartCommunityLive = async (community: WeverseCommunity) => {
+      if(!claimWeverseLiveOpportunity(community.id))return;
+      const current=loadWeverseState();
+      if(current.lives.some(live=>live.communityId===community.id&&live.status==="live"))return;
+      const candidates=community.memberCharacterIds.filter(id=>weverseLiveAvailability(id).free);
+      if(!candidates.length)return;
+      const characterId=candidates[Math.floor(Math.random()*candidates.length)];
+      const generated=await generateWeverseLiveOpening(characterId,community,{opportunistic:true,liveType:"auto"});
+      if(generated.shouldStart===false)return;
+      persistLiveOpening(community,characterId,generated,{});
+  };
+
   const startLive = async () => {
     if (!liveCreator || startingLive) return;
     const community = communityMap.get(liveCreator.communityId);
@@ -938,28 +976,10 @@ export function WeverseApp({ onClose, onNotice }: Props) {
     try {
       const requestAt = Date.now();
       const generated = await generateWeverseLiveOpening(liveCreator.characterId, community, { theme: liveCreator.theme.trim() || undefined, liveType: liveCreator.liveType, now: new Date(requestAt) });
-      const member = resolveMember(community, liveCreator.characterId);
-      const viewerBase = Math.max(1000, community.fanCount || 100000);
-      const viewerCount = Math.max(320, Math.round(viewerBase * (0.018 + Math.random() * 0.05)));
-      // 关键：LLM 返回后才开始排播放时间，避免生成耗时把整轮内容“提前播完”。
-      const playbackStart = Date.now() + 250;
-      const segments = scheduleLiveSegments(liveCreator.characterId, generated.segments, playbackStart);
-      const comments = scheduleLiveFanComments(generated.comments, playbackStart);
-      const live: WeverseLive = {
-        id: createWeverseId("wvs_live"), communityId: community.id, hostCharacterIds: [liveCreator.characterId], activeCharacterIds: [liveCreator.characterId],
-        participantPresence: [{ characterId: liveCreator.characterId, joinedAt: playbackStart }], viewerPresence: [], liveType: generated.liveType || (liveCreator.liveType === "voice" ? "voice" : "visual"), orientation: "landscape",
-        status: "live", title: generated.title || `${liveCreator.official ? community.official.displayName : member.displayName} LIVE`, theme: liveCreator.theme.trim() || undefined,
-        coverUrl: liveCreator.coverUrl || (liveCreator.official ? community.coverUrl || community.official.avatarUrl : member.liveCoverUrl) || undefined, startedAt: playbackStart, official: liveCreator.official === true,
-        viewerCount, peakViewerCount: viewerCount, heartCount: Math.max(120, Math.round(viewerCount * (1.5 + Math.random() * 3.5))), roundCount: 0,
-        lastConsumedUserCommentAt: playbackStart - 1, segments, comments,
-      };
-      setState(addWeverseLive(live));
-      const liveActorName = live.official ? community.official.displayName : member.displayName;
-      const liveAvatar = live.official ? community.official.avatarUrl : member.avatarUrl;
-      pushNotification({ kind: "live", communityId: community.id, title: `${liveActorName} 开始了 ${live.liveType === "voice" ? "Voice Live" : "Video Live"}`, body: live.title, avatarUrl: liveAvatar, targetType: "live", targetId: live.id, characterId: live.official ? undefined : liveCreator.characterId, createdAt: live.startedAt });
+      const live=persistLiveOpening(community,liveCreator.characterId,generated,liveCreator);
       setLiveCreator(null);
       navigate({ type: "live", liveId: live.id });
-      onNotice?.(liveCreator.official ? `${community.official.displayName} 开启了 Official Live` : `${member.displayName} 开播了`);
+      onNotice?.(liveCreator.official ? `${community.official.displayName} 开启了 Official Live` : `${resolveMember(community,liveCreator.characterId).displayName} 开播了`);
     } catch (error) {
       onNotice?.(`LIVE 生成失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -986,6 +1006,7 @@ export function WeverseApp({ onClose, onNotice }: Props) {
     if (!community || !primaryCharacterId) return onNotice?.("这场 LIVE 缺少成员信息");
     const currentBefore = loadWeverseState().lives.find((item) => item.id === live.id) || live;
     const consumeThrough = Date.now();
+    if(!weverseLiveAvailability(primaryCharacterId,consumeThrough,live.id).free){manuallyEndLive(currentBefore);onNotice?.("成员接下来有其他安排，本场 LIVE 已结束");return;}
     const consumedAfter = currentBefore.lastConsumedUserCommentAt ?? currentBefore.startedAt - 1;
     const userRows = currentBefore.comments
       .filter((comment) => comment.authorType === "user" && comment.createdAt > consumedAfter && comment.createdAt <= consumeThrough)
@@ -1139,9 +1160,17 @@ export function WeverseApp({ onClose, onNotice }: Props) {
     }
   };
 
+  const liveAvailabilityCheckedAt=useRef(0);
   useEffect(() => {
     const timer = window.setInterval(() => {
       const now = Date.now();
+      if(now-liveAvailabilityCheckedAt.current>=15000){
+        liveAvailabilityCheckedAt.current=now;
+        loadWeverseState().lives.filter(item=>item.status==="live").forEach(item=>{
+          const host=item.hostCharacterIds[0];
+          if(host&&!weverseLiveAvailability(host,now,item.id).free)manuallyEndLive(item);
+        });
+      }
       const due = loadWeverseState().lives.filter((item) => item.status === "live" && item.endedAt && item.endedAt <= now);
       due.forEach((item) => finalizeLive(item));
     }, 900);
@@ -1424,6 +1453,7 @@ export function WeverseApp({ onClose, onNotice }: Props) {
       if (!artistPost) return;
       const newFanComments = await addFanPosts(community, artistPost, true);
       await maybeAddArtistReply(community, artistPost, newFanComments);
+      await maybeStartCommunityLive(community).catch(()=>undefined);
       setState(loadWeverseState());
       setCommunityTab("feed");
       setCommunityFeedFilter("highlight");

@@ -1,4 +1,7 @@
 "use client";
+import { createForwardedChatRecord, forwardedChatPrompt } from "@/lib/chat-forward";
+import type { ForwardedChatRecord } from "@/lib/chat-forward";
+import { ForwardAvatar } from "./forwarded-chat-record";
 import { chatContactDisplayName, chatPokeDisplayName } from "@/lib/communication-display-name";
 import { chooseBusyResumeAt, clearBusyHoldPending, getActiveCalendarBusy, loadBusyHoldPending, saveBusyHoldPending } from "@/lib/chat-busy-hold";
 
@@ -8,7 +11,8 @@ import { cleanStreamText, splitStreamPreviewSegments, stripLiteralTexts, stripXm
 import type { StateValue } from "@/lib/chat-storage";
 import { parseStateValues, mergeStateValues } from "@/lib/state-value-parser";
 import { parseAIResponse, type ParsedMessagePart } from "@/lib/rich-message-parser";
-import { isKnownStickerLabel } from "@/lib/sticker-data";
+import { isKnownStickerLabel, findStickerByName } from "@/lib/sticker-data";
+import { findCustomStickerByName } from "@/lib/custom-sticker-storage";
 import { translateReasoningText } from "@/lib/reasoning-translate";
 import { MessageBubble, MediaDetailModal, prewarmStickerCache, BilingualTextBlock, isStandaloneHtmlPreviewContent, normalizeTextBubbleContent } from "./message-bubble";
 import { GeneratedImageErrorDialog } from "./generated-image-error-dialog";
@@ -196,6 +200,7 @@ const CHAT_VISUAL_MEDIA_TYPES = new Set([
     "transfer",
     "payment_request",
     "gift",
+    "chat_record",
     "contact_card",
     "image",
     "location",
@@ -231,6 +236,7 @@ const CHAT_MEDIA_BUBBLE_TYPES = new Set([
     "transfer",
     "payment_request",
     "gift",
+    "chat_record",
     "contact_card",
     "image",
     "location",
@@ -1456,7 +1462,16 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
     const [contextMenuAnchor, setContextMenuAnchor] = useState<ContextMenuAnchor | null>(null);
     const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+    const [forwardDraft, setForwardDraft] = useState<ForwardedChatRecord | null>(null);
+    const [forwardSearch, setForwardSearch] = useState("");
+    const [forwardSending, setForwardSending] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+    useEffect(()=>{
+        if(!forwardDraft)return;
+        const close=(event:KeyboardEvent)=>{if(event.key==="Escape"&&!forwardSending)setForwardDraft(null);};
+        window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);
+    },[forwardDraft,forwardSending]);
+
     const [showConfirmMultiDelete, setShowConfirmMultiDelete] = useState(false);
     const [expandedMonologueId, setExpandedThinkingId] = useState<string | null>(null);
     // 思维链底部弹窗：存当前查看的 reasoning 文本，null = 关闭
@@ -5776,6 +5791,42 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         return ids;
     }, [getMessageDisplayContent, getSelectableStoredMessageId, projectedMessages, voiceCallGroups.memberSet]);
 
+    const openForwardPicker = () => {
+        try {
+            const pickedPhotos=projectedMessages.filter(msg=>selectedMessageIds.has(msg.displaySourceId||msg.id)&&(msg.mediaType==="image"||msg.mediaType==="media_file"&&msg.mediaData?.fileType==="image"));
+            const rows = projectedMessages.filter(msg=>selectedMessageIds.has(msg.displaySourceId || msg.id)||pickedPhotos.some(photo=>msg.role===photo.role&&msg.senderCharacterId===photo.senderCharacterId&&(msg.mediaType==="image"||msg.mediaType==="media_file"&&msg.mediaData?.fileType==="image")&&Boolean(photo.mediaData?.photoBatchId&&photo.mediaData.photoBatchId===msg.mediaData?.photoBatchId || photo.responseBatchId&&photo.responseBatchId===msg.responseBatchId)))
+                .filter(msg=>!isHiddenChatFlowMessage(msg,getMessageDisplayContent(msg)))
+                .map(msg=>{
+                    if(msg.mediaType!=="sticker"||msg.mediaData?.stickerUrl)return {...msg,content:getMessageDisplayContent(msg)};
+                    const label=msg.mediaData?.label||"";
+                    const custom=findCustomStickerByName(msg.senderCharacterId||session.contactId,label);
+                    const stickerUrl=custom?.externalUrl||custom?.assetId||findStickerByName(label)?.stickerUrl;
+                    return {...msg,content:getMessageDisplayContent(msg),mediaData:{...msg.mediaData,stickerUrl}};
+                });
+            const record=createForwardedChatRecord(rows, session.isGroup ? session.groupName || "群聊" : chatContactDisplayName(session.contactId,session) || quoteCharacterName, msg=>{
+                const user=msg.role==="user";
+                const char=msg.senderCharacterId ? groupCharMap.get(msg.senderCharacterId) : character;
+                const name=session.isGroup ? groupMemberName(session,user?GROUP_SELF_KEY:msg.senderCharacterId||"",char||null,user?userIdentity?.name||"我":msg.senderName||"群成员") : user?quoteUserName:quoteCharacterName;
+                return {name,avatar:user?effectiveUserAvatar:char?resolveChatCharacterAvatar(char):chatAvatar};
+            });
+            setForwardSearch("");setForwardDraft(record);
+        } catch(error) { showChatToast(error instanceof Error ? error.message : "暂时无法转发"); }
+    };
+    const forwardToSession = (target: ChatSession) => {
+        if(!forwardDraft||forwardSending)return;
+        const current=loadChatSessions().find(row=>row.id===target.id);
+        if(!current||current.isSpectator)return showChatToast("无法向该会话发送消息");
+        const muteUntil=current.groupMutes?.[GROUP_SELF_KEY];
+        if(muteUntil&&new Date(muteUntil).getTime()>Date.now())return showChatToast("你在该群中暂时被禁言");
+        setForwardSending(true);
+        try {
+            pushChatMessage({sessionId:current.id,role:"user",mediaType:"chat_record",content:forwardedChatPrompt(forwardDraft),mediaData:{forwardRecord:JSON.parse(JSON.stringify(forwardDraft))}});
+            setForwardDraft(null);cancelMultiSelect();showChatToast("聊天记录已转发");
+            if(current.id===session.id){syncMessagesFromStorage();setPendingGenerate(true);}
+        } catch(error){showChatToast(error instanceof Error?error.message:"转发失败，请重试");}
+        finally {setForwardSending(false);}
+    };
+
     const multiDeleteTargetIds = useMemo(() => {
         if (selectedMessageIds.size === 0) return [];
         const storedMessages = loadChatMessages(session.id);
@@ -6802,6 +6853,18 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 <div style={{ overflowAnchor: 'auto', height: 1 }} />
             </div>
 
+            {forwardDraft && createPortal(<div className="chat-forward-mask" data-theme={wrapperRef.current?.closest(".chat-app")?.getAttribute("data-chat-theme")==="dark"?"dark":"light"} onClick={event=>{if(event.target===event.currentTarget&&!forwardSending)setForwardDraft(null);}}>
+                <section className="chat-forward-dialog chat-forward-picker" role="dialog" aria-modal="true" aria-label="选择转发会话">
+                    <header className="chat-forward-heading"><div><strong>合并转发 · {forwardDraft.entries.length} 条</strong><small>选择接收的单聊或群聊</small></div><button type="button" aria-label="取消转发" disabled={forwardSending} onClick={()=>setForwardDraft(null)}><X size={22}/></button></header>
+                    <input autoFocus className="chat-forward-search" placeholder="搜索会话" aria-label="搜索转发会话" value={forwardSearch} onChange={event=>setForwardSearch(event.target.value)}/>
+                    <div className="chat-forward-scroll">{loadChatSessions().filter(row=>!row.isSpectator).map(row=>{
+                        const char=loadCharacters().find(item=>item.id===row.contactId);
+                        const name=row.isGroup?row.groupName||"群聊":chatContactDisplayName(row.contactId,row)||char?.name||"联系人";
+                        if(!name.toLowerCase().includes(forwardSearch.toLowerCase()))return null;
+                        return <button key={row.id} className="chat-forward-recipient" type="button" disabled={forwardSending} onClick={()=>forwardToSession(row)}><ForwardAvatar image={row.isGroup?row.groupAvatar:char?resolveChatCharacterAvatar(char):null} name={name}/><span>{name}<small>{row.isGroup?"群聊":"单聊"}</small></span><span>发送</span></button>;
+                    })}</div>
+                </section>
+            </div>,document.body)}
             {/* Input Bar — absolute at bottom, same layer as header */}
             {isMultiSelectMode && !offlineMode && (
                 <div className="chat-multi-select-bar chat-room-main-pane" data-ui="multi-select">
@@ -6822,6 +6885,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 : `实际删除 ${multiDeleteTargetIds.length} 条`}
                         </span>
                     </div>
+                    <button type="button" className="chat-multi-select-forward-btn" disabled={!selectedMessageIds.size} onClick={openForwardPicker}>合并转发</button>
                     <button
                         type="button"
                         className="chat-multi-select-delete-btn"
@@ -6851,7 +6915,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             ) : (
             <ChatTextInputBar
                 ref={chatTextInputRef}
-                characterName={session.isGroup ? (character?.name || "对方") : quoteCharacterName}
+                characterName={session.isGroup && quotingMessage ? groupMemberName(session, quotingMessage.role === "user" ? GROUP_SELF_KEY : quotingMessage.senderCharacterId || "", quotingMessage.senderCharacterId ? groupCharMap.get(quotingMessage.senderCharacterId) || null : null, quotingMessage.senderName || "群成员") : quoteCharacterName}
                 characterId={session.contactId}
 	                stickerCharacterIds={session.isGroup ? session.participantIds : undefined}
 	                isGroup={!!session.isGroup}

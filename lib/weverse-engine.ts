@@ -1,3 +1,4 @@
+import { weverseLiveAvailability } from "./weverse-live-availability";
 import { worldlineContextForApp } from "./worldline-storage";
 import { isPublicCalendarItem } from "./calendar-master";
 import { photoStoryReplyContext } from "./photo-story-data";
@@ -553,7 +554,7 @@ export async function generateWeverseScheduleBatch(
         `参考时间：${now.toISOString()}。成员 ID：\n${memberRows || "无"}`,
         options?.startDate && options?.endDate ? `补充 ${options.startDate} 至 ${options.endDate} 的历史公开日程，参考当时的职业阶段。数量约 ${options.count || 6} 条。` : "补充未来4至6周的少量具体事项，节奏随工作推进自然疏密。",
         "分类：performance舞台/活动，brand品牌/时尚活动，media节目播出/幕后/采访公开，release作品/预告/专辑发布，anniversary纪念节点。visibility统一public。",
-        "实际参加的工作calendarSync=true，安排合理准备与通勤，并参考已有占用时段；上线或播出节点calendarSync=false。busyLevel按手机可用程度填1随时回复、2短暂回复、3忙时等待、4无法看手机；发布节点填1。内部工作和私人生活由手机日历管理，个人LIVE沿用实际发生记录。",
+        "实际参加的工作calendarSync=true，安排合理准备与通勤，并参考已有占用时段；上线或播出节点calendarSync=false。busyLevel按手机可用程度填1随时回复、2短暂回复、3忙时等待、4无法看手机；发布节点填1。内部工作和私人生活由手机日历管理。LIVE日程仅安排围绕作品或重要节点、需要提前预告的专题直播，如回归宣传、新剧宣传或陪看，作为实际活动占用时间；日常随性开播留给平台按状态与空闲触发。",
         worldlineContextForApp("weverse", {publicEvents:true}).slice(0,2400),
         `现有 WVS Schedule：\n${existingRows}`,
         `成员手机日历参考：\n${communityCalendarContext(community, now)}`,
@@ -613,6 +614,7 @@ export type GeneratedWeverseLiveArtistComment = {
 };
 
 export type GeneratedWeverseLiveRound = {
+  shouldStart?: boolean;
   liveType?: "visual" | "voice";
   title?: string;
   segments: GeneratedWeverseLiveSegment[];
@@ -743,11 +745,13 @@ function liveFormatRules(opening = false, liveType: "visual" | "voice" | "auto" 
 export async function generateWeverseLiveOpening(
   characterId: string,
   community: WeverseCommunity,
-  options?: { theme?: string; now?: Date; liveType?: "visual" | "voice" | "auto" },
+  options?: { theme?: string; now?: Date; liveType?: "visual" | "voice" | "auto"; opportunistic?: boolean },
 ): Promise<GeneratedWeverseLiveRound> {
   const now = options?.now ?? new Date();
+  const available=weverseLiveAvailability(characterId,now.getTime());
+  if(!available.free)throw new ChatEngineError(available.reason);
   const resolved = await resolveCharacterGeneration(characterId, community, { now });
-  const theme = String(options?.theme || "").trim();
+  const theme = String(options?.theme || available.scheduledTheme || "").trim();
   const requestedLiveType = options?.liveType === "voice" || options?.liveType === "visual" ? options.liveType : "auto";
   const raw = await sendLLMRequest(
     resolved.apiConfig,
@@ -758,6 +762,7 @@ export async function generateWeverseLiveOpening(
         role: "system",
         content: [
           ...liveFormatRules(true, requestedLiveType),
+          options?.opportunistic ? '这是刷新时的一次随性开播机会。结合本人心情、近期生活和世界线中的直播习惯决定现在是否想播；想播时返回shouldStart:true与开场，不想播时只返回{"shouldStart":false}。' : "按本人状态自然开播，延续世界线中设定的直播习惯。",
           theme ? `用户给了一个软主题：${theme}。这是方向，不是脚本；按人设自然发挥、允许跑题。` : "用户没有指定主题。请结合人设、近期经历、当前时间与状态，自然决定为什么突然开播以及想聊什么。",
           "开场先只让最初开播者自己在 Stage 上，不要立刻安排其他艺人连线。",
           requestedLiveType === "voice" ? "生成本场直播标题、开场的 3~5 个短 speech segment 和 9~14 条初始观众留言。" : "生成本场直播标题、开场的 3~5 个短 segment（以说话为主；visual 模式只有确实出现新动作时才插入 action）和 9~14 条初始观众留言。",
@@ -773,6 +778,7 @@ export async function generateWeverseLiveOpening(
     { appId: "weverse", appTags: ["weverse", "live"], skipOutputRegex: true },
   );
   const parsed = extractJsonObject(raw);
+  if(options?.opportunistic && parsed?.shouldStart === false)return {shouldStart:false,segments:[],comments:[],artistComments:[],viewerJoins:[],viewerLeaves:[],participantJoins:[],participantLeaves:[],shouldEnd:false};
   const liveType: "visual" | "voice" = requestedLiveType === "auto" ? (parsed?.liveType === "voice" ? "voice" : "visual") : requestedLiveType;
   const allowed = new Set([characterId]);
   const segments = normalizeLiveSegments(parsed?.segments, allowed, characterId).filter((segment) => liveType === "visual" || segment.kind === "speech");

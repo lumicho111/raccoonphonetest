@@ -1,4 +1,5 @@
 "use client";
+import { isRingtoneSource } from "@/lib/ringtone-source";
 import { chatContactDisplayName, chatPokeDisplayName } from "@/lib/communication-display-name";
 
 import { RelationshipSuggestionPrompt } from "./character/relationship-suggestion-prompt";
@@ -1149,7 +1150,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     if (!incomingCall) return;
     const url = loadPhoneState().ringtoneUrl?.trim();
     let stopRingtone: () => void = () => undefined;
-    if (url && /^https?:\/\//i.test(url)) {
+    if (url && isRingtoneSource(url)) {
       const audio = new Audio(url);
       audio.loop = true;
       audio.play().catch(() => undefined);
@@ -1233,7 +1234,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       const character = loadCharacters().find(item => item.id === thread.characterId);
       enqueueIslandNotice({ sessionId: `sms:${thread.id}`, title: smsContactDisplayName(thread.characterId, character?.name || thread.characterNumber || "短信"), body: message.original, avatar: character?.avatar || null });
       const url = loadSms().ringtoneUrl?.trim();
-      if (url && /^https?:\/\//i.test(url)) { const audio = new Audio(url); void audio.play().catch(() => undefined); }
+      if (url && isRingtoneSource(url)) { const audio = new Audio(url); void audio.play().catch(() => undefined); }
     };
     const onMissed = (event: Event) => {
       const detail = (event as CustomEvent<{name: string; avatar: string | null}>).detail;

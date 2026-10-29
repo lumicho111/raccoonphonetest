@@ -1,3 +1,4 @@
+import { forwardedChatPrompt } from "./chat-forward";
 import { filterUserIdentityForCharacter, scopeUserIdentity, commonUserRelationship } from "./user-knowledge";
 import { resolveUserIdentity } from "./settings-storage";
 import { loadCharacters } from "./character-storage";
@@ -1166,6 +1167,8 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
     const d = msg.mediaData;
     const money = `${d?.currency && d.currency !== "CNY" ? `${d.currency} ` : ""}${d?.amount ?? 0}`;
     switch (msg.mediaType) {
+        case "chat_record":
+            return d?.forwardRecord ? forwardedChatPrompt(d.forwardRecord) : msg.content;
         case "red_packet": {
             const cnt = d?.count;
             return isGroup && cnt && cnt > 1

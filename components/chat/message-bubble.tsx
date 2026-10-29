@@ -1,4 +1,5 @@
 "use client";
+import { ForwardedChatBubble } from "./forwarded-chat-record";
 import { chatContactDisplayName, chatPokeDisplayName } from "@/lib/communication-display-name";
 
 import { useState, useEffect, useCallback, useRef, useMemo, memo, type ReactNode } from "react";
@@ -102,6 +103,8 @@ function PluginKindBubble({ msg, kind }: { msg: ChatMessage; kind: string }) {
 export const MessageBubble = memo(function MessageBubble({ msg, photoGroup, onUpdate, charName, userName, quoteCharacterName, quoteUserName, isGroup = false, onSystemMessage, groupSize, onShowDetail, characterId, onMusicPlay, onActionSelect, onMeetingInviteAction, displayContent, defaultTranslationExpanded = false, inlineKktMeta }: MessageBubbleProps) {
     if (photoGroup && photoGroup.length > 1) return <ChatPhotoDeck messages={photoGroup} onUpdate={onUpdate} characterId={characterId} />;
     switch (msg.mediaType) {
+        case "chat_record":
+            return <ForwardedChatBubble msg={msg} />;
         case "red_packet":
             return <RedPacketBubble msg={msg} charName={charName} userName={userName} groupSize={groupSize} onShowDetail={onShowDetail} />;
         case "transfer":

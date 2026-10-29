@@ -551,12 +551,17 @@
 .calendar-tl-vscroll {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  min-width: 0;
+  overflow: auto;
+  touch-action: pan-x pan-y;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 48px;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
 .calendar-tl-row {
+  min-width: 100%;
   display: flex;
   align-items: stretch;
 }
@@ -564,7 +569,10 @@
 .calendar-tl-gutter {
   flex: none;
   width: 48px;
-  position: relative;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--c-calendar-bg);
 }
 
 .calendar-now-badge {
@@ -595,13 +603,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 横纵滚动统一由 vscroll 承担，避免嵌套滚动区截住上下手势。 */
 .calendar-tl-hscroll {
   flex: 1;
   min-width: 0;
   display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
 }
 
 .calendar-tl-day {

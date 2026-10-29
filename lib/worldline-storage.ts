@@ -53,9 +53,10 @@ export function worldlineEnabledForApp(world: Worldline, appId: string): boolean
 }
 
 /** Shared facts are assembled afresh for every generation; local notes are deliberately omitted. */
-export function worldlineContextForApp(appId: string, options?: { publicEvents?: boolean }): string {
+export function worldlineContextForApp(appId: string, options?: { publicEvents?: boolean; focusText?: string }): string {
   const world = activeWorldline();
   if (!world || !worldlineEnabledForApp(world, appId)) return "";
+  if (["theqoo", "twitter", "xiaohongshu"].includes(appId)) return publicPlatformWorldlineContext(world, options);
   const archive = (world.archive || []).flatMap(group => group.entries.map(entry => `${group.name} / ${entry.title}：${entry.content}`));
   const history = (world.progressHistory || []).slice(0, -1).map(progress => `${progress.recordedAt}：${progress.text}`);
   const current = world.progressHistory?.at(-1)?.text || world.currentState;
@@ -98,4 +99,29 @@ export function worldlinePublicEvents(category?: string): Array<{ world: Worldli
   return (active ? [active] : []).flatMap(world => world.events
     .filter(event => event.visibility === "public" && (!category || !event.category || event.category === category))
     .map(event => ({ world, event })));
+}
+
+/** Public feeds select present-day subjects; historical facts serve continuity checks. */
+function publicPlatformWorldlineContext(world: Worldline, options?: { publicEvents?: boolean; focusText?: string }): string {
+  const current = world.progressHistory?.at(-1)?.text || world.currentState || "";
+  const query = `${current} ${options?.focusText || ""}`;
+  const terms = new Set((query.match(/[a-zA-Z0-9_]{3,}|[\u3400-\u9fff]{2,}/g) || []).flatMap(word => /[\u3400-\u9fff]/.test(word) ? Array.from({length:Math.max(0,word.length-1)},(_,i)=>word.slice(i,i+2)) : [word.toLowerCase()]));
+  const score = (text: string) => { const normalized=text.toLowerCase(); return [...terms].filter(term=>normalized.includes(term)).length; };
+  const choose = (rows: string[], count: number, max: number) => rows.map((text,index)=>({text,index,rank:score(text)})).filter(row=>row.rank>=2).sort((a,b)=>b.rank-a.rank||b.index-a.index).slice(0,count).map(row=>row.text.slice(0,650)).join("\n").slice(0,max);
+  const archive = (world.archive || []).flatMap(group=>group.entries.flatMap(entry=>entry.content.split(/\n+/).filter(Boolean).map(line=>`${group.name} / ${entry.title}：${line}`)));
+  const history = (world.progressHistory || []).slice(0,-1).map(row=>`${row.recordedAt}：${row.text}`);
+  const relevantArchive = choose(archive,4,1800);
+  const relevantHistory = choose(history,3,1800);
+  const now = Date.now();
+  const events = options?.publicEvents ? world.events.filter(event=>event.visibility==="public" && Date.parse(event.occurredAt)<=now).sort((a,b)=>b.occurredAt.localeCompare(a.occurredAt)) : [];
+  const recentEvents = events.filter(event=>now-Date.parse(event.endsAt||event.occurredAt)<=14*86400000).slice(0,5).map(event=>`${worldlineTimeLabel(event,true)} ${event.title}：${event.detail.slice(0,350)}`);
+  const olderEvents = choose(events.filter(event=>!recentEvents.some(line=>line.includes(`${worldlineTimeLabel(event,true)} ${event.title}：`))).map(event=>`${worldlineTimeLabel(event,true)} ${event.title}：${event.detail}`),2,1000);
+  return [
+    `【世界线：${world.name}｜公开平台参考】`,
+    "选题以平台自身的日常生态为主，结合最新公开进展与仍有余韵的近期事件。背景与历史用于理解设定、核对相关事实；叙述沿用最新状态与既有因果。",
+    current.trim() ? `当前公共进度：${current.trim().slice(0,3000)}` : "",
+    recentEvents.length ? `近期已公开事件：\n${recentEvents.join("\n")}` : "",
+    relevantHistory || olderEvents ? `相关历史事实（话题涉及时核对前因）：\n${[relevantHistory,olderEvents].filter(Boolean).join("\n")}` : "",
+    relevantArchive ? `相关背景常识（理解设定用）：\n${relevantArchive}` : "",
+  ].filter(Boolean).join("\n\n");
 }

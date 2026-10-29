@@ -835,7 +835,7 @@ export async function sendLLMStreamRequest(
     const pluginPurpose = options?.appId ?? "chat";
     const afterPlugins = await applyChatPluginLlmRequest(preset, messages, pluginPurpose, options?.debugSessionId);
     const effectivePreset = afterPlugins.preset;
-    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true });
+    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true, focusText: afterPlugins.messages.map(m => typeof m.content === "string" ? m.content : "").join("\n").slice(-3000) });
     const worldlineMessages = worldlineContext ? [{ role: "system" as const, content: worldlineContext }, ...afterPlugins.messages] : afterPlugins.messages;
     const originalOnDelta = callbacks?.onDelta;
     const pluginCallbacks: ChatCompletionStreamCallbacks | undefined = callbacks ? {
@@ -945,7 +945,7 @@ export async function sendLLMRequest(
     const pluginPurpose = options?.appId ?? "chat";
     const afterPlugins = await applyChatPluginLlmRequest(preset, messages, pluginPurpose, options?.debugSessionId);
     const effectivePreset = afterPlugins.preset;
-    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true });
+    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true, focusText: afterPlugins.messages.map(m => typeof m.content === "string" ? m.content : "").join("\n").slice(-3000) });
     const worldlineMessages = worldlineContext ? [{ role: "system" as const, content: worldlineContext }, ...afterPlugins.messages] : afterPlugins.messages;
     const requestMessages = toLlmRequestMessages(worldlineMessages);
     const request = buildProviderRequest(config, effectivePreset, requestMessages);
@@ -1148,7 +1148,7 @@ export async function sendLLMToolStreamRequest(
     const pluginPurpose = options?.appId ?? "chat";
     const afterPlugins = await applyChatPluginLlmRequest(preset, messages, pluginPurpose, options?.debugSessionId);
     const effectivePreset = afterPlugins.preset;
-    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true });
+    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true, focusText: afterPlugins.messages.map(m => typeof m.content === "string" ? m.content : "").join("\n").slice(-3000) });
     const worldlineMessages = worldlineContext ? [{ role: "system" as const, content: worldlineContext }, ...afterPlugins.messages] : afterPlugins.messages;
     const request = buildProviderRequest(config, effectivePreset, worldlineMessages, { tools, stream: true, maxTokens: options?.maxTokens });
     publishDebugPromptSnapshot({ request, config, preset: effectivePreset, meta, options, requestKind: "native-tools-stream", tools });
@@ -1304,7 +1304,7 @@ export async function sendLLMToolRequest(
     const pluginPurpose = options?.appId ?? "chat";
     const afterPlugins = await applyChatPluginLlmRequest(preset, messages, pluginPurpose, options?.debugSessionId);
     const effectivePreset = afterPlugins.preset;
-    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true });
+    const worldlineContext = worldlineContextForApp(pluginPurpose, { publicEvents: true, focusText: afterPlugins.messages.map(m => typeof m.content === "string" ? m.content : "").join("\n").slice(-3000) });
     const worldlineMessages = worldlineContext ? [{ role: "system" as const, content: worldlineContext }, ...afterPlugins.messages] : afterPlugins.messages;
     const request = buildProviderRequest(config, effectivePreset, worldlineMessages, { tools });
     publishDebugPromptSnapshot({ request, config, preset: effectivePreset, meta, options, requestKind: "native-tools", tools });

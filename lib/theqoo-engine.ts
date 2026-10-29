@@ -133,7 +133,7 @@ export async function generateTheqooPosts(
 
   const searchRule = keyword.trim()
     ? `用户正在搜索：${keyword.trim().slice(0, 160)}。围绕这个关键词从不同角度生成相关帖子，不要把关键词当成真实新闻事实。`
-    : `这是随机刷新。随机混合不同板块和生活话题，不围绕固定关键词。`;
+    : `这是随机刷新。先构思互不相同的网友话题，生活、求助、吐槽、兴趣和娱乐讨论自然混合；世界线最新进展可偶尔成为话题，历史背景在相关话题中用于衔接事实。每次刷新保留丰富的独立日常，跨批次延续选题多样性。`;
 
   const schema = translationEnabled
     ? `只输出 JSON：{"posts":[{"category":"생활","topicKey":"中文事件或话题短语","titleOriginal":"韩文","titleTranslated":"中文","bodyOriginal":"韩文","bodyTranslated":"中文","views":1234,"imageTexts":["中文文字图，可空"],"comments":[{"original":"韩文","translated":"中文","isOP":false}]}]}。`
@@ -158,7 +158,7 @@ export async function generateTheqooPosts(
       let parsed: { posts?: unknown[] };
       try {
         const raw = await sendLLMRequest(config, preset, [
-          { role: "system", content: `${theqooLanguagePrompt(prompt, forumLanguage, translationEnabled)}\n本批只生成 ${needed} 篇帖子，每篇 10 条评论；这是整次刷新中第 ${batch + 1} 批。帖子可能发布于今天、昨天或前天；叙述事件时请符合当日时间线，评论可发生在发帖之后直到本次刷新。${plan.hot ? "这一批全部是 HOT 专属帖，category 必须为 HOT。话题要有自然热议感，不能照搬普通新闻帖。" : "这一批只生成普通板块帖子，category 不得为 HOT；尽量混合不同板块。"}${scheduleInstruction}\n以下主题已有帖子，不能换标题重写同一件事：${recentTopics.join("；") || "暂无"}。同一批内也不能重复事件、人物话题或生活故事。` },
+          { role: "system", content: `${theqooLanguagePrompt(prompt, forumLanguage, translationEnabled)}\n本批只生成 ${needed} 篇帖子，每篇 10 条评论；这是整次刷新中第 ${batch + 1} 批。帖子可能发布于今天、昨天或前天；叙述事件时请符合当日时间线，评论可发生在发帖之后直到本次刷新。${plan.hot ? "这一批全部是 HOT 专属帖，category 必须为 HOT。话题要有自然热议感，不能照搬普通新闻帖。" : "这一批只生成普通板块帖子，category 不得为 HOT；尽量混合不同板块。"}${scheduleInstruction}\n以下主题已有帖子，不能换标题重写同一件事：${recentTopics.join("；") || "暂无"}。同一批内也不能重复事件、人物话题或生活故事。相同世界线进展在本次刷新中合并成一个话题；旧进展有新的后续时再自然延续。` },
           { role: "user", content: "生成这一批，只输出 JSON。" },
         ], [], undefined, { appId: "theqoo", appTags: ["theqoo", "forum", "anonymous"], skipOutputRegex: true });
         const start = raw.indexOf("{"), end = raw.lastIndexOf("}");

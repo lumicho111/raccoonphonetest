@@ -1,3 +1,4 @@
+import { forwardedChatPrompt } from "./chat-forward";
 import {worldlineTimeLabel} from "./worldline-event-time";
 import { canHearCallMessage } from "./call-participation";
 // lib/short-term-assembler.ts
@@ -227,7 +228,8 @@ export function loadNativeTimeline(
             if (msg.mediaData?.callAudienceIds) { const audience = msg.mediaData.callAudienceIds.map(id => chars.find(char => char.id === id)?.name || "参与者").join("、"); content = `【通话台词，仅${audience}听到】${content}`; }
 
             // Action notifications: group format with names
-            if (msg.mediaType === "accept_red_packet") content = `[${msg.mediaData?.claimer || ""}领取了${msg.mediaData?.owner || ""}的红包]`;
+            if (msg.mediaType === "chat_record" && msg.mediaData?.forwardRecord) content = forwardedChatPrompt(msg.mediaData.forwardRecord);
+            else if (msg.mediaType === "accept_red_packet") content = `[${msg.mediaData?.claimer || ""}领取了${msg.mediaData?.owner || ""}的红包]`;
             else if (msg.mediaType === "decline_red_packet") content = `[${msg.mediaData?.claimer || ""}退回了${msg.mediaData?.owner || ""}的红包]`;
             else if (msg.mediaType === "accept_transfer") content = `[${msg.mediaData?.claimer || ""}领取了${msg.mediaData?.owner || ""}的转账]`;
             else if (msg.mediaType === "decline_transfer") content = `[${msg.mediaData?.claimer || ""}退回了${msg.mediaData?.owner || ""}的转账]`;
@@ -357,7 +359,8 @@ export function loadNativeTimeline(
             let content = stripStateAndInnerForPrompt(msg.content || "");
 
             // Action notifications: always override content to bracket format (stored content is natural language for UI)
-            if (msg.mediaType === "accept_red_packet") content = "[领取红包]";
+            if (msg.mediaType === "chat_record" && msg.mediaData?.forwardRecord) content = forwardedChatPrompt(msg.mediaData.forwardRecord);
+            else if (msg.mediaType === "accept_red_packet") content = "[领取红包]";
             else if (msg.mediaType === "decline_red_packet") content = "[拒收红包]";
             else if (msg.mediaType === "accept_transfer") content = "[领取转账]";
             else if (msg.mediaType === "decline_transfer") content = "[拒收转账]";

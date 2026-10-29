@@ -40,7 +40,7 @@ export async function generateTwitterText(input: {
   replyToMessage?: TwitterMessage;
   anonymous?: boolean;
   senderName?: string;
-  accountProfile?: { name: string; identity?: string; visibility?: "public" | "protected"; disclosure?: "independent" | "full" | "clues"; disclosureClues?: string; allowClueProgression?: boolean };
+  accountProfile?: { name: string; operationStyle?: string; identity?: string; visibility?: "public" | "protected"; disclosure?: "independent" | "full" | "clues"; disclosureClues?: string; allowClueProgression?: boolean };
   accountKind?: "alternate" | "group";
   communityName?: string;
   withComments?: boolean;
@@ -74,6 +74,7 @@ export async function generateTwitterText(input: {
     unifiedRecentItems: context?.unifiedRecentItems ?? [],
     timeContext: buildCharacterTimeContext(character.timeZone),
   });
+  const operationRule = input.kind !== "dm" ? `本账号运营与发言方式：${input.accountProfile?.operationStyle?.trim().slice(0,1600) || "本人运营，按角色性格正常分享与交流"}。公开发帖和互动依照该方式，主账号也可以是普通网友。` : "";
   const publicRule = `X 的帖子和回复是公开的。你可以有私下记忆，但不得随意公开地下关系、私人聊天内容或未公开身份。用户主账号在 X 上的昵称是“${input.state.profile.name}”，网友对用户的称呼是“${twitterPublicAddress(input.state)}”；公开发言和生成的路人评论不得仅凭私下人设或记忆知道其本名就公开使用。`;
   const linkedSources = anonymous ? "" : roleSocialContext(character.id, input.state.socialSourcesByCharacter[character.id]);
   const sourceRule = linkedSources ? `本人可参考关联来源：${linkedSources}。日历不是公开信息；发公开帖子或回复时只可提已公开的活动，不得泄漏私人安排。` : "";
@@ -117,6 +118,7 @@ export async function generateTwitterText(input: {
   }
   if (input.kind === "post") instruction += "\n" + mediaPreferencePrompt("twitter", character.id);
   const messages: LLMMessage[] = [...prompt, { role: "system", content: instruction }, { role: "user", content: "现在自然地回复。" }];
+  if (operationRule) messages.push({role:"system",content:operationRule});
   const raw = await sendLLMRequest(apiConfig, preset, messages, regexes, { characterName: character.name, userName: anonymous ? "匿名用户" : input.kind === "dm" ? identity?.name || input.state.profile.name : twitterPublicAddress(input.state) }, { appId: "twitter", translationCharacterId: character.id, appTags: ["twitter", input.kind], skipOutputRegex: true });
   const lines = parseLines(raw);
   if (input.kind === "post") {

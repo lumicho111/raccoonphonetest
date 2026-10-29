@@ -1,3 +1,4 @@
+import type { ForwardedChatRecord } from "./chat-forward";
 import type { WalletCurrency } from "./wallet-types";
 // lib/chat-storage.ts
 
@@ -147,6 +148,7 @@ export type ChatMessage = {
         | "music" | "music_share" | "music_notify" | "music_not_found"
         | "xiaohongshu_note_share"
         | "gift"
+        | "chat_record"
         | "contact_card"
         | "app_card"
         | "tool_notice"
@@ -161,6 +163,7 @@ export type ChatMessage = {
     origin?: "chat" | "reading_discuss" | "custom_app" | "custom_app_background" | "story_floating_phone";
     mediaUrl?: string;
     mediaData?: {
+        forwardRecord?: ForwardedChatRecord;
         amount?: number;          // 红包/转账金额
         count?: number;           // 红包个数
         label?: string;           // 红包留言/转账备注/照片描述/位置名/表情名
@@ -609,6 +612,7 @@ export function isSystemInstructionMessage(msg: Pick<ChatMessage, "role" | "medi
 
 export function getChatMessagePreview(msg: ChatMessage): string {
     if (isReadingDiscussMessage(msg)) return "";
+    if (msg.mediaType === "chat_record") return `[聊天记录] ${msg.mediaData?.forwardRecord?.sourceName || "合并转发"}`;
 
     const userName = (() => { try { return resolveUserIdentity()?.name; } catch { return undefined; } })();
     const toYou = (text: string) => userName ? text.replace(new RegExp(userName, "g"), "你") : text;
