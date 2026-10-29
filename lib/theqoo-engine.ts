@@ -1,3 +1,4 @@
+import { schedulePublicContentSuffix } from "./schedule-public-content";
 import { calendarPublicClues } from "./calendar-public-clues";
 import { isPublicCalendarItem } from "./calendar-master";
 import { theqooPostLanguage } from "./theqoo-storage";
@@ -77,7 +78,7 @@ function scheduleContext(settings: TheqooSourceSettings): string {
       for (const plan of loadOwnerCalendarPlans(type, id)) {
         for (const item of plan.items) {
           if (isPublicCalendarItem(item) && item.date >= start && item.date <= end) {
-            lines.push(`手机日历(${name}) ${item.date}: ${item.title.slice(0, 80)}`);
+            lines.push(`手机日历(${name}) ${item.date}: ${item.title.slice(0, 80)}${schedulePublicContentSuffix(item,now,loadCharacters().find(c=>c.id===id)?.timeZone)}`);
           }
         }
       }
@@ -88,7 +89,7 @@ function scheduleContext(settings: TheqooSourceSettings): string {
     for (const item of state.schedules) {
       if (item.visibility !== "public" || item.startsAt < now - 7 * 86400000 || item.startsAt > now + 35 * 86400000) continue;
       const community = state.communities.find(c => c.id === item.communityId);
-      lines.push(`WVS公开日程(${community?.name || "社区"}) ${new Date(item.startsAt).toISOString().slice(0, 10)}: ${item.title.slice(0, 80)}`);
+      lines.push(`WVS公开日程(${community?.name || "社区"}) ${new Date(item.startsAt).toISOString().slice(0, 10)}: ${item.title.slice(0, 80)}${schedulePublicContentSuffix(item,now)}`);
     }
   }
   if(settings.includeCalendar || settings.includeWeverseSchedule) for(const char of loadCharacters().filter(c=>settings.includeCalendar || loadWeverseState().communities.some(w=>w.memberCharacterIds.includes(c.id))).slice(0,12)) lines.unshift(...calendarPublicClues(char.id,now));

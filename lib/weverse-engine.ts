@@ -1,3 +1,5 @@
+import { loadSchedulePrompts } from "./schedule-prompt-settings";
+import { schedulePublicContentSuffix } from "./schedule-public-content";
 import { weverseLiveAvailability } from "./weverse-live-availability";
 import { worldlineContextForApp } from "./worldline-storage";
 import { isPublicCalendarItem } from "./calendar-master";
@@ -73,6 +75,7 @@ export type GeneratedWeverseArtistReply = {
 };
 
 export type GeneratedWeverseScheduleItem = {
+  contentDescription?: string; publicAt?: string;
   type: WeverseScheduleType;
   visibility: "public" | "internal";
   title: string;
@@ -144,7 +147,7 @@ async function resolveCharacterGeneration(characterId: string, community: Wevers
   ]);
 
   const now = options?.now ?? new Date();
-  const scheduleSummary = historical ? "" : loadOwnerCalendarPlans("character", character.id).flatMap(p=>p.items).filter(i=>isPublicCalendarItem(i)).map(i=>`${i.date} ${i.startTime} ${i.title}`).slice(0,24).join("\n");
+  const scheduleSummary = historical ? "" : loadOwnerCalendarPlans("character", character.id).flatMap(p=>p.items).filter(i=>isPublicCalendarItem(i)).map(i=>`${i.date} ${i.startTime} ${i.title}${schedulePublicContentSuffix(i,now.getTime(),character.timeZone)}`).slice(0,24).join("\n");
   const messages = assemblePromptPayload({
     character,
     history: [],
@@ -237,9 +240,10 @@ function commentContext(post: WeversePost): string {
 
 function communityTimeContext(community: WeverseCommunity, now = new Date()): string {
   const chars = loadCharacters().filter((item) => community.memberCharacterIds.includes(item.id));
-  if (chars.length) return buildGroupTimeContext(chars.map((item) => ({ name: item.name, timeZone: item.timeZone })), now).timeContext;
   const zone = getSystemTimeZone();
-  return `当前社区参考时间：${formatZonedChineseDateTime(now, zone)} ${zone}，${getZonedWeekday(now, zone)}`;
+  const time = chars.length ? buildGroupTimeContext(chars.map((item) => ({ name: item.name, timeZone: item.timeZone })), now).timeContext : `当前社区参考时间：${formatZonedChineseDateTime(now, zone)} ${zone}，${getZonedWeekday(now, zone)}`;
+  const schedules = loadWeverseState().schedules.filter(item => item.communityId === community.id && item.visibility === "public" && item.startsAt >= now.getTime()-7*86400000 && item.startsAt <= now.getTime()+35*86400000).sort((a,b)=>a.startsAt-b.startsAt).slice(0,24).map(item=>`${new Date(item.startsAt).toISOString()} ${item.title}${schedulePublicContentSuffix(item,now.getTime())}`);
+  return [time,schedules.length ? `可参考的公开日程（未来只谈安排，已解锁内容可供讨论）：\n${schedules.join("\n")}` : ""].filter(Boolean).join("\n");
 }
 
 function officialMediaContext(community: WeverseCommunity): string {
@@ -526,7 +530,7 @@ function communityCalendarContext(community: WeverseCommunity, now: Date): strin
       .sort((a,b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
       .slice(0, 16);
     if (!items.length) continue;
-    rows.push(`${character?.name || characterId}：${items.map((item) => `${item.date} ${item.startTime}-${item.endTime} ${item.title}${item.location ? ` @${item.location}` : ""}`).join("；")}`);
+    rows.push(`${character?.name || characterId}：${items.map((item) => `${item.date} ${item.startTime}-${item.endTime} ${item.title}${item.contentDescription ? `｜内容底稿：${item.contentDescription}` : ""}${item.location ? ` @${item.location}` : ""}`).join("；")}`);
   }
   return rows.length ? rows.join("\n") : "成员手机日历中暂无可参考的近期工作安排。";
 }
@@ -544,22 +548,24 @@ export async function generateWeverseScheduleBatch(
     .filter((item) => item.communityId === community.id)
     .sort((a,b) => a.startsAt-b.startsAt)
     .slice(-24)
-    .map((item) => `${new Date(item.startsAt).toISOString()} | ${item.type} | ${item.title} | members=${item.memberCharacterIds.join(",")}`)
+    .map((item) => `${new Date(item.startsAt).toISOString()} | ${item.type} | ${item.title}${item.contentDescription ? `｜内容底稿：${item.contentDescription}` : ""} | members=${item.memberCharacterIds.join(",")}`)
     .join("\n") || "暂无 WVS Schedule 条目。";
   const messages: LLMMessage[] = [
     {
       role: "system",
       content: [
-        `为 Weverse「${community.name}」补充公开工作日程与作品节点。结合成员职业阶段、现有项目和手机日历，把工作细化为可信的公开活动、宣传与物料发布；已有项目优先衔接后续内容，适合角色的新项目也可自然出现。`,
+        `为 Weverse「${community.name}」生成日程。`,
+        loadSchedulePrompts().weverse,
+        "公开日程标题和时间提前可见；contentDescription用一两句写清具体内容，到publicAt解锁，留空按开始时间解锁。location可留空或填发布平台。",
         `参考时间：${now.toISOString()}。成员 ID：\n${memberRows || "无"}`,
         options?.startDate && options?.endDate ? `补充 ${options.startDate} 至 ${options.endDate} 的历史公开日程，参考当时的职业阶段。数量约 ${options.count || 6} 条。` : "补充未来4至6周的少量具体事项，节奏随工作推进自然疏密。",
         "分类：performance舞台/活动，brand品牌/时尚活动，media节目播出/幕后/采访公开，release作品/预告/专辑发布，anniversary纪念节点。visibility统一public。",
-        "实际参加的工作calendarSync=true，安排合理准备与通勤，并参考已有占用时段；上线或播出节点calendarSync=false。busyLevel按手机可用程度填1随时回复、2短暂回复、3忙时等待、4无法看手机；发布节点填1。内部工作和私人生活由手机日历管理。LIVE日程仅安排围绕作品或重要节点、需要提前预告的专题直播，如回归宣传、新剧宣传或陪看，作为实际活动占用时间；日常随性开播留给平台按状态与空闲触发。",
+        "实际参加的工作calendarSync=true，安排合理准备与通勤，并参考已有占用时段；上线或播出节点calendarSync=false。busyLevel按手机可用程度填1随时回复、2短暂回复、3忙时等待、4无法看手机；发布节点填1。内部工作和私人生活由手机日历管理。",
         worldlineContextForApp("weverse", {publicEvents:true}).slice(0,2400),
         `现有 WVS Schedule：\n${existingRows}`,
         `成员手机日历参考：\n${communityCalendarContext(community, now)}`,
         "memberCharacterIds 只能使用上面提供的真实 ID；团体共同活动可填多个。",
-        `只输出 JSON，不要 Markdown。格式：{"items":[{"visibility":"public","type":"performance","title":"...","date":"YYYY-MM-DD","startTime":"HH:MM","endTime":"HH:MM","location":"...或空","memberCharacterIds":["真实ID"],"calendarSync":true,"busyLevel":3}]}。只返回有依据的具体事项。`,
+        `只输出 JSON，不要 Markdown。格式：{"items":[{"visibility":"public","type":"performance","title":"...","contentDescription":"一两句具体看点","publicAt":"","date":"YYYY-MM-DD","startTime":"HH:MM","endTime":"HH:MM","location":"...或空","memberCharacterIds":["真实ID"],"calendarSync":true,"busyLevel":3}]}。只返回有依据的具体事项。`,
       ].join("\n"),
     },
     { role: "user", content: "刷新生成这段时间的 Community Schedule。" },
@@ -581,6 +587,8 @@ export async function generateWeverseScheduleBatch(
     const calendarSync = item.calendarSync === true;
     return {
       type: normalizedType,
+      contentDescription: typeof item.contentDescription === "string" ? item.contentDescription.slice(0,4000) : undefined,
+      publicAt: typeof item.publicAt === "string" ? item.publicAt : undefined,
       visibility,
       title,
       date,

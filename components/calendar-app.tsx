@@ -1,4 +1,5 @@
 "use client";
+import { formatZonedPromptTimestamp, getSystemTimeZone } from "@/lib/character-time";
 import { useGenerationFeedback } from "@/components/generation-feedback";
 import { PendingCalendarEvents } from "./calendar/pending-events";
 
@@ -314,7 +315,7 @@ export function PhoneCalendarApp({
 
   const openEditItem = (item: CalendarScheduleItem) => {
     setEditingItem({
-      encounterScene:item.encounterScene,visibility:item.visibility,kind:item.kind,publicAt:item.publicAt,
+      contentDescription:item.contentDescription,encounterScene:item.encounterScene,visibility:item.visibility,kind:item.kind,publicAt:item.publicAt && /[zZ]|[+-]\d\d:\d\d$/.test(item.publicAt) ? formatZonedPromptTimestamp(new Date(item.publicAt),loadCharacters().find(c=>c.id===selectedOwner?.ownerId)?.timeZone||getSystemTimeZone()).replace(" ","T") : item.publicAt,
       id: item.id,
       date: item.date,
       endDate: item.date,
@@ -380,7 +381,7 @@ export function PhoneCalendarApp({
         location: editingItem.location,
         title: editingItem.title,
         emoji: sanitizeScheduleEmoji(editingItem.emoji),
-        encounterScene:editingItem.encounterScene,visibility:editingItem.visibility||"private",kind:editingItem.kind||"event",publicAt:editingItem.publicAt,
+        contentDescription:editingItem.contentDescription,encounterScene:editingItem.encounterScene,visibility:editingItem.visibility||"private",kind:editingItem.kind||"event",publicAt:editingItem.publicAt,
         source: editingItem.externalSource === "weverse" ? "weverse" : "manual",
         externalSource: editingItem.externalSource,
         externalId: editingItem.externalId,
@@ -402,6 +403,7 @@ export function PhoneCalendarApp({
         endTime: editingItem.endTime,
         location: editingItem.location,
         title: editingItem.title,
+        contentDescription: editingItem.contentDescription, publicAt: editingItem.publicAt,
       });
     }
     setEditingItem(null);

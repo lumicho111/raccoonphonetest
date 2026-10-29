@@ -1,4 +1,5 @@
 "use client";
+import { unlockedScheduleContent } from "@/lib/schedule-public-content";
 import { useGenerationFeedback } from "@/components/generation-feedback";
 import { weverseLiveAvailability, claimWeverseLiveOpportunity } from "@/lib/weverse-live-availability";
 import { preparePhotoStoryCaption } from "@/lib/photo-story-caption";
@@ -177,6 +178,7 @@ type LiveCreatorDraft = {
 };
 
 type ScheduleEditorDraft = {
+  contentDescription?: string; publicAt?: string;
   id?: string;
   communityId: string;
   visibility: "public" | "internal";
@@ -380,6 +382,13 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
   const [tab, setTab] = useState<MainTab>("feed");
   const [routeStack, setRouteStack] = useState<Route[]>([{ type: "root" }]);
   const [state, setState] = useState<WeverseState>(() => loadWeverseState());
+  useEffect(() => {
+    const next = state.schedules.map(item => item.publicAt || item.startsAt).filter(at => at > Date.now()).sort((a,b)=>a-b)[0];
+    if (!next) return;
+    const timer = window.setTimeout(() => setState(loadWeverseState()), Math.min(2147483647, Math.max(1,next-Date.now()+50)));
+    return () => window.clearTimeout(timer);
+  }, [state]);
+
   const [characters, setCharacters] = useState<Character[]>(() => loadCharacters());
   const [, setPhotoTick] = useState(0);
 
@@ -744,6 +753,8 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
       visibility: item?.visibility || "public",
       type: item?.type || "performance",
       title: item?.title || "",
+      contentDescription: item?.contentDescription || "",
+      publicAt: item?.publicAt ? `${formatIsoDate(new Date(item.publicAt))}T${pad(new Date(item.publicAt).getHours())}:${pad(new Date(item.publicAt).getMinutes())}` : "",
       date: formatIsoDate(base),
       startTime: `${pad(base.getHours())}:${pad(base.getMinutes())}`,
       endTime: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
@@ -769,6 +780,8 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
       communityId: community.id,
       type: scheduleEditor.type,
       title,
+      contentDescription: scheduleEditor.contentDescription?.trim(),
+      publicAt: scheduleEditor.publicAt ? new Date(scheduleEditor.publicAt).getTime() : undefined,
       startsAt,
       endsAt,
       location: scheduleEditor.location.trim() || undefined,
@@ -819,7 +832,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
           title: row.title,
           startsAt,
           endsAt,
-          location: row.location,
+          location: row.location, contentDescription:row.contentDescription, publicAt:row.publicAt ? new Date(row.publicAt).getTime() : undefined,
           memberCharacterIds: row.memberCharacterIds,
           source: "generated",
           visibility: row.visibility,
@@ -1579,7 +1592,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
           if (!Number.isFinite(startsAt) || startsAt < start || startsAt > end) continue;
           if (loadWeverseState().schedules.some(item => item.communityId === community.id && item.title === row.title && item.startsAt === startsAt)) continue;
           const endsAtRaw = scheduleDateTime(row.date, row.endTime);
-          const item: WeverseScheduleItem = { id: createWeverseId("wvs_schedule"), communityId: community.id, type: row.type, title: row.title, startsAt, endsAt: Number.isFinite(endsAtRaw) && endsAtRaw > startsAt ? endsAtRaw : startsAt + 3600000, location: row.location, memberCharacterIds: row.memberCharacterIds, visibility: row.visibility, calendarSync: row.calendarSync, busyLevel: row.busyLevel, source: "generated", createdAt: Date.now(), updatedAt: Date.now() };
+          const item: WeverseScheduleItem = { id: createWeverseId("wvs_schedule"), communityId: community.id, type: row.type, title: row.title, startsAt, endsAt: Number.isFinite(endsAtRaw) && endsAtRaw > startsAt ? endsAtRaw : startsAt + 3600000, location: row.location, contentDescription:row.contentDescription, publicAt:row.publicAt ? new Date(row.publicAt).getTime() : undefined, memberCharacterIds: row.memberCharacterIds, visibility: row.visibility, calendarSync: row.calendarSync, busyLevel: row.busyLevel, source: "generated", createdAt: Date.now(), updatedAt: Date.now() };
           upsertWeverseScheduleItem(item); syncWeverseScheduleItemToCalendar(item); saved++;
         }
         setHistoryProgress(`已补充 ${saved} 条历史日程`);onNotice(`已补充 ${saved} 条历史日程`);
@@ -2129,10 +2142,10 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
   const renderSchedule = (community: WeverseCommunity) => {
     const storedRows = state.schedules.filter((item) => item.communityId === community.id).map((item) => ({
       id: item.id, title: item.title, startsAt: item.startsAt, endsAt: item.endsAt, type: item.type as WeverseScheduleType | "live",
-      location: item.location, memberCharacterIds: item.memberCharacterIds, calendarSync: item.calendarSync, visibility: item.visibility, stored: item, liveId: undefined as string | undefined,
+      location: item.location, contentDescription:unlockedScheduleContent(item), memberCharacterIds: item.memberCharacterIds, calendarSync: item.calendarSync, visibility: item.visibility, stored: item, liveId: undefined as string | undefined,
     }));
     const liveRows = state.lives.filter((live) => live.communityId === community.id && live.status === "ended").map((live) => ({
-      id: `live:${live.id}`, title: live.title || "LIVE", startsAt: live.startedAt, endsAt: live.endedAt, type: "live" as const, location: undefined,
+      id: `live:${live.id}`, title: live.title || "LIVE", startsAt: live.startedAt, endsAt: live.endedAt, type: "live" as const, location: undefined, contentDescription:"",
       memberCharacterIds: live.hostCharacterIds, calendarSync: false, visibility: "public" as const, stored: undefined as WeverseScheduleItem | undefined, liveId: live.id,
     }));
     const allRows = [...storedRows, ...liveRows].sort((a,b) => a.startsAt-b.startsAt);
@@ -2157,7 +2170,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
     const memberNames = (ids: string[]) => ids.map((id) => resolveMember(community, id).displayName).join(" · ");
     const renderRow = (item: typeof rows[number], compact = false) => <button key={item.id} type="button" className={`${styles.scheduleEventCard} ${typeClass(item)} ${compact ? styles.scheduleNextCard : ""}`} onClick={() => item.liveId ? navigate({ type: "live", liveId: item.liveId }) : item.stored ? openScheduleEditor(community, item.stored) : undefined}>
       <span className={styles.scheduleEventRail} />
-      <div className={styles.scheduleEventBody}><div className={styles.scheduleEventTop}><b>{item.visibility === "internal" ? "内部行程" : (WVS_SCHEDULE_LABELS as Record<string,string>)[item.type]}</b><time>{scheduleTimeLabel(item.startsAt)}{item.endsAt ? ` - ${scheduleTimeLabel(item.endsAt)}` : ""}</time></div><h4>{item.title}</h4>{item.location ? <p>{item.location}</p> : null}{item.memberCharacterIds.length ? <small>{memberNames(item.memberCharacterIds)}</small> : null}</div>
+      <div className={styles.scheduleEventBody}><div className={styles.scheduleEventTop}><b>{item.visibility === "internal" ? "内部行程" : (WVS_SCHEDULE_LABELS as Record<string,string>)[item.type]}</b><time>{scheduleTimeLabel(item.startsAt)}{item.endsAt ? ` - ${scheduleTimeLabel(item.endsAt)}` : ""}</time></div><h4>{item.title}</h4>{item.contentDescription ? <p>{item.contentDescription}</p> : null}{item.location ? <p>{item.location}</p> : null}{item.memberCharacterIds.length ? <small>{memberNames(item.memberCharacterIds)}</small> : null}</div>
       {item.visibility === "internal" ? <span className={`${styles.scheduleSyncBadge} ${styles.scheduleInternalBadge}`}>仅内部</span> : item.calendarSync ? <span className={styles.scheduleSyncBadge}>手机日历</span> : null}
     </button>;
     return <div className={styles.schedulePage}>
@@ -2401,6 +2414,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
             <div className={styles.scheduleEditorGrid}><label><span>日期</span><input type="date" value={scheduleEditor.date} onChange={(e) => setScheduleEditor({ ...scheduleEditor, date: e.target.value })} /></label><label><span>开始</span><input type="time" value={scheduleEditor.startTime} onChange={(e) => setScheduleEditor({ ...scheduleEditor, startTime: e.target.value })} /></label><label><span>结束</span><input type="time" value={scheduleEditor.endTime} onChange={(e) => setScheduleEditor({ ...scheduleEditor, endTime: e.target.value })} /></label></div>
             <label className={styles.fieldLabel}>地点 / 平台</label>
             <input className={styles.select} value={scheduleEditor.location} onChange={(e) => setScheduleEditor({ ...scheduleEditor, location: e.target.value })} placeholder="可留空" />
+            {scheduleEditor.visibility === "public" && <><label className={styles.fieldLabel}>公开内容描述</label><textarea className={styles.textarea} rows={4} maxLength={4000} value={scheduleEditor.contentDescription || ""} onChange={e => setScheduleEditor({...scheduleEditor,contentDescription:e.target.value})} placeholder="一两句具体内容，到解锁时间后公开"/><label className={styles.fieldLabel}>内容解锁时间（留空按日程开始时间）</label><input className={styles.input} type="datetime-local" value={scheduleEditor.publicAt || ""} onChange={e => setScheduleEditor({...scheduleEditor,publicAt:e.target.value})}/></>}
             <label className={styles.fieldLabel}>参与成员</label>
             <div className={styles.scheduleMemberPicker}>{community.memberCharacterIds.map((id) => { const m = resolveMember(community, id); const checked = scheduleEditor.memberCharacterIds.includes(id); return <button type="button" key={id} data-checked={checked ? "true" : undefined} onClick={() => setScheduleEditor({ ...scheduleEditor, memberCharacterIds: checked ? scheduleEditor.memberCharacterIds.filter((value) => value !== id) : [...scheduleEditor.memberCharacterIds, id] })}><Avatar text={m.displayName} imageUrl={m.avatarUrl} tone="soft"/><span>{m.displayName}</span></button>; })}</div>
             {scheduleEditor.visibility === "public" ? <label className={styles.scheduleSyncToggle}><span><b>实际占用角色时间</b><small>全部公开日程都会同步日历。作品上线、节目播出等节点不占用当时的时间，请关闭。</small></span><input type="checkbox" checked={scheduleEditor.calendarSync} onChange={(e) => setScheduleEditor({ ...scheduleEditor, calendarSync: e.target.checked })}/></label> : <div className={`${styles.scheduleSyncToggle} ${styles.scheduleInternalSync}`}><span><b>自动同步角色手机日历</b><small>内部工作行程不会对粉丝公开，但会作为角色真实安排写入 Calendar。</small></span><span>✓</span></div>}

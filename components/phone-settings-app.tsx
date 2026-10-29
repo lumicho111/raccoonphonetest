@@ -59,7 +59,7 @@ type SubPage =
     | "about";
 
 const SETTINGS_MENU = [
-    { id: "aiBehavior", icon: SlidersHorizontal, label: "AI 行为", desc: "主动配图倾向", iconColor: BINDING_ACCENTS.api, glass: "" },
+    { id: "aiBehavior", icon: SlidersHorizontal, label: "AI 行为", desc: "配图偏好与日程生成提示词", iconColor: BINDING_ACCENTS.api, glass: "" },
     { id: "api", icon: HardDrive, label: "API 设置", desc: "大模型接口", iconColor: BINDING_ACCENTS.api , glass: "api" },
     { id: "voice", icon: Mic, label: "语音 API", desc: "语音合成", iconColor: BINDING_ACCENTS.voice , glass: "voice" },
     { id: "imageGeneration", icon: Image, label: "图像生成 API", desc: "模型、参考图与提示词", iconColor: CONTENT_APP_ACCENTS.moments , glass: "image-generation" },
@@ -379,7 +379,7 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
 
     return (
         <SettingsContext.Provider value={{ setSubpageTitle, setOverrideBack, setSubpageRightAction }}>
-            <PageShell title={title} onBack={handleBack} rightAction={currentPage !== "main" ? subpageRightActions[currentPage] : undefined} bodyRef={pageBodyRef}>
+            <PageShell className="settings-unified" title={title} onBack={handleBack} rightAction={currentPage !== "main" ? subpageRightActions[currentPage] : undefined} bodyRef={pageBodyRef}>
                 {currentPage === "main" && (
                     <div className="page-menu settings-main-menu">
                         {!selfHostedMode && (

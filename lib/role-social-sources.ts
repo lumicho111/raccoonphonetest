@@ -1,3 +1,5 @@
+import { loadCharacters } from "./character-storage";
+import { schedulePublicContentSuffix } from "./schedule-public-content";
 import { calendarPublicClues } from "./calendar-public-clues";
 import { isPublicCalendarItem } from "./calendar-master";
 import { loadOwnerCalendarPlans } from "./calendar-storage";
@@ -16,7 +18,7 @@ export function roleSocialContext(characterId: string, setting?: RoleSocialSourc
   if (setting.includeCalendar) {
     for (const plan of loadOwnerCalendarPlans(characterId === "user" ? "user" : "character", characterId === "user" ? "self" : characterId)) {
       for (const item of plan.items) if (isPublicCalendarItem(item) && item.date >= lower && item.date <= upper) {
-        lines.push(`本人日历 ${item.date} ${item.startTime} ${item.title.slice(0, 80)}`);
+        lines.push(`本人日历 ${item.date} ${item.startTime} ${item.title.slice(0, 80)}${schedulePublicContentSuffix(item,now,loadCharacters().find(c=>c.id===characterId)?.timeZone)}`);
       }
     }
   }
@@ -26,7 +28,7 @@ export function roleSocialContext(characterId: string, setting?: RoleSocialSourc
     for (const item of wvs.schedules) if (item.visibility === "public" && linked.has(item.communityId)
       && characterId !== "user" && (!item.memberCharacterIds.length || item.memberCharacterIds.includes(characterId))
       && item.startsAt >= now - 3 * 86400000 && item.startsAt <= now + 35 * 86400000) {
-      lines.push(`WVS公开日程 ${new Date(item.startsAt).toISOString().slice(0, 16)} ${item.title.slice(0, 80)}`);
+      lines.push(`WVS公开日程 ${new Date(item.startsAt).toISOString().slice(0, 16)} ${item.title.slice(0, 80)}${schedulePublicContentSuffix(item,now)}`);
     }
     for (const post of wvs.posts) if (linked.has(post.communityId) && post.createdAt >= now - 3 * 86400000
       && post.createdAt <= now && (characterId === "user" ? post.authorType === "user" : post.authorType === "official" || post.authorType === "artist" && post.authorId === characterId)) {

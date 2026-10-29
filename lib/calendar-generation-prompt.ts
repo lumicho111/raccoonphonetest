@@ -1,1 +1,5 @@
-export const CALENDAR_LIFE_GENERATION_PROMPT = "根据角色职业、资历、关系、当前项目与世界线，构思这段时间值得提前安排的具体事件，兼顾工作进展与重要私人约定。职业内容适用于所有角色，明星是否使用WVS不影响其丰富程度。先构思事情，再按准备、执行和后续的合理间隔安排日期；各周按事件变化形成不同分布，已有明确周期的特殊约定沿用约定日期。忙闲随项目自然变化，数量随角色和跨度决定，日期可以留白。固定上班、上课、健身等日常作息省略，普通吃饭、购物、探店、家务留给自主生活；连续的同项准备合并记录。沿用已确认的约定，按本次补充或重排模式处理已有事项。\n直播日程选取围绕作品与重要节点、需要提前安排的专题活动，如回归宣传、新剧宣传或陪看；日常随性直播由平台结合角色状态和空闲自主触发。\n每项标visibility(public/private)与kind(event/milestone)。event是实际占用时间的行程，milestone是作品上线、节目播出等公开节点。publicAt可填消息公布时间，留空立即公开。busyLevel按手机可用程度填1立刻回复、2短暂回复、3忙时等待、4无法看手机，公开节点填1。采用角色当地时间。\n私人实际行程处在路人可见的公共场景时，可填一句encounterScene，只写短暂可见的动作和宽泛场所，如“在场馆外随工作人员上车”，其余留空。后台决定是否产生偶遇线索。多人安排结合各自关系与本次允许的共同组合，输出指定结构。";
+import { loadSchedulePrompts } from "./schedule-prompt-settings";
+export const CALENDAR_SCHEDULE_CONTRACT = "每项标visibility(public/private)与kind(event/milestone)。event实际占用时间，milestone为上线或播出等不占用时间的节点。公开日程标题和时间提前可见，contentDescription用一两句确定具体内容，到publicAt才解锁；publicAt留空按日程开始时间解锁，使用角色当地时间。location可留空或填地点／发布平台。busyLevel填1立刻回复、2短暂回复、3忙时等待、4无法看手机，节点填1。私人公共场景可填一句encounterScene，仅写路人能短暂看见的动作与宽泛场所。按指定结构输出。";
+export function calendarGenerationPrompt() { return loadSchedulePrompts().calendar + "\n" + CALENDAR_SCHEDULE_CONTRACT; }
+// Kept as a default for older callers; engines load the saved prompt at request time.
+export const CALENDAR_LIFE_GENERATION_PROMPT = calendarGenerationPrompt();

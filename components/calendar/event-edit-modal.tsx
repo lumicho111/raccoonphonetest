@@ -6,6 +6,7 @@ import type { CalendarBusyLevel, CalendarColorKey } from "@/lib/calendar-types";
 import { CALENDAR_COLOR_KEYS } from "@/lib/calendar-utils";
 
 export type CalendarEventDraft = {
+  contentDescription?: string;
   encounterScene?: string;
   visibility?: "public"|"private"; kind?: "event"|"milestone"; publicAt?:string;
   id?: string;
@@ -86,12 +87,12 @@ export function CalendarEventEditModal({
             </Select>
           </div>
           {draft.visibility === "public" && <div className="flex flex-col gap-1">
-            <span className="menu-desc ml-1">消息公开时间</span>
+            <span className="menu-desc ml-1">内容解锁时间</span>
             <div className="grid grid-cols-2 gap-3">
-              <Input aria-label="消息公开日期" type="date" value={draft.publicAt?.slice(0, 10) || ""} onChange={e => onChange({ ...draft, publicAt: e.target.value ? `${e.target.value}T${draft.publicAt?.slice(11, 16) || "00:00"}` : undefined })} />
-              <Input aria-label="消息公开时刻" type="time" value={draft.publicAt?.slice(11, 16) || ""} onChange={e => onChange({ ...draft, publicAt: e.target.value ? `${draft.publicAt?.slice(0, 10) || draft.date}T${e.target.value}` : undefined })} />
+              <Input aria-label="内容解锁日期" type="date" value={draft.publicAt?.slice(0, 10) || ""} onChange={e => onChange({ ...draft, publicAt: e.target.value ? `${e.target.value}T${draft.publicAt?.slice(11, 16) || "00:00"}` : undefined })} />
+              <Input aria-label="内容解锁时刻" type="time" value={draft.publicAt?.slice(11, 16) || ""} onChange={e => onChange({ ...draft, publicAt: e.target.value ? `${draft.publicAt?.slice(0, 10) || draft.date}T${e.target.value}` : undefined })} />
             </div>
-            <span className="menu-desc ml-1">留空则立即公开</span>
+            <span className="menu-desc ml-1">标题和时间提前公开；留空按日程开始时间解锁具体内容</span>
           </div>}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -146,12 +147,16 @@ export function CalendarEventEditModal({
             />
           </div>
 
+          {draft.visibility === "public" && <div className="flex flex-col gap-1">
+            <label className="menu-desc ml-1" htmlFor="calendar-content-description">公开内容描述</label>
+            <textarea id="calendar-content-description" className="ui-input" rows={4} maxLength={4000} value={draft.contentDescription || ""} onChange={e => onChange({ ...draft, contentDescription:e.target.value })} placeholder="写一两句节目内容、选曲或企划看点；到解锁时间后供各平台参考。" />
+          </div>}
           <div className="flex flex-col gap-1">
-            <label className="menu-desc ml-1">地点</label>
+            <label className="menu-desc ml-1">地点／发布平台（可选）</label>
             <Input
               value={draft.location}
               onChange={e => onChange({ ...draft, location: e.target.value })}
-              placeholder="例如：公司会议室 / 家里 / 商场"
+              placeholder="例如：拍摄场地 / YouTube、Weverse"
             />
           </div>
 

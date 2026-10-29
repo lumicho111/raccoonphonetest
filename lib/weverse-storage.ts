@@ -51,6 +51,8 @@ export type WeverseNotice = {
 export type WeverseScheduleType = "media" | "anniversary" | "performance" | "recording" | "shoot" | "brand" | "release" | "other";
 export type WeverseScheduleVisibility = "public" | "internal";
 export type WeverseScheduleItem = {
+  contentDescription?: string;
+  publicAt?: number;
   id: string;
   communityId: string;
   type: WeverseScheduleType;
@@ -269,6 +271,8 @@ function normalizeSchedule(raw: unknown): WeverseScheduleItem | null {
     communityId: item.communityId,
     type,
     title: item.title.trim() || "Schedule",
+    contentDescription: typeof item.contentDescription === "string" ? item.contentDescription.slice(0,4000) : undefined,
+    publicAt: typeof item.publicAt === "number" && Number.isFinite(item.publicAt) ? item.publicAt : undefined,
     startsAt,
     endsAt,
     location: typeof item.location === "string" && item.location.trim() ? item.location.trim() : undefined,

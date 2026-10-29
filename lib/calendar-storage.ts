@@ -1,3 +1,5 @@
+import { schedulePublicContentSuffix } from "./schedule-public-content";
+import { loadCharacters } from "./character-storage";
 import { reconcileCalendarMaster } from "./calendar-master";
 import type { CalendarColorKey, CalendarOwnerType, CalendarScheduleItem, CalendarWeekPlan } from "./calendar-types";
 import {
@@ -194,7 +196,7 @@ export function upsertCalendarScheduleItem(
     title: item.title.trim(),
     emoji: sanitizeScheduleEmoji(item.emoji),
     colorKey: item.colorKey || pickScheduleColorKey(item.startTime),
-    encounterScene:item.encounterScene, visibility: item.visibility || "private", kind: item.kind || "event", publicAt:item.publicAt, wvsType:item.wvsType,
+    contentDescription:item.contentDescription?.trim().slice(0,4000), encounterScene:item.encounterScene, visibility: item.visibility || "private", kind: item.kind || "event", publicAt:item.publicAt, wvsType:item.wvsType,
     source: item.source,
     externalSource: item.externalSource,
     externalId: item.externalId,
@@ -311,7 +313,7 @@ export function applyGeneratedCalendarRange(generatedByOwner:Array<{ownerId:stri
  let saved=0;const pending=loadPendingCalendarGroups();
  for(const group of groups.values()){
   group.conflicts=[];
-  const additions=group.owners.filter(({ownerId,item})=>!plans.filter(p=>p.ownerType==="character"&&p.ownerId===ownerId).flatMap(p=>p.items).some(i=>(i.id===item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title&&i.visibility===item.visibility&&i.kind===item.kind&&i.publicAt===item.publicAt&&i.location===item.location&&i.busyLevel===item.busyLevel)||(i.id!==item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title)));
+  const additions=group.owners.filter(({ownerId,item})=>!plans.filter(p=>p.ownerType==="character"&&p.ownerId===ownerId).flatMap(p=>p.items).some(i=>(i.id===item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title&&i.visibility===item.visibility&&i.kind===item.kind&&i.publicAt===item.publicAt&&i.contentDescription===item.contentDescription&&i.location===item.location&&i.busyLevel===item.busyLevel)||(i.id!==item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title)));
   for(const {ownerId,item} of additions)if(item.kind!=="milestone")for(const existing of plans.filter(p=>p.ownerType==="character"&&p.ownerId===ownerId).flatMap(p=>p.items))if(existing.id!==item.id&&existing.kind!=="milestone"&&existing.date===item.date&&existing.startTime<item.endTime&&item.startTime<existing.endTime)group.conflicts.push(`${ownerId}：${existing.date} ${existing.startTime}–${existing.endTime} ${existing.title}`);
   if(group.conflicts.length){pending.push(group);continue;}
   for(const {ownerId,item} of additions){const weekStart=getWeekStartIso(new Date(`${item.date}T00:00:00`));let plan=plans.find(p=>p.ownerType==="character"&&p.ownerId===ownerId&&p.weekStart===weekStart);if(!plan){plan={id:`calendar_${Date.now()}_${Math.random()}`,ownerType:"character",ownerId,weekStart,items:[],updatedAt:new Date().toISOString()};plans.push(plan);}plan.items=plan.items.filter(i=>i.id!==item.id);for(const other of plans)if(other!==plan&&other.ownerType==="character"&&other.ownerId===ownerId)other.items=other.items.filter(i=>i.id!==item.id);plan.items.push(item);saved++;}
@@ -354,7 +356,7 @@ export function formatCalendarScheduleForPrompt(
         return `${date} ${getWeekdayLabel(date)}：暂无明确安排`;
       }
       const summary = items
-        .map(item => `[${item.visibility === "public" ? "公开" : "私人/内部"}·${item.kind === "milestone" ? "公开节点，不占用时间" : "实际行程"}] ${item.startTime}-${item.endTime} @${item.location || "未定"} ${item.title}`)
+        .map(item => `[${item.visibility === "public" ? "公开" : "私人/内部"}·${item.kind === "milestone" ? "公开节点，不占用时间" : "实际行程"}] ${item.startTime}-${item.endTime} @${item.location || "未定"} ${item.title}${item.visibility === "public" ? schedulePublicContentSuffix(item,Date.now(),loadCharacters().find(c=>c.id===ownerId)?.timeZone) : ""}`)
         .join("；");
       return `${date} ${getWeekdayLabel(date)}：${summary}`;
     })
@@ -443,6 +445,7 @@ export function normalizeGeneratedScheduleItems(
     title: string;
     emoji?: string;
     colorKey?: CalendarColorKey;
+    contentDescription?: string;
     encounterScene?: string;
     visibility?: "public" | "private"; kind?: "event" | "milestone"; publicAt?: string;
     busyLevel?: 1 | 2 | 3 | 4;
@@ -469,6 +472,7 @@ export function normalizeGeneratedScheduleItems(
           ? item.busyLevel
           : fallbackBusyLevel(item.title),
         colorKey: isCalendarColorKey(item.colorKey) ? item.colorKey : pickScheduleColorKey(item.startTime),
+        contentDescription: item.contentDescription?.trim().slice(0,4000),
         encounterScene: item.encounterScene?.trim().slice(0,100),
         visibility: item.visibility === "public" ? "public" as const : "private" as const, kind: item.kind === "milestone" ? "milestone" as const : "event" as const, publicAt:item.publicAt,
         source: "generated" as const,

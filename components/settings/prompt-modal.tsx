@@ -36,7 +36,7 @@ export function PromptModal({
     return (
         <div className="modal-overlay">
             <div
-                className="rounded-[14px] w-[270px] flex flex-col"
+                className="modal-dialog rounded-[14px] w-[270px] flex flex-col"
                 style={{
                     backgroundColor: "var(--c-input)",
                     padding: "20px 16px 0",

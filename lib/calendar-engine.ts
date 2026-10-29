@@ -1,4 +1,4 @@
-import { CALENDAR_LIFE_GENERATION_PROMPT } from "./calendar-generation-prompt";
+import { calendarGenerationPrompt } from "./calendar-generation-prompt";
 import type { Character } from "./character-types";
 import type { ApiConfig, PresetConfig, RegexConfig, WorldBookConfig } from "./settings-types";
 import type { UserIdentity } from "@/components/settings/user-identity";
@@ -179,7 +179,7 @@ async function resolveCalendarAssemblerInput(
   if (!preset) preset = presets.find(entry => entry.builtIn) ?? null;
   // Replace the calendar task slot in the request copy; do not reset the user's whole preset.
   if (preset) preset = { ...preset, prompts: preset.prompts.map(prompt => prompt.identifier === "calendar_plan_generation"
-    ? { ...prompt, content: CALENDAR_LIFE_GENERATION_PROMPT } : prompt) };
+    ? { ...prompt, content: calendarGenerationPrompt() } : prompt) };
 
 
   const allWorldBooks = loadWorldBooks();
@@ -245,8 +245,8 @@ async function resolveCalendarAssemblerInput(
     customStickerExample: ownerType === "character" ? getCustomStickerExample(ownerId) : "",
   } as AssemblerInput);
 
-  if (!llmMessages.some(message => typeof message.content === "string" && message.content.includes(CALENDAR_LIFE_GENERATION_PROMPT))) {
-    llmMessages.push({ role: "system", content: CALENDAR_LIFE_GENERATION_PROMPT });
+  if (!llmMessages.some(message => typeof message.content === "string" && message.content.includes(calendarGenerationPrompt()))) {
+    llmMessages.push({ role: "system", content: calendarGenerationPrompt() });
   }
   return {
     apiConfig,
@@ -318,7 +318,7 @@ function parseRangeScheduleResponse(
     const busyLevel = busyLevelValue === 1 || busyLevelValue === 2 || busyLevelValue === 3 || busyLevelValue === 4
       ? busyLevelValue as 1 | 2 | 3 | 4
       : undefined;
-    return [{ encounterScene: typeof row.encounterScene === "string" ? row.encounterScene.slice(0,100) : undefined, visibility: row.visibility === "public" ? "public" as const : "private" as const, kind: row.kind === "milestone" ? "milestone" as const : "event" as const, publicAt: typeof row.publicAt === "string" ? row.publicAt : undefined, date, startTime, endTime, location: String(row.location || ""), title, emoji: String(row.emoji || ""), ...(busyLevel ? { busyLevel } : {}) }];
+    return [{ encounterScene: typeof row.encounterScene === "string" ? row.encounterScene.slice(0,100) : undefined, visibility: row.visibility === "public" ? "public" as const : "private" as const, kind: row.kind === "milestone" ? "milestone" as const : "event" as const, contentDescription: typeof row.contentDescription === "string" ? row.contentDescription.slice(0,4000) : undefined, publicAt: typeof row.publicAt === "string" ? row.publicAt : undefined, date, startTime, endTime, location: String(row.location || ""), title, emoji: String(row.emoji || ""), ...(busyLevel ? { busyLevel } : {}) }];
   }));
   const responseCharacters = Array.isArray(root.characters) ? root.characters : [];
   for (const entry of responseCharacters) {
@@ -426,12 +426,12 @@ export async function generateCalendarScheduleRange(
       : "每个人独立安排，不让彼此行程互相影响，也不要安排共同活动。";
     const ownerIdMap = owners.map(owner => `- ${owner.name}：${owner.id}`).join("\n");
     const prompt = [
-      "每项必须包含 visibility=public/private、kind=event/milestone。event是实际占用时间的行程，milestone是作品上线、节目播出等不占用当时的时间的公开节点。publicAt为可选的消息公开时间（ISO日期时间）；未到公开时间不对外透露。不得把私人生活标成公开。",
+      "每项必须包含 visibility=public/private、kind=event/milestone。event是实际占用时间的行程，milestone是作品上线、节目播出等不占用当时的时间的公开节点。公开日程的标题与时间提前可见；contentDescription用一两句明确内容，到publicAt解锁，留空按开始时间解锁。私人保持私人。",
       `为以下角色安排 ${request.fromDate} 至 ${request.toDate} 的日历。名称与系统ID：\n${ownerIdMap}`,
       modeInstruction,
       sharedInstruction,
       request.existingMode === "replan" ? "本次重新安排：只保留列出的手动与WVS固定事项，待替换的旧AI安排不作日期和活动模板。" : "本次补充安排：已有事项全部保留，只新增有依据且不重叠的事项。",
-      "JSON 格式：{\"characters\":[{\"characterId\":\"角色ID\",\"items\":[{\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}],\"sharedItems\":[{\"participantIds\":[\"角色ID\",\"角色ID\"],\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}",
+      "JSON 格式：{\"characters\":[{\"characterId\":\"角色ID\",\"items\":[{\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"contentDescription\":\"公开内容的一两句底稿\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}],\"sharedItems\":[{\"participantIds\":[\"角色ID\",\"角色ID\"],\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"contentDescription\":\"公开内容的一两句底稿\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}",
       "只返回一个JSON对象。characters为每位所选角色各提供一项；无新增事项时items为空数组。共同事项只放sharedItems，不能再放入个人items。所有日期在请求范围内；未安排的日子不写占位项。",
       "角色背景：\n" + personaContext,
       worldBookContext,
