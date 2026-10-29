@@ -1,4 +1,5 @@
 "use client";
+import { useGenerationFeedback } from "@/components/generation-feedback";
 import { preparePhotoStoryCaption } from "@/lib/photo-story-caption";
 import type { PhotoStorySnapshot } from "@/lib/photo-story-data";
 
@@ -110,7 +111,7 @@ function DmMessage({ message, reference, speaker, avatar, onJump, onContext }: {
   </div>;
 }
 
-export function TwitterApp({ onClose, onNotice }: Props) {
+export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
   const [state, setState] = useState<TwitterState>(() => loadTwitterState());
   const stateRef = useRef(state);
   const [characters, setCharacters] = useState<Character[]>(() => loadCharacters());
@@ -185,6 +186,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
   const [busy, setBusy] = useState(false);
   const [generationKind, setGenerationKind] = useState("");
   const generationRef = useRef("");
+  const { onNotice, feedback: generationFeedback } = useGenerationFeedback(busy ? `正在生成${generationKind || " X 内容"}…` : null, externalNotice);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const userIdentity = resolveUserIdentity(undefined, "twitter");
@@ -291,7 +293,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
       const comments = await generateTwitterComments(snapshot, post, display(post.authorId).name, previous);
       commit(current => addComments(current, post.id, comments, Date.now()));
       await processPendingReplies();
-    } catch (error) { alert(error instanceof Error ? error.message : "评论刷新失败。"); }
+    } catch (error) { alert(error instanceof Error ? `生成失败：${error.message}` : "评论刷新失败。"); }
     finally { finishGeneration(); }
   };
   const refreshWorld = async (targetCommunityId?: string, topicHint?: string, queryHint?: string) => {
@@ -348,7 +350,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
       if (topicHint || queryHint) setSearchResultIds(ids => [...ids, ...generatedIds]);
       setFeedHint("");
       await processPendingReplies();
-    } catch (error) { alert(error instanceof Error ? error.message : "动态刷新失败。"); }
+    } catch (error) { alert(error instanceof Error ? `生成失败：${error.message}` : "动态刷新失败。"); }
     finally { finishGeneration(); setSearchLoading(false); if (targetCommunityId) setCommunityBusyKind(null); }
   };
   const refreshTrends = async () => {
@@ -358,7 +360,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
       commit(current => ({ ...current, trends: labels.map(label => ({ id: createTwitterId(), label, scope: "world" as const, volume: Math.round(90 + stableFraction(label) * 9500), createdAt: Date.now() })) }));
       setTrendFilter(null);
       await processPendingReplies();
-    } catch (error) { alert(error instanceof Error ? error.message : "热门刷新失败。"); }
+    } catch (error) { alert(error instanceof Error ? `生成失败：${error.message}` : "热门刷新失败。"); }
     finally { finishGeneration(); }
   };
   const refreshStrangerDms = async () => {
@@ -375,7 +377,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
         return { ...current, accounts, conversations: [...conversations, ...current.conversations] };
       });
       await processPendingReplies();
-    } catch (error) { alert(error instanceof Error ? error.message : "私信刷新失败。"); }
+    } catch (error) { alert(error instanceof Error ? `生成失败：${error.message}` : "私信刷新失败。"); }
     finally { finishGeneration(); }
   };
   const backfillTranslations = async () => {
@@ -392,7 +394,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
         commit(current => ({ ...current, posts: current.posts.map(post => translations.has(post.id) ? { ...post, translated: translations.get(post.id) } : post), conversations: current.conversations.map(convo => ({ ...convo, messages: convo.messages.map(message => translations.has(message.id) ? { ...message, translated: translations.get(message.id) } : message) })) }));
       }
       alert(`已补译 ${completed} 条旧内容。`);
-    } catch (error) { alert(error instanceof Error ? error.message : "旧内容补译失败。"); }
+    } catch (error) { alert(error instanceof Error ? `生成失败：${error.message}` : "旧内容补译失败。"); }
     finally { finishGeneration(); }
   };
   const uploadImage = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -416,7 +418,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
       if (!result) throw new Error("请先配置并启用小手机的图片生成方案。");
       setGeneratedPreview(result.blob);
       setGeneratedPreviewUrl(result.dataUrl);
-    } catch (error) { alert(error instanceof Error ? error.message : "图片生成失败。"); }
+    } catch (error) { alert(error instanceof Error ? `生成失败：${error.message}` : "图片生成失败。"); }
     finally { finishGeneration(); }
   };
   const attachGeneratedImage = async (addToPost = true) => {
@@ -562,7 +564,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
         if (kind === "reply") setCommentTargetId(null);
       }
       await processPendingReplies();
-    } catch (error) { alert(error instanceof Error ? error.message : "生成失败，请重试。"); }
+    } catch (error) { alert(error instanceof Error ? `生成失败：${error.message}` : "生成失败，请重试。"); }
     finally { finishGeneration(); if (kind === "post" && communityId) setCommunityBusyKind(null); }
   };
 
@@ -623,6 +625,7 @@ export function TwitterApp({ onClose, onNotice }: Props) {
   });
 
   return <div className={styles.app}>
+      {generationFeedback}
     <header className={styles.header}>
       <button className={styles.headerAvatar} onClick={() => setDrawerOpen(true)} aria-label="打开我的菜单"><Avatar image={currentUserAccount.avatarUrl} label={currentUserAccount.name} /></button>
       <strong className={tab === "home" ? styles.xMark : ""}>{tab === "home" ? "𝕏" : tab === "explore" ? "搜索" : tab === "notices" ? "通知" : "私信"}</strong>

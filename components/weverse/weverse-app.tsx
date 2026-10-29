@@ -1,4 +1,5 @@
 "use client";
+import { useGenerationFeedback } from "@/components/generation-feedback";
 import { weverseLiveAvailability, claimWeverseLiveOpportunity } from "@/lib/weverse-live-availability";
 import { preparePhotoStoryCaption } from "@/lib/photo-story-caption";
 
@@ -375,7 +376,7 @@ function WeversePostImage({ src, onClick }: { src: string; onClick?: () => void 
   return <button type="button" className={styles.postImageButton} onClick={onClick}><ResolvedAssetImage src={src} className={styles.postImage} alt="WVS post" /></button>;
 }
 
-export function WeverseApp({ onClose, onNotice }: Props) {
+export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
   const [tab, setTab] = useState<MainTab>("feed");
   const [routeStack, setRouteStack] = useState<Route[]>([{ type: "root" }]);
   const [state, setState] = useState<WeverseState>(() => loadWeverseState());
@@ -438,6 +439,7 @@ export function WeverseApp({ onClose, onNotice }: Props) {
   const [scheduleEditor, setScheduleEditor] = useState<ScheduleEditorDraft | null>(null);
   const [generatingScheduleCommunityId, setGeneratingScheduleCommunityId] = useState<string | null>(null);
   const [showInternalSchedule, setShowInternalSchedule] = useState(true);
+  const { onNotice, feedback: generationFeedback } = useGenerationFeedback(generatingScheduleCommunityId ? "正在生成 WVS 日程…" : generatingHistoryCommunityId ? (/^正在/.test(historyProgress) ? historyProgress : "正在补充 WVS 历史记录…") : startingLive ? "正在生成 LIVE 开场…" : generatingLiveId ? "正在生成 LIVE 后续…" : generatingCommentsPostId ? "正在生成 WVS 评论…" : photoGenerating ? "正在生成 WVS 图片…" : translationBusy ? "正在翻译…" : generatingCommunityId ? "正在生成 WVS 社区内容…" : null, externalNotice);
   const [flashCommentId, setFlashCommentId] = useState<string | null>(null);
   const [, setIdentityTick] = useState(0);
 
@@ -1449,15 +1451,19 @@ export function WeverseApp({ onClose, onNotice }: Props) {
     setGeneratingCommunityId(community.id);
     onNotice?.(`正在刷新 ${community.name}…`);
     try {
+      onNotice("正在生成 Artist 动态…");
       const artistPost = await generateArtistForCommunity(community);
       if (!artistPost) return;
+      onNotice("正在补充粉丝动态和评论…");
       const newFanComments = await addFanPosts(community, artistPost, true);
+      onNotice("正在处理艺人互动…");
       await maybeAddArtistReply(community, artistPost, newFanComments);
-      await maybeStartCommunityLive(community).catch(()=>undefined);
+      onNotice("正在检查或生成 LIVE…");
+      const liveIssue=await maybeStartCommunityLive(community).then(()=>"",error=>`；LIVE 生成失败：${error instanceof Error ? error.message : String(error)}`);
       setState(loadWeverseState());
       setCommunityTab("feed");
       setCommunityFeedFilter("highlight");
-      onNotice?.("已生成 Artist Post，并补充了一轮自然粉丝互动");
+      onNotice(`已生成 Artist Post，并补充了一轮自然粉丝互动${liveIssue}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       onNotice?.(`WVS 生成失败：${message}`);
@@ -1576,7 +1582,7 @@ export function WeverseApp({ onClose, onNotice }: Props) {
           const item: WeverseScheduleItem = { id: createWeverseId("wvs_schedule"), communityId: community.id, type: row.type, title: row.title, startsAt, endsAt: Number.isFinite(endsAtRaw) && endsAtRaw > startsAt ? endsAtRaw : startsAt + 3600000, location: row.location, memberCharacterIds: row.memberCharacterIds, visibility: row.visibility, calendarSync: row.calendarSync, busyLevel: row.busyLevel, source: "generated", createdAt: Date.now(), updatedAt: Date.now() };
           upsertWeverseScheduleItem(item); syncWeverseScheduleItemToCalendar(item); saved++;
         }
-        setHistoryProgress(`已补充 ${saved} 条历史日程`);
+        setHistoryProgress(`已补充 ${saved} 条历史日程`);onNotice(`已补充 ${saved} 条历史日程`);
       } else {
         for (let i = 0; i < draft.count; i++) {
           const createdAt = historyTimestamp(start, end, i, draft.count);
@@ -1592,10 +1598,10 @@ export function WeverseApp({ onClose, onNotice }: Props) {
         const current = latest.communities.find(item => item.id === community.id) || community;
         setState(upsertWeverseCommunity({ ...current, historyStartAt: Math.min(current.historyStartAt || start, start), historyCursorAt: Math.min(current.historyCursorAt || start, start), historyInitializedAt: current.historyInitializedAt || Date.now(), updatedAt: Date.now() }));
         const saved = latest.posts.length + latest.notices.length - before.posts.length - before.notices.length;
-        setHistoryProgress(`已补充 ${saved} 条历史动态`);
+        setHistoryProgress(`已补充 ${saved} 条历史动态`);onNotice(`已补充 ${saved} 条历史动态`);
       }
       setState(loadWeverseState());
-    } catch (error) { setState(loadWeverseState()); setHistoryProgress(`生成中断：${error instanceof Error ? error.message : String(error)}。已生成的内容会保留。`); }
+    } catch (error) { setState(loadWeverseState()); setHistoryProgress(`生成中断：${error instanceof Error ? error.message : String(error)}。已生成的内容会保留。`);onNotice(`生成中断：${error instanceof Error ? error.message : String(error)}。已生成的内容会保留。`); }
     finally { historyLock.current = false; setGeneratingHistoryCommunityId(null); }
   };
   const initializeCommunityHistory = async (community: WeverseCommunity) => {
@@ -2361,6 +2367,7 @@ export function WeverseApp({ onClose, onNotice }: Props) {
 
   return (
     <div className={styles.root}>
+      {generationFeedback}
       {renderTopbar()}
       <main className={`${styles.main} ${immersiveRoute ? styles.mainImmersive : ""}`}>{renderContent()}</main>
 

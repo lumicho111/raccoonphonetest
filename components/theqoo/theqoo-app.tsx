@@ -1,4 +1,5 @@
 "use client";
+import { useGenerationFeedback } from "@/components/generation-feedback";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Bookmark, Check, ChevronRight, ImagePlus, Languages, Menu, Pencil, RefreshCw, Search, Send, Star, Trash2, X } from "lucide-react";
@@ -49,7 +50,7 @@ function ForumImage({ assetId }: { assetId: string }) {
   return url ? <img className={styles.postImage} src={url} alt="帖子配图" /> : null;
 }
 
-export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onIdle }: {
+export function TheqooApp({ onClose, onNotice: externalNotice, visible = true, onBusyChange, onIdle }: {
   onClose: (isBusy?: boolean) => void;
   onNotice?: (message: string) => void;
   visible?: boolean;
@@ -71,6 +72,7 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
+  const { onNotice, feedback: generationFeedback } = useGenerationFeedback(busy ? (generationKind === "search" ? "正在生成搜索结果…" : "正在刷新 theqoo 帖子…") : moreCommentsPostId ? "正在生成更多评论…" : imageBusy ? "正在生成图片…" : publishing ? "正在发布帖子…" : commentBusy ? "正在发布评论…" : null, externalNotice, visible);
   const [imagePrompt, setImagePrompt] = useState("");
   const [textImageDraft, setTextImageDraft] = useState("");
   const [textImageTargetId, setTextImageTargetId] = useState<string | null>(null);
@@ -164,11 +166,12 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
       if (!rows.length) throw new Error("这次没有生成帖子，请重试。");
 
       let followups: Record<string, import("@/lib/theqoo-storage").TheqooComment[]> | null = null;
+      let followupsFailed = false;
       if (processPending && state.posts.some(post => post.comments.some(c => c.authoredByUser && c.pendingRefresh))) {
         try {
           followups = await generateTheqooCommentFollowups(state.posts, state.worldBookIds, state.translationEnabled, state.forumLanguage);
         } catch {
-          onNotice?.("新帖已生成；旧帖的后续讨论暂未生成，下次刷新还会尝试。");
+          followupsFailed = true;
         }
       }
       const done = followups;
@@ -188,9 +191,9 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
         ],
       }));
       setCategory("전체");
-      onNotice?.(processPending ? `已随机刷新 ${rows.length} 条帖子，并处理待回复评论。` : `已按关键词生成 ${rows.length} 条帖子。`);
+      onNotice?.(processPending ? `已随机刷新 ${rows.length} 条帖子${followupsFailed ? "；旧帖的后续讨论生成失败，下次刷新还会尝试。" : "，待回复评论已处理。"}` : `已按关键词生成 ${rows.length} 条帖子。`);
     } catch (error) {
-      onNotice?.(error instanceof Error ? error.message : "刷新失败，请重试。");
+      onNotice?.(error instanceof Error ? `操作失败：${error.message}` : "刷新失败，请重试。");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -217,8 +220,9 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
       const extra = await generateTheqooMoreComments(post, state.worldBookIds, state.translationEnabled, state.forumLanguage);
       setState(s => ({ ...s, posts: s.posts.map(item => item.id === post.id
         ? { ...item, comments: [...item.comments, ...extra] } : item) }));
+      onNotice(extra.length ? `已加载 ${extra.length} 条新评论` : "本次没有新的评论");
     } catch (error) {
-      onNotice?.(error instanceof Error ? error.message : "评论加载失败，请重试。");
+      onNotice?.(error instanceof Error ? `操作失败：${error.message}` : "评论加载失败，请重试。");
     } finally {
       moreBusyRef.current = false;
       setMoreCommentsPostId(null);
@@ -282,7 +286,7 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
         setPage("detail");
       }
     } catch (error) {
-      onNotice?.(error instanceof Error ? error.message : "保存失败，输入已保留，请重试。");
+      onNotice?.(error instanceof Error ? `操作失败：${error.message}` : "保存失败，输入已保留，请重试。");
     } finally {
       setPublishing(false);
     }
@@ -314,7 +318,7 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
       setCommentText("");
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }));
     } catch (error) {
-      onNotice?.(error instanceof Error ? error.message : "评论发布失败，请重试。");
+      onNotice?.(error instanceof Error ? `操作失败：${error.message}` : "评论发布失败，请重试。");
     } finally {
       setCommentBusy(false);
     }
@@ -343,8 +347,9 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
       setImageEditor(false);
       setImagePrompt("");
       setImageTargetId(null);
+      onNotice("图片已生成并添加");
     } catch (error) {
-      onNotice?.(error instanceof Error ? error.message : "生图失败，请重试。");
+      onNotice?.(error instanceof Error ? `操作失败：${error.message}` : "生图失败，请重试。");
     } finally {
       setImageBusy(false);
     }
@@ -395,7 +400,7 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
       const result = await translateTheqooTexts({ test: "今天吃完饭去散步吧" }, state.forumLanguage);
       onNotice?.(`翻译测试成功：${result.test.original}`);
     } catch (error) {
-      onNotice?.(error instanceof Error ? error.message : "翻译测试失败。");
+      onNotice?.(error instanceof Error ? `操作失败：${error.message}` : "翻译测试失败。");
     } finally {
       setPublishing(false);
     }
@@ -454,6 +459,7 @@ export function TheqooApp({ onClose, onNotice, visible = true, onBusyChange, onI
       }[page];
 
   return <div className={styles.app}>
+      {generationFeedback}
     {languageOpen && <div className={styles.overlay} onClick={() => setLanguageOpen(false)}><section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="theqoo-language-title" onClick={e => e.stopPropagation()}><div className={styles.dialogTitle}><span id="theqoo-language-title">{t("인터페이스 언어", "界面语言")}</span><button type="button" onClick={() => setLanguageOpen(false)} aria-label="关闭"><X size={19}/></button></div><div className={styles.languageChoices}>{([{value:"zh",label:"中文 UI"},{value:"ko",label:"韩语 UI"},{value:"ja",label:"日语 UI"}] as const).map(language => <button type="button" key={language.value} aria-pressed={language.value===state.uiLanguage} onClick={() => {setState(previous => ({...previous,uiLanguage:language.value}));setLanguageOpen(false);}}><span>{language.label}</span>{state.uiLanguage===language.value && <Check size={17}/>}</button>)}</div></section></div>}
     <header className={styles.top}>
       <div className={styles.bar}>

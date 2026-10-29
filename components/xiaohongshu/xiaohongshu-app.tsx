@@ -1,4 +1,5 @@
 "use client";
+import { useGenerationFeedback } from "@/components/generation-feedback";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type TouchEvent, type UIEvent, type WheelEvent } from "react";
 import { ShareFat } from "@phosphor-icons/react";
@@ -727,7 +728,7 @@ function CommentList({
   );
 }
 
-export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBusyChange }: XiaohongshuAppProps) {
+export function XiaohongshuApp({ onClose, onNotice: externalNotice, visible = true, onIdle, onBusyChange }: XiaohongshuAppProps) {
   const [state, setState] = useState<XiaohongshuState>(() => loadXiaohongshuState());
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedTab, setSelectedTab] = useState<XiaohongshuTabId>("home");
@@ -737,6 +738,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   const [composeOpen, setComposeOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [busy, setBusy] = useState<BusyState>("idle");
+  const { onNotice, feedback: generationFeedback } = useGenerationFeedback(busy !== "idle" ? ({"npc-feed":"正在生成小红书内容…","character-activity":"正在生成角色动态与互动…","publish":"正在发布笔记…","npc-reaction":"正在生成网友反馈…","character-reaction":"正在生成角色反馈…","comment-reply":"正在生成评论回复…","mention-reply":"正在生成 @ 回复…","more-comments":"正在生成更多评论…","dm-reply":"正在生成私信回复…"} as Record<string,string>)[busy] : null, externalNotice, visible);
   const [error, setError] = useState("");
   const [debugErrorTitle, setDebugErrorTitle] = useState("暂时无法完成小红书操作。");
   const [debugRawOutput, setDebugRawOutput] = useState("");
@@ -949,7 +951,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
       setDebugRawOutput("");
       setDebugParseError(message);
     }
-    onNotice?.(message);
+    onNotice(`${title} ${message}`);
   }
 
   function resolveAuthorAvatar(source: XiaohongshuAuthorType, authorId: string, authorName: string, seed: string): string {
@@ -2478,6 +2480,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
 
   return (
     <section className="xhs-app cp-xhs-module">
+      {generationFeedback}
       {selectedTab !== "profile" && !selectedNote && !selectedDmThread ? (
         <header className="cp-xhs-appbar xhs-appbar">
           <button

@@ -1,4 +1,5 @@
 "use client";
+import { useGenerationFeedback } from "@/components/generation-feedback";
 import { PendingCalendarEvents } from "./calendar/pending-events";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -132,7 +133,7 @@ function formatSimpleDate(dateText: string | null): string {
 
 export function PhoneCalendarApp({
   onClose,
-  onNotice,
+  onNotice: externalNotice,
 }: {
   onClose: () => void;
   onNotice?: (text: string) => void;
@@ -151,6 +152,7 @@ export function PhoneCalendarApp({
   const [showDaysPanel, setShowDaysPanel] = useState(false);
   const [showMenstrualSettings, setShowMenstrualSettings] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { onNotice, feedback: generationFeedback } = useGenerationFeedback(isGenerating ? "正在生成日历行程…" : null, externalNotice);
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [generationFromDate, setGenerationFromDate] = useState(() => {
     const start = new Date(); start.setDate(start.getDate() - 7); return formatIsoDate(start);
@@ -286,14 +288,12 @@ export function PhoneCalendarApp({
     void (async () => {
       autoAttemptedRef.current.add(autoKey);
       setIsGenerating(true);
-      const result = await generateWeeklyCalendarSchedule(selectedOwner.ownerType, selectedOwner.ownerId, weekStart);
-      setIsGenerating(false);
-      if (!result.success) {
-        onNotice?.(result.error || "自动生成失败");
-        return;
-      }
-      refreshPlans();
-      onNotice?.("已自动生成本周角色日程");
+      try {
+        const result = await generateWeeklyCalendarSchedule(selectedOwner.ownerType, selectedOwner.ownerId, weekStart);
+        if (!result.success) { onNotice(`自动生成失败：${result.error || "请重试"}`); return; }
+        refreshPlans(); onNotice("已自动生成本周角色日程");
+      } catch(error) { onNotice(`自动生成失败：${error instanceof Error ? error.message : String(error)}`); }
+      finally { setIsGenerating(false); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoGenerateEnabled, isGenerating, selectedOwner, weekStart]);
@@ -428,6 +428,7 @@ export function PhoneCalendarApp({
     if (isGenerating || generationCharacterIds.length < 1 || generationCharacterIds.length > 3) return;
     setShowGenerateConfirm(false);
     setIsGenerating(true);
+    try {
     const result = await generateCalendarScheduleRange({
       characterIds: generationCharacterIds,
       fromDate: generationFromDate,
@@ -436,15 +437,16 @@ export function PhoneCalendarApp({
       sharedPairs: generationMode === "together" ? generationSharedPairs : [],
       existingMode: generationExistingMode,
     });
-    setIsGenerating(false);
     if (!result.success) {
-      onNotice?.(result.error || "生成失败");
+      onNotice(`生成失败：${result.error || "请重试"}`);
       return;
     }
     refreshPlans();
     onNotice?.(result.generatedCount || result.pendingCount
       ? `已添加 ${result.generatedCount} 条，另有 ${result.pendingCount||0} 条待调整`
       : "AI 本次没有生成值得记录的日程（0 条）");
+    } catch(error) { onNotice(`生成失败：${error instanceof Error ? error.message : String(error)}`); }
+    finally { setIsGenerating(false); }
   };
 
   const openGenerateDialog = () => {
@@ -629,6 +631,7 @@ export function PhoneCalendarApp({
 
   return (
     <div className="calendar-app-shell" data-calendar-theme={config.theme}>
+      {generationFeedback}
       {appliedCalendarCss && <SessionCustomCSS css={appliedCalendarCss} scope=".calendar-app-shell" />}
       <div className="calendar-app"><PendingCalendarEvents/>
         {view === "month" ? (
