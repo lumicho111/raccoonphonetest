@@ -418,9 +418,7 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
                                 <FeaturedCard item={cloudFeaturedItem} />
                             </div>
                             <div className="mt-[10px]">
-                                <CardGrid
-                                    items={SETTINGS_MENU.filter(item => ["toolbox"].includes(item.id)).map(makeCardItem)}
-                                />
+                                <FeaturedCard item={{ ...makeCardItem(SETTINGS_MENU.find(item => item.id === "toolbox")!), desc: "外部工具调用" }} />
                             </div>
                             <div className="mt-[10px]">
                                 <FeaturedCard item={agentComputerFeaturedItem} />

@@ -265,16 +265,16 @@ export function ModerationCenter({ onNotice }: { onNotice?: (msg: string) => voi
     borderRadius: 14,
     padding: "12px 14px",
     marginBottom: 10,
-    fontSize: 13,
+    fontSize: "calc(13px * var(--app-text-scale,1))",
     lineHeight: 1.6,
   };
-  const subStyle: React.CSSProperties = { color: "var(--text-tertiary, #8a8f98)", fontSize: 11.5 };
+  const subStyle: React.CSSProperties = { color: "var(--text-tertiary, #8a8f98)", fontSize: "calc(11.5px * var(--app-text-scale,1))" };
   const btnStyle: React.CSSProperties = {
     border: "1px solid var(--border-soft, rgba(0,0,0,.1))",
     background: "none",
     borderRadius: 999,
     padding: "5px 12px",
-    fontSize: 12,
+    fontSize: "calc(12px * var(--app-text-scale,1))",
     fontWeight: 600,
     cursor: "pointer",
     color: "inherit",
@@ -313,7 +313,7 @@ export function ModerationCenter({ onNotice }: { onNotice?: (msg: string) => voi
           {reports.map(report => (
             <div key={report.id} style={cardStyle}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <strong style={{ fontSize: 12.5 }}>[{TYPE_LABELS[report.contentType] ?? report.contentType}] {report.contentOwnerName || "未知作者"}</strong>
+                <strong style={{ fontSize: "calc(12.5px * var(--app-text-scale,1))" }}>[{TYPE_LABELS[report.contentType] ?? report.contentType}] {report.contentOwnerName || "未知作者"}</strong>
                 <span style={subStyle}>{new Date(report.createdAt).toLocaleString()}</span>
               </div>
               <div style={{ margin: "4px 0", wordBreak: "break-all" }}>{report.contentPreview || "（无内容摘要）"}</div>
@@ -375,7 +375,7 @@ export function ModerationCenter({ onNotice }: { onNotice?: (msg: string) => voi
           {canManageRepo ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 12, borderRadius: 12, background: "var(--surface-inset, rgba(0,0,0,.03))" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>自动审核</div>
+                <div style={{ fontSize: "calc(13px * var(--app-text-scale,1))", fontWeight: 600 }}>自动审核</div>
                 <div style={{ ...subStyle, marginTop: 2 }}>
                   开启后新投稿直接上架、不再排队。任何人传的东西都会立刻公开，只能事后下架。
                 </div>
@@ -393,24 +393,24 @@ export function ModerationCenter({ onNotice }: { onNotice?: (msg: string) => voi
             return (
               <div key={item.number} style={cardStyle}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <strong style={{ fontSize: 12.5 }}>{item.title}</strong>
+                  <strong style={{ fontSize: "calc(12.5px * var(--app-text-scale,1))" }}>{item.title}</strong>
                   <span style={subStyle}>{new Date(item.createdAt).toLocaleString()}</span>
                 </div>
                 <div style={subStyle}>提交账号：{item.author}</div>
-                {item.body ? <div style={{ margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontSize: 12 }}>{item.body}</div> : null}
+                {item.body ? <div style={{ margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontSize: "calc(12px * var(--app-text-scale,1))" }}>{item.body}</div> : null}
 
                 {expanded && files === "loading" ? <p style={subStyle}><Loader2 size={13} className="animate-spin" style={{ verticalAlign: -2 }} /> 内容加载中…</p> : null}
                 {expanded && Array.isArray(files) ? (
                   <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
                     {files.map(file => (
                       <div key={file.path} style={{ border: "1px solid var(--border-soft, rgba(0,0,0,.08))", borderRadius: 10, padding: "6px 8px" }}>
-                        <div style={{ fontSize: 11.5, fontWeight: 600, wordBreak: "break-all" }}>{file.path}</div>
+                        <div style={{ fontSize: "calc(11.5px * var(--app-text-scale,1))", fontWeight: 600, wordBreak: "break-all" }}>{file.path}</div>
                         {file.imageDataUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img src={file.imageDataUrl} alt="" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 6, marginTop: 4 }} />
                         ) : null}
                         {file.textPreview ? (
-                          <pre style={{ margin: "4px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontSize: 11, maxHeight: 180, overflowY: "auto", fontFamily: "inherit" }}>{file.textPreview}</pre>
+                          <pre style={{ margin: "4px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontSize: "calc(11px * var(--app-text-scale,1))", maxHeight: 180, overflowY: "auto", fontFamily: "inherit" }}>{file.textPreview}</pre>
                         ) : null}
                         {file.note ? <div style={subStyle}>{file.note}</div> : null}
                       </div>
@@ -424,7 +424,7 @@ export function ModerationCenter({ onNotice }: { onNotice?: (msg: string) => voi
                       value={shareRejectReason}
                       onChange={event => setShareRejectReason(event.target.value)}
                       placeholder="拒绝理由（可选，投稿人可见）"
-                      style={{ flex: 1, minWidth: 0, border: "1px solid var(--border-soft, rgba(0,0,0,.1))", borderRadius: 10, padding: "6px 10px", fontSize: 12, background: "var(--surface-inset, rgba(0,0,0,.03))", color: "inherit", outline: "none" }}
+                      style={{ flex: 1, minWidth: 0, border: "1px solid var(--border-soft, rgba(0,0,0,.1))", borderRadius: 10, padding: "6px 10px", fontSize: "calc(12px * var(--app-text-scale,1))", background: "var(--surface-inset, rgba(0,0,0,.03))", color: "inherit", outline: "none" }}
                     />
                     <button type="button" style={dangerBtn} disabled={!!shareBusy[item.number]} onClick={() => void runShareAction(item, "reject", shareRejectReason)}>
                       {shareBusy[item.number] === "reject"
@@ -461,7 +461,7 @@ export function ModerationCenter({ onNotice }: { onNotice?: (msg: string) => voi
               onChange={event => setUserQuery(event.target.value)}
               onKeyDown={event => { if (event.key === "Enter") void searchUser(); }}
               placeholder="输入用户名精确查找"
-              style={{ flex: 1, minWidth: 0, border: "1px solid var(--border-soft, rgba(0,0,0,.1))", borderRadius: 12, padding: "8px 12px", fontSize: 13, background: "var(--surface-inset, rgba(0,0,0,.03))", color: "inherit", outline: "none" }}
+              style={{ flex: 1, minWidth: 0, border: "1px solid var(--border-soft, rgba(0,0,0,.1))", borderRadius: 12, padding: "8px 12px", fontSize: "calc(13px * var(--app-text-scale,1))", background: "var(--surface-inset, rgba(0,0,0,.03))", color: "inherit", outline: "none" }}
             />
             <button type="button" style={{ ...btnStyle, display: "inline-flex", alignItems: "center", gap: 4 }} disabled={userBusy} onClick={() => void searchUser()}>
               <Search size={13} />查找
