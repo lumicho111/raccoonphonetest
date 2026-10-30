@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Pause, Play, Volume2 } from "lucide-react";
 import type { WeversePost } from "@/lib/weverse-storage";
-import { playAudioBlobViaMediaElement, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
+import { playAudioBlobViaMediaElement, resolveUserVoiceConfig, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
 import styles from "./weverse-app.module.css";
 
 type Props = {
@@ -57,7 +57,7 @@ export function WeverseVoicePost({ post, onNotice }: Props) {
       stop();
       return;
     }
-    const voiceConfig = resolveVoiceConfig(post.authorId, "weverse");
+    const voiceConfig = post.authorId.startsWith("user:") ? resolveUserVoiceConfig() : resolveVoiceConfig(post.authorId, "weverse");
     if (!voiceConfig || !voiceConfig.enableTTS) {
       onNotice?.("请先在配置绑定中为这个角色的 Weverse 绑定可用语音方案");
       return;

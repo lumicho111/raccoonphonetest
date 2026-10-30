@@ -306,17 +306,17 @@ export function loadPendingCalendarGroups():PendingCalendarGroup[]{try{return JS
 export function removePendingCalendarGroup(id:string){kvSet(PENDING_KEY,JSON.stringify(loadPendingCalendarGroups().filter(g=>g.id!==id)));}
 export function applyGeneratedCalendarRange(generatedByOwner:Array<{ownerId:string;items:CalendarScheduleItem[]}>,fromDate:string,toDate:string,mode:"supplement"|"replan"): {saved:number;pending:number} {
  const store=loadStore();
- const replaced=mode==="replan"?new Set(generatedByOwner.flatMap(({ownerId})=>store.plans.filter(p=>p.ownerType==="character"&&p.ownerId===ownerId).flatMap(p=>p.items).filter(i=>i.source==="generated"&&i.date>=fromDate&&i.date<=toDate).map(i=>i.sharedGroupId).filter(Boolean))):new Set();
+ const replaced=mode==="replan"?new Set(generatedByOwner.flatMap(({ownerId})=>store.plans.filter(p=>p.ownerType===(ownerId.startsWith("user:")?"user":"character")&&p.ownerId===(ownerId.startsWith("user:")?"self":ownerId)).flatMap(p=>p.items).filter(i=>i.source==="generated"&&i.date>=fromDate&&i.date<=toDate).map(i=>i.sharedGroupId).filter(Boolean))):new Set();
  const plans=store.plans.map(p=>({...p,items:p.items.filter(i=>!((i.sharedGroupId&&replaced.has(i.sharedGroupId))||(mode==="replan"&&generatedByOwner.some(o=>o.ownerId===p.ownerId)&&p.ownerType==="character"&&i.source==="generated"&&i.date>=fromDate&&i.date<=toDate)))}));
  const groups=new Map<string,PendingCalendarGroup>();
  for(const {ownerId,items} of generatedByOwner)for(const item of items){if(item.date<fromDate||item.date>toDate)continue;const key=item.sharedGroupId||item.id;const g=groups.get(key)||{id:key,owners:[],conflicts:[]};g.owners.push({ownerId,item});groups.set(key,g);}
  let saved=0;const pending=loadPendingCalendarGroups();
  for(const group of groups.values()){
   group.conflicts=[];
-  const additions=group.owners.filter(({ownerId,item})=>!plans.filter(p=>p.ownerType==="character"&&p.ownerId===ownerId).flatMap(p=>p.items).some(i=>(i.id===item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title&&i.visibility===item.visibility&&i.kind===item.kind&&i.publicAt===item.publicAt&&i.contentDescription===item.contentDescription&&i.location===item.location&&i.busyLevel===item.busyLevel)||(i.id!==item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title)));
-  for(const {ownerId,item} of additions)if(item.kind!=="milestone")for(const existing of plans.filter(p=>p.ownerType==="character"&&p.ownerId===ownerId).flatMap(p=>p.items))if(existing.id!==item.id&&existing.kind!=="milestone"&&existing.date===item.date&&existing.startTime<item.endTime&&item.startTime<existing.endTime)group.conflicts.push(`${ownerId}：${existing.date} ${existing.startTime}–${existing.endTime} ${existing.title}`);
+  const additions=group.owners.filter(({ownerId,item})=>!plans.filter(p=>p.ownerType===(ownerId.startsWith("user:")?"user":"character")&&p.ownerId===(ownerId.startsWith("user:")?"self":ownerId)).flatMap(p=>p.items).some(i=>(i.id===item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title&&i.visibility===item.visibility&&i.kind===item.kind&&i.publicAt===item.publicAt&&i.contentDescription===item.contentDescription&&i.location===item.location&&i.busyLevel===item.busyLevel)||(i.id!==item.id&&i.date===item.date&&i.startTime===item.startTime&&i.endTime===item.endTime&&i.title===item.title)));
+  for(const {ownerId,item} of additions)if(item.kind!=="milestone")for(const existing of plans.filter(p=>p.ownerType===(ownerId.startsWith("user:")?"user":"character")&&p.ownerId===(ownerId.startsWith("user:")?"self":ownerId)).flatMap(p=>p.items))if(existing.id!==item.id&&existing.kind!=="milestone"&&existing.date===item.date&&existing.startTime<item.endTime&&item.startTime<existing.endTime)group.conflicts.push(`${ownerId}：${existing.date} ${existing.startTime}–${existing.endTime} ${existing.title}`);
   if(group.conflicts.length){pending.push(group);continue;}
-  for(const {ownerId,item} of additions){const weekStart=getWeekStartIso(new Date(`${item.date}T00:00:00`));let plan=plans.find(p=>p.ownerType==="character"&&p.ownerId===ownerId&&p.weekStart===weekStart);if(!plan){plan={id:`calendar_${Date.now()}_${Math.random()}`,ownerType:"character",ownerId,weekStart,items:[],updatedAt:new Date().toISOString()};plans.push(plan);}plan.items=plan.items.filter(i=>i.id!==item.id);for(const other of plans)if(other!==plan&&other.ownerType==="character"&&other.ownerId===ownerId)other.items=other.items.filter(i=>i.id!==item.id);plan.items.push(item);saved++;}
+  for(const {ownerId,item} of additions){const weekStart=getWeekStartIso(new Date(`${item.date}T00:00:00`));let plan=plans.find(p=>p.ownerType===(ownerId.startsWith("user:")?"user":"character")&&p.ownerId===(ownerId.startsWith("user:")?"self":ownerId)&&p.weekStart===weekStart);if(!plan){plan={id:`calendar_${Date.now()}_${Math.random()}`,ownerType:ownerId.startsWith("user:")?"user":"character",ownerId:ownerId.startsWith("user:")?"self":ownerId,weekStart,items:[],updatedAt:new Date().toISOString()};plans.push(plan);}plan.items=plan.items.filter(i=>i.id!==item.id);for(const other of plans)if(other!==plan&&other.ownerType===(ownerId.startsWith("user:")?"user":"character")&&other.ownerId===(ownerId.startsWith("user:")?"self":ownerId))other.items=other.items.filter(i=>i.id!==item.id);plan.items.push(item);saved++;}
  }
  kvSet(PENDING_KEY,JSON.stringify(pending));saveStore({plans});return {saved,pending:[...groups.values()].filter(g=>g.conflicts.length).length};
 }
@@ -552,4 +552,11 @@ export function getCalendarOwnerLabel(ownerType: CalendarOwnerType, ownerName: s
 
 export function getCalendarOwnerKey(ownerType: CalendarOwnerType, ownerId: string): string {
   return getOwnerStorageKey(ownerType, ownerId);
+}
+
+/** Public user plans are shared facts; unreleased descriptions stay out of model input. */
+export function buildUserPublicCalendarContext(): string {
+ const now=Date.now(),lower=new Date(now-7*86400000).toISOString().slice(0,10),upper=new Date(now+35*86400000).toISOString().slice(0,10);
+ const rows=loadOwnerCalendarPlans("user","self").flatMap(p=>p.items).filter(i=>i.visibility==="public"&&i.date>=lower&&i.date<=upper).sort((a,b)=>(a.date+a.startTime).localeCompare(b.date+b.startTime)).slice(0,20).map(i=>`${i.date} ${i.startTime} ${i.title}${i.location?` @${i.location}`:""}${schedulePublicContentSuffix(i)}`);
+ return rows.length?`用户已公开的日程安排（仅作可知事实，按话题自然使用）：\n${rows.join("\n")}`.slice(0,6000):"";
 }

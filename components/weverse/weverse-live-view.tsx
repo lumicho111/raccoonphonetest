@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BadgeCheck, ChevronRight, Heart, LoaderCircle, Play, Send, Square, Volume2, X } from "lucide-react";
 import type { WeverseLive } from "@/lib/weverse-storage";
-import { playAudioBlobViaMediaElement, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
+import { playAudioBlobViaMediaElement, resolveUserVoiceConfig, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
 import styles from "./weverse-app.module.css";
 
 type Props = {
+  isUserHost?: boolean; onHostSend?:(text:string,kind:"speech"|"action")=>void;
   live: WeverseLive;
   speakerNames: Record<string, string>;
   speakerAvatars: Record<string, string>;
@@ -50,8 +51,9 @@ function liveElapsed(startedAt: number, endAt: number): string {
   return `${String(min).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
 }
 
-export function WeverseLiveView({ live, speakerNames, speakerAvatars, userName, busy, onBack, onAdvance, onSendComment, onHeart, onFinalizeEnd, onManualEnd }: Props) {
+export function WeverseLiveView({ isUserHost,onHostSend, live, speakerNames, speakerAvatars, userName, busy, onBack, onAdvance, onSendComment, onHeart, onFinalizeEnd, onManualEnd }: Props) {
   const [clock, setClock] = useState(() => Date.now());
+  const [hostKind,setHostKind]=useState<"speech"|"action">("speech");
   const [draft, setDraft] = useState("");
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
   const [artistCommentsOpen, setArtistCommentsOpen] = useState(false);
@@ -148,7 +150,7 @@ export function WeverseLiveView({ live, speakerNames, speakerAvatars, userName, 
       return;
     }
 
-    const voiceConfig = resolveVoiceConfig(characterId, "weverse");
+    const voiceConfig = characterId.startsWith("user:") ? resolveUserVoiceConfig() : resolveVoiceConfig(characterId, "weverse");
     if (!voiceConfig || !voiceConfig.enableTTS) {
       showVoiceNotice("请先在配置绑定中为 Weverse 绑定可用的语音方案");
       return;
@@ -196,7 +198,7 @@ export function WeverseLiveView({ live, speakerNames, speakerAvatars, userName, 
   const sendDraft = () => {
     const value = draft.trim();
     if (!value || live.status === "ended") return;
-    onSendComment(value);
+    if(isUserHost)onHostSend?.(value,hostKind);else onSendComment(value);
     setDraft("");
   };
 
@@ -318,14 +320,15 @@ export function WeverseLiveView({ live, speakerNames, speakerAvatars, userName, 
 
       <div className={styles.liveBottomPanel}>
         {live.status === "live" ? <div className={styles.liveComposer}>
+          {isUserHost && <button type="button" onClick={()=>setHostKind(k=>k==="speech"?"action":"speech")}>{hostKind==="speech"?"语":"动"}</button>}
           <input
             value={draft}
             disabled={isEnding}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); sendDraft(); } }}
-            placeholder={isEnding ? "角色正在收尾…" : "输入评论，回车发送"}
+            placeholder={isUserHost ? (hostKind==="speech"?"说点什么…":"写下动作…") : isEnding ? "角色正在收尾…" : "输入评论，回车发送"}
           />
-          <button type="button" className={styles.livePlaneButton} onClick={onAdvance} disabled={!canAdvance} aria-label={busy ? "生成中" : isPlaying ? "播放中" : "召唤或继续播放"}><Send size={18} /></button>
+          <button type="button" className={styles.livePlaneButton} onClick={()=>isUserHost && draft.trim() ? sendDraft() : onAdvance()} disabled={isUserHost ? busy : !canAdvance} aria-label={busy ? "生成中" : isPlaying ? "播放中" : "召唤或继续播放"}><Send size={18} /></button>
           <button type="button" className={styles.liveHeartButton} onClick={tapHeart} aria-label="点赞"><Heart size={20} fill="currentColor" /></button>
           <div className={styles.liveHeartFloatLayer}>{heartBursts.map((item) => <Heart key={item.id} className={styles.liveHeartFloat} style={{ left: `${item.x}%` }} size={19} fill="currentColor" />)}</div>
         </div> : <div className={styles.liveEndedBanner}>LIVE 已结束</div>}

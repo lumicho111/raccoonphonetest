@@ -198,3 +198,8 @@ export function deleteWeverseLiveMemory(liveId: string): void {
     saveEventsByKey(key, next);
   }
 }
+
+/** A later replay view, not a live presence or a reply task. */
+export function recordWeverseReplaySummary(characterId:string,liveId:string,title:string,summary:string):void {
+ upsert(characterId,{id:`weverse_live_viewer_${liveId}_${characterId}`,timestamp:new Date().toISOString(),shared:false,sourceKeys:[`wvs:${liveId}`],content:`[Weverse 回放观看] 该角色后来观看了直播《${title}》的整场回放：${summary}`});
+}

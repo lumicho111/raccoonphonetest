@@ -542,7 +542,8 @@ export async function generateWeverseScheduleBatch(
 ): Promise<GeneratedWeverseScheduleItem[]> {
   const resolved = await resolveCommunityApi(community);
   const now = options?.now ?? new Date();
-  const characters = loadCharacters().filter((item) => community.memberCharacterIds.includes(item.id));
+  const identity = community.userIdentityId ? resolveUserIdentity(undefined,"weverse") : null;
+  const characters = community.userIdentityId ? [{id:`user:${community.userIdentityId}`,name:identity?.name || community.name,persona:identity?.bio || community.description || "",timeZone:getSystemTimeZone()}] : loadCharacters().filter((item) => community.memberCharacterIds.includes(item.id));
   const memberRows = characters.map((item) => `${item.id} = ${item.name}：${(item.persona||"").slice(0,1200)}`).join("\n").slice(0,6000);
   const existingRows = existing
     .filter((item) => item.communityId === community.id)
@@ -770,6 +771,7 @@ export async function generateWeverseLiveOpening(
         role: "system",
         content: [
           ...liveFormatRules(true, requestedLiveType),
+          (community.memberProfiles[characterId]?.liveStyle || community.liveStyle) ? `直播风格：${(community.memberProfiles[characterId]?.liveStyle || community.liveStyle || "").slice(0,6000)}。作为长期倾向，结合本次主题自然变化。` : "",
           options?.opportunistic ? '这是刷新时的一次随性开播机会。结合本人心情、近期生活和世界线中的直播习惯决定现在是否想播；想播时返回shouldStart:true与开场，不想播时只返回{"shouldStart":false}。' : "按本人状态自然开播，延续世界线中设定的直播习惯。",
           theme ? `用户给了一个软主题：${theme}。这是方向，不是脚本；按人设自然发挥、允许跑题。` : "用户没有指定主题。请结合人设、近期经历、当前时间与状态，自然决定为什么突然开播以及想聊什么。",
           "开场先只让最初开播者自己在 Stage 上，不要立刻安排其他艺人连线。",
@@ -820,6 +822,7 @@ export async function generateWeverseLiveContinuation(
         role: "system",
         content: [
           ...liveFormatRules(false, live.liveType),
+          (community.memberProfiles[characterId]?.liveStyle || community.liveStyle) ? `直播风格：${(community.memberProfiles[characterId]?.liveStyle || community.liveStyle || "").slice(0,6000)}` : "",
           `本场 LIVE 标题：${live.title}`,
           live.theme ? `最初的软主题：${live.theme}` : "本场没有预设主题。",
           `这已经是第 ${Math.max(1, live.roundCount + 1)} 段推进。`,

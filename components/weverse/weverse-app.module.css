@@ -850,3 +850,7 @@
 .textPhotoCard{display:flex;align-items:center;justify-content:center;width:min(100%,270px);min-height:200px;margin:12px 0;padding:22px;border:0;border-radius:16px;background:#f2f3f7;color:#565967;line-height:1.6;text-align:center;overflow-wrap:anywhere}
 .textPhotoCard{height:180px;min-height:180px;padding:16px;color:#222029;overflow:hidden}
 .textPhotoScroll{display:block;max-width:100%;max-height:100%;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;line-height:1.5;text-align:center;overflow-wrap:anywhere}
+
+.root :global(.wvs-community-dialog){inset:24px 16px;max-height:calc(100% - 48px);height:auto;border-radius:24px;overflow:hidden;box-shadow:0 0 0 100vmax #0005}
+
+.root :global(.wvs-create-popover){position:absolute;right:16px;bottom:84px;width:210px;max-width:calc(100% - 32px);border-radius:20px;padding:14px}

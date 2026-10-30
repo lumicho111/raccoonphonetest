@@ -9,6 +9,7 @@ registerKvMigration(WEV_STATE_KEY);
 
 export type WeverseAccountProfile = { displayName: string; avatarUrl?: string; bio?: string };
 export type WeverseMemberProfile = {
+  liveStyle?: string;
   characterId: string;
   displayName?: string;
   avatarUrl?: string;
@@ -24,6 +25,8 @@ export type WeverseMemberProfile = {
 export type WeverseHistoryMode = "new" | "existing" | "custom";
 
 export type WeverseCommunity = {
+  userIdentityId?: string;
+  liveStyle?: string;
   id: string; name: string; description?: string; avatarUrl?: string; coverUrl?: string;
   official: WeverseAccountProfile;
   memberCharacterIds: string[];
@@ -252,6 +255,8 @@ function normalizeCommunity(raw: unknown): WeverseCommunity | null {
   const historyMode: WeverseHistoryMode = item.historyMode === "new" || item.historyMode === "custom" ? item.historyMode : item.historyMode === "existing" ? "existing" : "new";
   return { id: item.id, name: item.name, description: typeof item.description === "string" ? item.description : undefined, avatarUrl: typeof item.avatarUrl === "string" ? item.avatarUrl : undefined, coverUrl: typeof item.coverUrl === "string" ? item.coverUrl : undefined,
     official: { displayName: typeof officialRaw.displayName === "string" && officialRaw.displayName.trim() ? officialRaw.displayName : `${item.name} Official`, avatarUrl: typeof officialRaw.avatarUrl === "string" ? officialRaw.avatarUrl : undefined, bio: typeof officialRaw.bio === "string" ? officialRaw.bio : undefined },
+    userIdentityId: typeof item.userIdentityId === "string" ? item.userIdentityId : undefined,
+    liveStyle: typeof item.liveStyle === "string" ? item.liveStyle : undefined,
     memberCharacterIds: uniqueStrings(item.memberCharacterIds), memberProfiles: profiles as Record<string, WeverseMemberProfile>, officialMediaPhotoIds: uniqueStrings(item.officialMediaPhotoIds), fanCount: finiteNonNegative(item.fanCount, 100000),
     historyMode, historyStartAt: typeof item.historyStartAt === "number" && Number.isFinite(item.historyStartAt) ? item.historyStartAt : undefined,
     historyInitializedAt: typeof item.historyInitializedAt === "number" && Number.isFinite(item.historyInitializedAt) ? item.historyInitializedAt : undefined,

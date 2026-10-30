@@ -30,13 +30,13 @@ export function reconcileCalendarMaster(){
   }
   const schedules:WeverseScheduleItem[]=[];
   for(const community of wvs.communities||[])for(const plan of store.plans){
-   if(plan.ownerType!=="character"||!community.memberCharacterIds.includes(plan.ownerId))continue;
+   if(plan.ownerType==="user" ? !community.userIdentityId : !community.memberCharacterIds.includes(plan.ownerId))continue;
    for(const item of plan.items){
     if(!isPublicCalendarItem(item))continue;
     const identity=item.externalId||item.sharedGroupId||item.id;
     const id=item.externalId||`cal_${community.id}_${identity}`;
     const existing=schedules.find(s=>s.id===id);if(existing){existing.memberCharacterIds.push(plan.ownerId);continue;}
-    schedules.push({id,communityId:community.id,title:item.title,contentDescription:item.contentDescription,publicAt:item.publicAt ? scheduleContentUnlockAt(item,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()) : undefined,type:item.wvsType||(item.kind==="milestone"?"release":"performance"),visibility:"public",calendarSync:item.kind!=="milestone",busyLevel:item.kind==="milestone"?1:(item.busyLevel||3),startsAt:calendarWallTimeToInstant(item.date,item.startTime,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()),endsAt:calendarWallTimeToInstant(item.date,item.endTime,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()),location:item.location,memberCharacterIds:[plan.ownerId],source:"manual",createdAt:new Date(item.createdAt).getTime(),updatedAt:new Date(item.updatedAt).getTime()});
+    schedules.push({id,communityId:community.id,title:item.title,contentDescription:item.contentDescription,publicAt:item.publicAt ? scheduleContentUnlockAt(item,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()) : undefined,type:item.wvsType||(item.kind==="milestone"?"release":"performance"),visibility:"public",calendarSync:item.kind!=="milestone",busyLevel:item.kind==="milestone"?1:(item.busyLevel||3),startsAt:calendarWallTimeToInstant(item.date,item.startTime,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()),endsAt:calendarWallTimeToInstant(item.date,item.endTime,loadCharacters().find(c=>c.id===plan.ownerId)?.timeZone||getSystemTimeZone()),location:item.location,memberCharacterIds:[plan.ownerType==="user" ? `user:${community.userIdentityId}` : plan.ownerId],source:"manual",createdAt:new Date(item.createdAt).getTime(),updatedAt:new Date(item.updatedAt).getTime()});
    }
   }
   // Only public projections are exposed by WVS; private originals now live in Calendar.
