@@ -54,6 +54,7 @@ function liveElapsed(startedAt: number, endAt: number): string {
 export function WeverseLiveView({ isUserHost,onHostSend, live, speakerNames, speakerAvatars, userName, busy, onBack, onAdvance, onSendComment, onHeart, onFinalizeEnd, onManualEnd }: Props) {
   const [clock, setClock] = useState(() => Date.now());
   const [hostKind,setHostKind]=useState<"speech"|"action">("speech");
+  const commentsFollow=useRef(true);
   const [draft, setDraft] = useState("");
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
   const [artistCommentsOpen, setArtistCommentsOpen] = useState(false);
@@ -112,8 +113,7 @@ export function WeverseLiveView({ isUserHost,onHostSend, live, speakerNames, spe
   useEffect(() => {
     const box = commentBoxRef.current;
     if (!box) return;
-    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 110;
-    if (nearBottom) box.scrollTop = box.scrollHeight;
+    if(commentsFollow.current) box.scrollTo({top:box.scrollHeight,behavior:"smooth"});
   }, [visibleComments.length]);
 
   useEffect(() => {
@@ -242,7 +242,7 @@ export function WeverseLiveView({ isUserHost,onHostSend, live, speakerNames, spe
             })}</div>
             {latestVoiceSystem ? <div className={styles.voiceLiveSystem}>{latestVoiceSystem.original}</div> : null}
           </div>
-          <div ref={commentBoxRef} className={`${styles.liveComments} ${styles.voiceLiveComments}`}>
+          <div ref={commentBoxRef} className={`${styles.liveComments} ${styles.voiceLiveComments}`} onWheel={e=>{if(e.deltaY<0)commentsFollow.current=false;}} onTouchStart={()=>{commentsFollow.current=false;}} onPointerDown={()=>{commentsFollow.current=false;}} onScroll={e=>{const b=e.currentTarget;if(b.scrollHeight-b.scrollTop-b.clientHeight<40)commentsFollow.current=true;}}>
             {visibleComments.map((comment) => (
               <div key={comment.id} className={`${styles.liveComment} ${comment.authorType === "user" ? styles.liveCommentMe : ""} ${comment.authorType === "artist" ? styles.liveCommentArtist : ""}`}>
                 {comment.authorType === "artist" ? <span className={styles.liveArtistCommentAvatar}>{comment.authorAvatarUrl ? <img src={comment.authorAvatarUrl} alt="" /> : comment.authorName.slice(0,1)}</span> : null}
@@ -304,7 +304,7 @@ export function WeverseLiveView({ isUserHost,onHostSend, live, speakerNames, spe
         </article>)}</div>
       </div> : null}
 
-      {!isVoiceLive ? <div ref={commentBoxRef} className={styles.liveComments}>
+      {!isVoiceLive ? <div ref={commentBoxRef} className={styles.liveComments} onWheel={e=>{if(e.deltaY<0)commentsFollow.current=false;}} onTouchStart={()=>{commentsFollow.current=false;}} onPointerDown={()=>{commentsFollow.current=false;}} onScroll={e=>{const b=e.currentTarget;if(b.scrollHeight-b.scrollTop-b.clientHeight<40)commentsFollow.current=true;}}>
         {visibleComments.map((comment) => (
           <div key={comment.id} className={`${styles.liveComment} ${comment.authorType === "user" ? styles.liveCommentMe : ""} ${comment.authorType === "artist" ? styles.liveCommentArtist : ""}`}>
             {comment.authorType === "artist" ? <span className={styles.liveArtistCommentAvatar}>{comment.authorAvatarUrl ? <img src={comment.authorAvatarUrl} alt="" /> : comment.authorName.slice(0,1)}</span> : null}

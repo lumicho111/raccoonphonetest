@@ -854,3 +854,7 @@
 .root :global(.wvs-community-dialog){inset:24px 16px;max-height:calc(100% - 48px);height:auto;border-radius:24px;overflow:hidden;box-shadow:0 0 0 100vmax #0005}
 
 .root :global(.wvs-create-popover){position:absolute;right:16px;bottom:84px;width:210px;max-width:calc(100% - 32px);border-radius:20px;padding:14px}
+
+.root :global(.wvs-community-dialog){top:max(76px,calc(env(safe-area-inset-top,0px) + 36px));bottom:max(32px,calc(env(safe-area-inset-bottom,0px) + 16px));max-height:calc(100% - 108px);min-height:0}
+.root :global(.wvs-community-dialog) .modalHeader{flex-shrink:0}
+.root :global(.wvs-self-badge){font-size:calc(10px * var(--app-text-scale,1));color:#8b9096;margin-left:auto}

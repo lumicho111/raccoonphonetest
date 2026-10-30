@@ -135,7 +135,8 @@ async function resolveCharacterGeneration(characterId: string, community: Wevers
   const allRegexes = loadRegexes();
   const regexes = (slot.regexIds || []).map((id) => allRegexes.find((item) => item.id === id)).filter(Boolean) as RegexConfig[];
 
-  const userIdentity = resolveUserIdentity(character.id, "weverse");
+  const fan=loadWeverseState().userProfile;
+  const userIdentity = {id:"wvs-fan",name:fan?.displayName || "我",avatarUrl:fan?.avatarUrl,bio:fan?.bio || "",gender:"",age:"",occupation:"",customSettings:""};
   const userName = userIdentity?.name || "用户";
   const prepared = prepareShortTermContext(character.id, "weverse", { history: [] });
   const memConfig = loadMemoryConfig();
