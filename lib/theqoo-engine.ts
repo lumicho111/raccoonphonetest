@@ -1,3 +1,6 @@
+import { loadTheqooPrompt } from "./theqoo-prompt-settings";
+import { forumMaterialCandidates, forumMaterialText, planForumMaterials } from "./theqoo-materials";
+import { worldlineContextForApp } from "./worldline-storage";
 import { schedulePublicContentSuffix } from "./schedule-public-content";
 import { calendarPublicClues } from "./calendar-public-clues";
 import { isPublicCalendarItem } from "./calendar-master";
@@ -20,8 +23,9 @@ export function theqooLanguagePrompt(text: string, language: TheqooForumLanguage
 
 const pickText = (value: unknown, max: number) => typeof value === "string" ? value.trim().slice(0, max) : "";
 
-function selectedWorldBookText(_legacyIds: string[]) {
-  return boundSocialWorldBooks("theqoo").map(book => `${book.name}：${book.entries.filter(entry => !entry.disable).map(entry => entry.content).join("；")}`).join("\n").slice(0, 4200);
+function selectedWorldBookText(_legacyIds: string[], query = "") {
+  const candidates = forumMaterialCandidates(boundSocialWorldBooks("theqoo"), query, () => 1);
+  return forumMaterialText(candidates, candidates.filter(e=>e.rank>0).slice(0,6).map(e=>e.id));
 }
 
 export const THEQOO_CATEGORIES = ["HOT", "뉴스", "정보", "생활", "잡담", "유머", "뷰티", "영화·방송", "아이돌"] as const;
@@ -69,6 +73,13 @@ function scheduleContext(settings: TheqooSourceSettings): string {
   const start = new Date(now - 7 * 86400000).toISOString().slice(0, 10);
   const end = new Date(now + 35 * 86400000).toISOString().slice(0, 10);
   const lines: string[] = [];
+  const dated: Array<{date:string; text:string}> = [];
+  const seen = new Set<string>();
+  const add = (owner: string, date: string, title: string, suffix: string) => {
+    const key = `${owner}|${date}|${title.normalize("NFKC").replace(/\s/g, "")}`;
+    if(seen.has(key))return;seen.add(key);
+    dated.push({date,text:`${date} ${owner}：${title.slice(0,80)}${suffix.slice(0,260)}`});
+  };
   if (settings.includeCalendar) {
     const owners: ["user" | "character", string, string][] = [
       ["user", "self", "U"],
@@ -78,7 +89,7 @@ function scheduleContext(settings: TheqooSourceSettings): string {
       for (const plan of loadOwnerCalendarPlans(type, id)) {
         for (const item of plan.items) {
           if (isPublicCalendarItem(item) && item.date >= start && item.date <= end) {
-            lines.push(`手机日历(${name}) ${item.date}: ${item.title.slice(0, 80)}${schedulePublicContentSuffix(item,now,loadCharacters().find(c=>c.id===id)?.timeZone)}`);
+            add(name, item.date, item.title, schedulePublicContentSuffix(item,now,loadCharacters().find(c=>c.id===id)?.timeZone));
           }
         }
       }
@@ -89,11 +100,16 @@ function scheduleContext(settings: TheqooSourceSettings): string {
     for (const item of state.schedules) {
       if (item.visibility !== "public" || item.startsAt < now - 7 * 86400000 || item.startsAt > now + 35 * 86400000) continue;
       const community = state.communities.find(c => c.id === item.communityId);
-      lines.push(`WVS公开日程(${community?.name || "社区"}) ${new Date(item.startsAt).toISOString().slice(0, 10)}: ${item.title.slice(0, 80)}${schedulePublicContentSuffix(item,now)}`);
+      for (const id of item.memberCharacterIds.length ? item.memberCharacterIds : [""]) {
+        const member = loadCharacters().find(c=>c.id===id);
+        const date = new Intl.DateTimeFormat("sv-SE", {timeZone:member?.timeZone || "Asia/Seoul"}).format(new Date(item.startsAt));
+        add(id.startsWith("user:") ? "U" : member?.name || community?.name || "社区", date, item.title, schedulePublicContentSuffix(item,now));
+      }
     }
   }
   if(settings.includeCalendar || settings.includeWeverseSchedule) for(const char of loadCharacters().filter(c=>settings.includeCalendar || loadWeverseState().communities.some(w=>w.memberCharacterIds.includes(c.id))).slice(0,12)) lines.unshift(...calendarPublicClues(char.id,now));
-  return lines.slice(0, 18).join("；");
+  const nearest = dated.sort((a,b)=>Math.abs(Date.parse(a.date)-now)-Math.abs(Date.parse(b.date)-now)).slice(0,18).map(row=>row.text);
+  return [...new Set([...lines.slice(0,2).map(line=>line.slice(0,200)),...nearest])].slice(0,18).map(line=>line.slice(0,340)).join("；").slice(0,2200);
 }
 
 function getForumConfig() {
@@ -120,13 +136,21 @@ export async function generateTheqooPosts(
   const presets = loadPresets();
   const presetId = resolveBinding(loadBindingConfig(), undefined, "theqoo").presetId;
   const preset = presets.find(p => p.id === presetId) ?? presets.find(p => p.builtIn) ?? presets[0] ?? null;
-  const world = selectedWorldBookText(worldBookIds);
+  const direction = loadTheqooPrompt();
   const schedules = scheduleContext(sourceSettings);
-  const scheduleBatch = schedules ? Math.floor(Math.random() * 3) : -1;
   const headlines: string[] = forumLanguage === "ja" ? [] : await fetch("/api/theqoo/trends")
     .then(r => r.ok ? r.json() : null)
     .then(data => Array.isArray(data?.titles) ? data.titles.slice(0, 8).filter((value: unknown): value is string => typeof value === "string") : [])
     .catch(() => []);
+
+  const materials = await planForumMaterials(config, boundSocialWorldBooks("theqoo"), [
+    worldlineContextForApp("theqoo", {publicEvents:true, focusText:keyword}),
+    keyword ? `搜索：${keyword}` : "随机刷新，允许完全独立于设定人物的日常话题。",
+    schedules ? `已开启的公开日程参考：${schedules}` : "",
+    `近期已聊话题（避免重复）：${recentPosts.slice(0,30).map(p=>p.topicKey || p.titleTranslated || p.titleOriginal).join("；").slice(0,1800)}`,
+    headlines.length ? `真实新闻标题线索：${headlines.join("；")}` : "",
+  ].filter(Boolean).join("\n"), direction);
+  const world = materials.facts;
 
   const languageRule = translationEnabled
     ? `内容语言：帖子标题、正文、普通评论需要同时给自然韩语和自然简体中文。韩语要像真实韩国匿名论坛网友；中文要准确保留韩网语气。文字图例外：所有文字图只允许简体中文，不要生成韩文，也不要给文字图做翻译。`
@@ -134,13 +158,13 @@ export async function generateTheqooPosts(
 
   const searchRule = keyword.trim()
     ? `用户正在搜索：${keyword.trim().slice(0, 160)}。围绕这个关键词从不同角度生成相关帖子，不要把关键词当成真实新闻事实。`
-    : `这是随机刷新。先构思互不相同的网友话题，生活、求助、吐槽、兴趣和娱乐讨论自然混合；世界线最新进展可偶尔成为话题，历史背景在相关话题中用于衔接事实。每次刷新保留丰富的独立日常，跨批次延续选题多样性。`;
+    : `这是随机刷新，按用户内容方向构思不同选题；本轮候选可以取舍，不设新旧话题配额。`;
 
   const schema = translationEnabled
     ? `只输出 JSON：{"posts":[{"category":"생활","topicKey":"中文事件或话题短语","titleOriginal":"韩文","titleTranslated":"中文","bodyOriginal":"韩文","bodyTranslated":"中文","views":1234,"imageTexts":["中文文字图，可空"],"comments":[{"original":"韩文","translated":"中文","isOP":false}]}]}。`
     : `只输出 JSON：{"posts":[{"category":"생활","topicKey":"中文事件或话题短语","title":"中文","body":"中文","views":1234,"imageTexts":["中文文字图，可空"],"comments":[{"text":"中文","isOP":false}]}]}。`;
 
-  const prompt = `你在生成当代韩国匿名论坛 theqoo 风格内容。时间背景为 ${new Date().getFullYear()} 年韩国。匿名署名统一为 무명의 더쿠。只引用配置绑定中为 theqoo 选择的世界书，不读取其他世界书。\n世界书：\n${world || "无"}\n近期韩国新闻标题（只能作为话题线索，不得据此猜测未提供的新闻细节，也不代表论坛热度）：${headlines.length ? headlines.join("；") : "未获取到实时标题，可生成普通日常，但不要虚构真实热点"}\n${searchRule}\n普通板块只能是：뉴스(新闻)、정보(资讯)、생활(生活)、잡담(闲谈)、유머(幽默)、뷰티(美妆)、영화·방송(影视)、아이돌(偶像)。HOT 是独立生成的热议板块，普通板块帖子不能按浏览量复制进 HOT。不要设为 전체。每篇给出具体的中文 topicKey，同一新闻事件、同一个生活故事即使换标题也要用同一个主题，不要拆成多篇。\n${opPolicy}\n${languageRule}\n每篇恰好 10 条完整且不同的匿名评论。少数帖子可以带一张文字图；文字图只写中文，格式 imageTexts:["中文文字内容"]，没有就 []。文字图是公告截图、整理卡或网友自制文字卡，不生成真人照片；偶像板块默认不配图。现实人物和作品的事实不可凭空编造为已发生的新闻；世界书中的虚构设定可自然融入。${schema}`;
+  const prompt = `你在生成当代韩国匿名论坛 theqoo 风格内容。时间背景为 ${new Date().getFullYear()} 年韩国。匿名署名统一为 무명의 더쿠。只引用配置绑定中为 theqoo 选择的世界书，不读取其他世界书。\n世界书：\n${world || "无"}\n近期韩国新闻标题（只能作为话题线索，不得据此猜测未提供的新闻细节，也不代表论坛热度）：${headlines.length ? headlines.join("；") : "未获取到实时标题，可生成普通日常，但不要虚构真实热点"}\n${searchRule}\n用户内容方向：${direction}\n本轮选题候选（可取舍，不是逐条复述）：${materials.topics || "自由构思不同的日常话题"}\n普通板块只能是：뉴스(新闻)、정보(资讯)、생활(生活)、잡담(闲谈)、유머(幽默)、뷰티(美妆)、영화·방송(影视)、아이돌(偶像)。HOT 是独立生成的热议板块，普通板块帖子不能按浏览量复制进 HOT。不要设为 전체。每篇给出具体的中文 topicKey，同一新闻事件、同一个生活故事即使换标题也要用同一个主题，不要拆成多篇。\n${opPolicy}\n${languageRule}\n每篇恰好 10 条完整且不同的匿名评论。少数帖子可以带一张文字图；文字图只写中文，格式 imageTexts:["中文文字内容"]，没有就 []。文字图是公告截图、整理卡或网友自制文字卡，不生成真人照片；偶像板块默认不配图。现实人物和作品的事实不可凭空编造为已发生的新闻；世界书中的虚构设定可自然融入。${schema}`;
 
   const items: Record<string, unknown>[] = [];
   const recentCount = Math.min(100, recentPosts.length);
@@ -148,9 +172,9 @@ export async function generateTheqooPosts(
   const batches = [{ count: 2, hot: true }, { count: 4, hot: false }, { count: 4, hot: false }];
   for (let batch = 0; batch < batches.length; batch++) {
     const plan = batches[batch];
-    const scheduleInstruction = batch === scheduleBatch
-      ? `可选关联素材：${schedules}。手机日历只作为时间线参考：只有明显属于公开演出、公开拍摄、公开活动、比赛、直播、正式发布等可公开事件才允许偶尔成为论坛话题；私人约会、就医、家庭安排、住址相关或明显私密事项绝不能当作公开事实或爆料。WVS 公开日程本身属于可公开素材，可以偶尔成为论坛讨论背景，但不要每次都讨论，也不要把未写出的细节自行补成新闻。整批至多 1 篇提及这些关联素材，也可以完全不提。`
-      : "这批不要围绕手机日历或 WVS 日程生成。";
+    const scheduleInstruction = schedules
+      ? `可选公开日程素材：${schedules}。标题与安排可用于预告讨论，具体内容遵守资料中的解锁状态。按选题自然引用，也可以完全不提；已在前批讨论的安排不重复成帖。`
+      : "本轮没有开启日程参考。";
     let accepted = 0;
     for (let attempt = 0; accepted < plan.count && attempt < 3; attempt++) {
       const needed = plan.count - accepted;
@@ -273,7 +297,7 @@ export async function generateTheqooMoreComments(
   const language = originalLanguage === "ja" ? "ja" : "ko";
   translationEnabled = originalLanguage !== "zh";
   const config = getForumConfig();
-  const world = selectedWorldBookText(worldBookIds);
+  const world = selectedWorldBookText(worldBookIds, `${post.titleOriginal} ${post.titleTranslated} ${post.bodyOriginal} ${post.bodyTranslated}`);
   const noOP = post.authoredByUser === true || post.category === "뉴스" || post.category === "정보";
   const languageRule = translationEnabled
     ? `每条评论输出自然韩语 original 和准确中文 translated。`
@@ -282,7 +306,7 @@ export async function generateTheqooMoreComments(
     ? `{"comments":[{"original":"韩文","translated":"中文","isOP":false}]}`
     : `{"comments":[{"text":"中文","isOP":false}]}`;
   const raw = await sendLLMRequest(config, null, [
-    { role: "system", content: theqooLanguagePrompt(`继续生成韩国匿名论坛帖下方此前尚未显示的评论。只参考选中的世界书：${world || "无"}。帖子分类：${post.category}。${opPolicy}恰好续写 10 条不同的匿名评论，不要复述已有评论，不要替用户发言，也不要把用户尚待下一次首页刷新的评论当成已被网友看到。${noOP ? "不能生成楼主回复，isOP 全部为 false。" : "可以自然出现原楼主补充，但不强制。"}${languageRule}只输出 JSON：${schema}。` , language, translationEnabled) },
+    { role: "system", content: theqooLanguagePrompt(`继续生成韩国匿名论坛帖下方此前尚未显示的评论。只参考选中的世界书：${world || "无"}。帖子分类：${post.category}。${opPolicy}内容风格：${loadTheqooPrompt()}。恰好续写 10 条不同的匿名评论，不要复述已有评论，不要替用户发言，也不要把用户尚待下一次首页刷新的评论当成已被网友看到。${noOP ? "不能生成楼主回复，isOP 全部为 false。" : "可以自然出现原楼主补充，但不强制。"}${languageRule}只输出 JSON：${schema}。` , language, translationEnabled) },
     { role: "user", content: JSON.stringify({ title: translationEnabled ? post.titleOriginal : post.titleTranslated || post.titleOriginal, body: translationEnabled ? post.bodyOriginal : post.bodyTranslated || post.bodyOriginal, recentComments: post.comments.filter(c => !c.pendingRefresh).slice(-22).map(c => ({ text: translationEnabled ? c.original : c.translated || c.original, isOP: post.authoredByUser ? c.authoredByUser === true : c.authoredByOP === true })) }) },
   ], [], undefined, { appId: "theqoo", appTags: ["theqoo", "comments"], skipOutputRegex: true });
   const start = raw.indexOf("{"), end = raw.lastIndexOf("}");
@@ -310,7 +334,7 @@ export async function generateTheqooCommentFollowups(
   const pending = posts.filter(post => post.comments.some(c => c.authoredByUser && c.pendingRefresh)).slice(0, 6);
   if (!pending.length) return {};
   const config = getForumConfig();
-  const world = selectedWorldBookText(worldBookIds);
+  const world = selectedWorldBookText(worldBookIds, pending.map(p=>`${p.titleOriginal} ${p.titleTranslated} ${p.bodyOriginal}`).join("\n"));
   const input = pending.map(post => ({
     postId: post.id,
     language: theqooPostLanguage(post),
@@ -332,7 +356,7 @@ export async function generateTheqooCommentFollowups(
   const raw = await sendLLMRequest(config, null, [
     {
       role: "system",
-      content: `你在模拟匿名论坛下一次“刷新页面”后自然出现的评论增量。只允许使用用户为论坛选择的世界书：${world || "无"}。每个输入帖子这一次必须新增 5 到 8 条匿名网友评论，数量随机，不要每帖固定相同。新增评论可以回应用户刚刚留下的 pending 评论，也可以继续原帖其他争论，不要让所有人都机械回复用户同一句。用户发表评论后不是即时得到回复，而是到了这次刷新才可能被看到。所有评论区都允许吐槽、反驳、冷嘲、阴阳、跑题和小规模吵架，也允许没人站用户这边。${opPolicy} 如果 authoredByUser:true，原楼主就是用户本人，绝对不能替用户生成任何 isOP:true 的楼主发言；只有 AI 原帖且分类不是 뉴스/정보 时，AI 才可以让原楼主自然回来补充。${languageRule} 每个帖子必须沿用输入 language 指定的语言：ja 的 original 用日语、中文保留日语语感，ko 用韩语；zh 用中文且 original/text 与 translated 一致。不要因本次界面切换改写旧帖语言。只输出 JSON：${schema}`,
+      content: `你在模拟匿名论坛下一次“刷新页面”后自然出现的评论增量。只允许使用用户为论坛选择的世界书：${world || "无"}。每个输入帖子这一次必须新增 5 到 8 条匿名网友评论，数量随机，不要每帖固定相同。新增评论可以回应用户刚刚留下的 pending 评论，也可以继续原帖其他争论，不要让所有人都机械回复用户同一句。用户发表评论后不是即时得到回复，而是到了这次刷新才可能被看到。所有评论区都允许吐槽、反驳、冷嘲、阴阳、跑题和小规模吵架，也允许没人站用户这边。${opPolicy}内容风格：${loadTheqooPrompt()}。 如果 authoredByUser:true，原楼主就是用户本人，绝对不能替用户生成任何 isOP:true 的楼主发言；只有 AI 原帖且分类不是 뉴스/정보 时，AI 才可以让原楼主自然回来补充。${languageRule} 每个帖子必须沿用输入 language 指定的语言：ja 的 original 用日语、中文保留日语语感，ko 用韩语；zh 用中文且 original/text 与 translated 一致。不要因本次界面切换改写旧帖语言。只输出 JSON：${schema}`,
     },
     { role: "user", content: JSON.stringify(input) },
   ], [], undefined, { appId: "theqoo", appTags: ["theqoo", "comments"], skipOutputRegex: true });

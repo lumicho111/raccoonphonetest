@@ -93,6 +93,7 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
           "ai_phone_image_generation_settings_v1",
           "ai_phone_bindings_v1",
           "ai_phone_schedule_prompts_v1",
+          "ai_phone_theqoo_prompt_v1",
           "ai_phone_follow_up_config_v1",
           "ai_phone_chat_send_config_v1",
           "ai_phone_user_identities_v1",

@@ -56,6 +56,7 @@ export function worldlineEnabledForApp(world: Worldline, appId: string): boolean
 export function worldlineContextForApp(appId: string, options?: { publicEvents?: boolean; focusText?: string }): string {
   const world = activeWorldline();
   if (!world || !worldlineEnabledForApp(world, appId)) return "";
+  if (appId === "theqoo") return theqooWorldlineContext(world, options?.focusText);
   if (["theqoo", "twitter", "xiaohongshu"].includes(appId)) return publicPlatformWorldlineContext(world, options);
   const archive = (world.archive || []).flatMap(group => group.entries.map(entry => `${group.name} / ${entry.title}：${entry.content}`));
   const history = (world.progressHistory || []).slice(0, -1).map(progress => `${progress.recordedAt}：${progress.text}`);
@@ -69,6 +70,34 @@ export function worldlineContextForApp(appId: string, options?: { publicEvents?:
     history.length ? `已发生的公共历史（不能因进度更新而遗忘）：\n${history.join("\n")}` : "",
     current?.trim() ? `当前公共进度（全体角色已知）：${current.trim()}` : "",
     publicEvents.length ? `可公开引用的事件：\n${publicEvents.join("\n")}` : "",
+  ].filter(Boolean).join("\n\n");
+}
+
+/** Forum-only continuity bundle. Other apps retain their existing readers. */
+export function theqooWorldlineContext(world: Worldline, focusText = ""): string {
+  const rows = world.progressHistory || [];
+  const current = rows.at(-1)?.text || world.currentState || "";
+  const previous = rows.at(-2)?.text || "";
+  const now = Date.now();
+  const events = world.events.filter(e => e.visibility === "public" && Date.parse(e.occurredAt) <= now
+    && now - Date.parse(e.endsAt || e.occurredAt) <= 14 * 86400000)
+    .sort((a,b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0,5);
+  const terms = [...new Set((`${current} ${focusText}`.match(/[a-zA-Z0-9_]{3,}|[\u3400-\u9fff]{2,}/g) || [])
+    .flatMap(w => /[\u3400-\u9fff]/.test(w) ? Array.from({length:w.length-1},(_,i)=>w.slice(i,i+2)) : [w.toLowerCase()]))];
+  const rank = (text: string) => terms.filter(t=>text.toLowerCase().includes(t)).length;
+  const older = rows.slice(0,-2).map(e=>({text:e.text,rank:rank(e.text)}))
+    .filter(e=>e.rank>=2).sort((a,b)=>b.rank-a.rank).slice(0,2).map(e=>e.text.slice(0,450)).join("\n");
+  const background = (world.archive || []).flatMap(g=>g.entries.map(e=>({
+    text:`${g.name} / ${e.title}：${e.content}`, rank:terms.filter(t=>`${e.title} ${e.content}`.toLowerCase().includes(t)).length,
+  }))).filter(e=>e.rank>=2).sort((a,b)=>b.rank-a.rank).slice(0,4).map(e=>e.text.slice(0,450)).join("\n");
+  return [
+    `【世界线：${world.name}｜论坛公开资料】`,
+    "当前状态优先；上一条用于衔接前因，状态变化沿用最新进展。资料是事实依据，不是每批必写的选题清单。",
+    current ? `当前进展：${current.slice(0,2400)}` : "",
+    previous ? `上一条进展（前情）：${previous.slice(0,1400)}` : "",
+    older ? `相关更早前因（仅供核对）：${older.slice(0,800)}` : "",
+    events.length ? `近期公开事件：\n${events.map(e=>`${worldlineTimeLabel(e,true)} ${e.title}：${e.detail.slice(0,300)}`).join("\n")}` : "",
+    background ? `背景常识（按需引用）：\n${background.slice(0,1400)}` : "",
   ].filter(Boolean).join("\n\n");
 }
 
