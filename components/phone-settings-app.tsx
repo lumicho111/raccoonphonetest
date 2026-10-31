@@ -12,6 +12,7 @@ import { ImageGenerationSettings } from "./settings/image-generation-settings";
 import { PresetManager } from "./settings/preset-manager";
 import { WorldBookManager } from "./settings/worldbook-manager";
 import { RegexManager } from "./settings/regex-manager";
+import { VoiceFavoritesPage } from "./settings/voice-favorites-page";
 import { DataManagement } from "./settings/data-management";
 import { UserIdentitySettings } from "./settings/user-identity";
 import { AboutDeclaration } from "./settings/about-declaration";
@@ -49,6 +50,7 @@ type SubPage =
     | "presets"
     | "worldbook"
     | "regex"
+    | "voiceFavorites"
     | "data"
     | "binding"
     | "identity"
@@ -66,6 +68,7 @@ const SETTINGS_MENU = [
     { id: "presets", icon: Fingerprint, label: "预设", desc: "角色预设", iconColor: BINDING_ACCENTS.preset , glass: "presets" },
     { id: "worldbook", icon: Globe, label: "世界书", desc: "世界观设定", iconColor: BINDING_ACCENTS.worldBook , glass: "worldbook" },
     { id: "regex", icon: Database, label: "正则规则", desc: "文本替换", iconColor: BINDING_ACCENTS.regex , glass: "regex" },
+    { id: "voiceFavorites", icon: Layers, label: "语音收藏", desc: "本地回听与按模块导出", iconColor: BINDING_ACCENTS.api, glass: "" },
     { id: "data", icon: Layers, label: "数据管理", desc: "导入导出", iconColor: BINDING_ACCENTS.api , glass: "data" },
     { id: "binding", icon: Link2, label: "配置绑定", desc: "管理全局默认、角色与应用的配置绑定关系", iconColor: BINDING_ACCENTS.identity , glass: "binding" },
     { id: "cloud", icon: CloudUpload, label: "云服务部署", desc: "备份 / 离线推送一站配置", iconColor: BINDING_ACCENTS.api , glass: "" },
@@ -310,6 +313,8 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
                 return <WorldBookManager isActive />;
             case "regex":
                 return <RegexManager isActive />;
+            case "voiceFavorites":
+                return <VoiceFavoritesPage />;
             case "data":
                 return <DataManagement onNotice={onNotice} />;
             case "binding":
@@ -401,7 +406,7 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
                             <h3 className="settings-menu-section-title">Data & Rules</h3>
                             <div className="mt-[10px] flex flex-col gap-3">
                                 <CardGrid
-                                    items={SETTINGS_MENU.filter(item => ["presets", "worldbook", "regex", "data", "aiBehavior"].includes(item.id)).map(makeCardItem)}
+                                    items={SETTINGS_MENU.filter(item => ["presets", "worldbook", "regex", "data", "voiceFavorites", "aiBehavior"].includes(item.id)).map(makeCardItem)}
                                 />
                                 <FeaturedCard item={bindingFeaturedItem} />
                             </div>

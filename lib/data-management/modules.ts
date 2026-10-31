@@ -47,6 +47,7 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
         label: "聊天设置与待处理状态",
         keys: [
           "ai_phone_chat_settings_v1",
+          "ai_phone_manual_call_groups_v1",
           "ai_phone_chat_character_profiles_v1",
           "ai_phone_followup_schedules_v1",
           "ai_phone_timed_wake_schedules_v1",
@@ -75,6 +76,15 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
         keys: ["ai_phone_idb_migrated_v1"],
       },
     ],
+  },
+  {
+    id: "voice_favorites",
+    label: "语音收藏",
+    description: "Chat 通话单句与语音消息的独立音频收藏；电话原收藏仍随电话数据备份",
+    variant: "teal",
+    critical: true,
+    large: true,
+    sources: [{ type: "indexeddb", dbName: "AiPhoneVoiceFavoritesDB", label: "收藏音频与文字索引" }],
   },
   {
     id: "settings",

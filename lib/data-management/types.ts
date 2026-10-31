@@ -1,4 +1,5 @@
 export type DataModuleId =
+  | "voice_favorites"
   | "chat"
   | "settings"
   | "characters"

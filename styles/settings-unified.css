@@ -40,3 +40,20 @@
 .settings-unified .ai-behavior-page :is(button,input,textarea,select){font-family:inherit}
 .settings-unified .ai-media-row{font-size:calc(14.4px * var(--app-text-scale,1));font-weight:700}
 .settings-unified .settings-row-description,.settings-unified .ai-media-note{font-size:calc(10.8px * var(--app-text-scale,1));font-weight:500}
+.voice-favorites-page { display:flex;flex-direction:column;gap:14px;font:inherit; }
+.voice-favorite-card { background:var(--settings-card,#fff);color:var(--settings-ink,var(--c-text,#222));border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0; }
+.voice-favorite-card header { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.voice-favorite-card header button { background:transparent;border:0;color:inherit;padding:6px; }
+.voice-favorite-card small { opacity:.6;font-size:calc(11px * var(--app-text-scale,1)); }
+.voice-favorite-card p { white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font-size:calc(14px * var(--app-text-scale,1)); }
+.voice-favorite-card audio { width:100%; }
+.voice-favorite-filters { display:flex;gap:6px;flex-wrap:wrap; }
+.voice-favorite-filters button { border:0;border-radius:12px;padding:8px 10px;font:inherit;background:var(--settings-card,#fff);color:inherit; }
+.voice-favorite-filters button[aria-pressed="true"] { background:#e4c850;color:#232323; }
+.voice-feature-overlay { position:absolute;inset:0;width:100%;height:100%;padding:max(64px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom));box-sizing:border-box; }
+.voice-feature-dialog { width:100%;max-width:380px;max-height:100%;overflow:auto;align-items:stretch;color:var(--c-text,#222);font-family:var(--app-font-family,inherit);font-size:calc(14px * var(--app-text-scale,1));border-radius:20px; }
+.voice-feature-dialog label { display:flex;flex-direction:column;gap:8px; }
+.voice-feature-dialog .settings-dialog-heading { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.voice-feature-dialog .settings-dialog-heading button { background:transparent;color:inherit;border:0; }
+/* In the unified collection, removing a phone favorite must not delete its source call. */
+.voice-favorites-page [aria-label="删除通话记录"] { display:none; }

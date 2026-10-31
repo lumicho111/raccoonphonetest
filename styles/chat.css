@@ -8315,3 +8315,9 @@
 .call-speech-row[data-translation] > .call-speech-audio { margin-top: 0; align-self: center; }
 .voicecall-cards .call-speech-row[data-translation] { align-items: center; }
 .voicecall-cards .call-speech-row[data-translation] > .call-speech-audio { margin-top: 0; align-self: center; }
+/* Multi-select actions remain reachable on narrow phone screens. */
+.chat-multi-select-bar[data-ui="multi-select"] { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px; }
+.chat-multi-select-bar[data-ui="multi-select"] > .chat-multi-select-icon-btn { grid-row:1;grid-column:1;justify-self:start;width:44px; }
+.chat-multi-select-bar[data-ui="multi-select"] > .chat-multi-select-summary { grid-row:1;grid-column:2 / -1; }
+.chat-multi-select-bar[data-ui="multi-select"] > .chat-multi-select-forward-btn,
+.chat-multi-select-bar[data-ui="multi-select"] > .chat-multi-select-delete-btn { min-width:0;min-height:44px;font-size:calc(12px * var(--app-text-scale,1));padding:8px;white-space:normal; }

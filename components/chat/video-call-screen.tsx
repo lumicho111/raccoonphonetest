@@ -1,4 +1,5 @@
 "use client";
+import { VoiceFavoriteDialog } from "./voice-favorite-dialog";
 import { useCallEndRecord } from "./use-call-end-record";
 import { parseCallOutput, SINGLE_CALL_ACTIONS } from "@/lib/call-participation";
 import { useChatCallIdentity, useChatUserAvatar, useGlobalCallAppearance } from "./use-chat-user-avatar";
@@ -109,6 +110,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
     const interimTextRef = useRef<string>("");
     const sttWarningShownRef = useRef(false);
     const messagesRef = useRef<ChatMessage[]>([]);
+    const [favoriteLine,setFavoriteLine]=useState<SubtitleEntry|null>(null);
     const lastAssistantTurnIdsRef = useRef<string[]>([]);
     const cameraStreamRef = useRef<MediaStream | null>(null);
     const cameraEnabledRef = useRef<boolean>(false);
@@ -706,6 +708,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
 
     return (
         <div className="absolute inset-0 z-[100] flex flex-col bg-black text-white overflow-hidden call-keyboard-shift videocall-redesign" style={keyboardOffsetStyle}>
+            {favoriteLine && <VoiceFavoriteDialog key={favoriteLine.id} draft={{kind:"call",sourceKey:`${session.id}:video:${favoriteLine.id}`,text:originalCallSpeech(favoriteLine.text),characterId:session.contactId,role:favoriteLine.role,getAudio:async()=>subtitleAudioCacheRef.current.get(favoriteLine.id)}} onClose={()=>setFavoriteLine(null)}/> }
             <CallVolumeControl />
 
             {onMinimize && callState !== "ENDED" && (
@@ -774,7 +777,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
             >
                 {subtitles.map(sub => sub.kind === "action" ? <div key={sub.id} className="call-video-action" data-role={sub.role}>{sub.text}</div> :
                     <CallTranscriptBubble key={sub.id} text={sub.text} onPlay={() => { void playSubtitle(sub); }}
-                        playing={playingSubtitleId === sub.id} disabled={(callState !== "IDLE" && playingSubtitleId !== sub.id) || isSpeakerMuted} role={sub.role} />)}
+                        playing={playingSubtitleId === sub.id} disabled={(callState !== "IDLE" && playingSubtitleId !== sub.id) || isSpeakerMuted} role={sub.role} onFavorite={()=>setFavoriteLine(sub)} />)}
                 {interimText && callState === "USER_SPEAKING" && (
                     <div
                         className="call-subtitle"

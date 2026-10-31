@@ -1,4 +1,10 @@
 "use client";
+import { loadManualCallGroups, saveManualCallGroup, removeManualCallGroup } from "@/lib/manual-call-groups";
+import { ManualCallDialog } from "./manual-call-dialog";
+import { VoiceFavoriteDialog, type FavoriteVoiceDraft } from "./voice-favorite-dialog";
+import { existingVoiceBlob } from "@/lib/voice-favorites";
+import { originalCallSpeech } from "@/lib/call-transcript";
+
 import { createForwardedChatRecord, forwardedChatPrompt } from "@/lib/chat-forward";
 import type { ForwardedChatRecord } from "@/lib/chat-forward";
 import { ForwardAvatar } from "./forwarded-chat-record";
@@ -1465,6 +1471,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const [forwardDraft, setForwardDraft] = useState<ForwardedChatRecord | null>(null);
     const [forwardSearch, setForwardSearch] = useState("");
     const [forwardSending, setForwardSending] = useState(false);
+    const [manualGroups,setManualGroups]=useState(()=>loadManualCallGroups());
+    const [manualDialog,setManualDialog]=useState(false);
+    const [favoriteVoice,setFavoriteVoice]=useState<FavoriteVoiceDraft|null>(null);
+    useEffect(()=>{setManualGroups(loadManualCallGroups());setManualDialog(false);setFavoriteVoice(null);},[session.id]);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     useEffect(()=>{
         if(!forwardDraft)return;
@@ -5436,6 +5446,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     <button onClick={() => (m.role === "assistant" ? handleEditResponseStart(m) : handleEditMessageStart(m))} className="ctx-menu-btn">
                         {m.role === "assistant" && (m.rawResponseText || m.editableResponseText) ? "编辑回复" : "编辑"}
                     </button>
+                    {m.mediaType === "audio" && <button className="ctx-menu-btn" onClick={()=>{const text=originalCallSpeech(m.mediaData?.label || m.content);setFavoriteVoice({kind:"message",sourceKey:`${session.id}:${storedMessageId}`,text,characterId:m.senderCharacterId || session.contactId,role:m.role === "user"?"user":"assistant",getAudio:()=>existingVoiceBlob(m.mediaData?.synthesizedFromText && m.mediaData.synthesizedFromText!==text ? undefined : m.mediaUrl)});setActiveMessageId(null);}}>收藏语音</button>}
                     {m.mediaType === "audio" && m.mediaData?.label && (
                         <button onClick={() => { setVoiceTextIds(prev => { const next = new Set(prev); if (next.has(m.id)) next.delete(m.id); else next.add(m.id); return next; }); setActiveMessageId(null); }} className="ctx-menu-btn">转文字</button>
                     )}
@@ -5702,7 +5713,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     // Build a map: startMsgId → { startIdx, endIdx, duration }
     // and a set of all message indices that belong to a voice call group
     const voiceCallGroups = useMemo(() => {
-        const groups: { startId: string; startIdx: number; endIdx: number; duration: string; callType: "voice" | "video"; callId?: string }[] = [];
+        const groups: { startId: string; startIdx: number; endIdx: number; duration: string; callType: "voice" | "video"; callId?: string; manualId?: string; messageIds?: string[] }[] = [];
         const memberSet = new Set<number>();
 
         let i = 0;
@@ -5744,8 +5755,20 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             }
             i++;
         }
+        for(const manual of manualGroups.filter(g=>g.sessionId===session.id)){
+            const ids=new Set(manual.messageIds);
+            const indices=projectedMessages.flatMap((m,index)=>ids.has(m.displaySourceId || m.id)?[index]:[]);
+            if(!indices.length)continue;
+            for(let g=groups.length-1;g>=0;g--)if(projectedMessages.slice(groups[g].startIdx,groups[g].endIdx+1).some(m=>ids.has(m.displaySourceId||m.id)))groups.splice(g,1);
+            groups.push({startId:manual.id,startIdx:indices[0],endIdx:indices[indices.length-1],duration:manual.duration,callType:manual.callType,manualId:manual.id,messageIds:manual.messageIds});
+        }
+        memberSet.clear();
+        for(const group of groups)for(let k=group.startIdx;k<=group.endIdx;k++){
+            const item=projectedMessages[k];
+            if(group.messageIds ? group.messageIds.includes(item.displaySourceId||item.id) : !group.callId || item.mediaData?.callId===group.callId)memberSet.add(k);
+        }
         return { groups, memberSet };
-    }, [projectedMessages]);
+    }, [projectedMessages,manualGroups,session.id]);
 
     // Reuse date and batch grouping in single and group chat. A photo deck has
     // one visible representative even though its pictures are stored separately.
@@ -6253,7 +6276,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     const vcGroup = voiceCallGroups.groups.find(g => g.startIdx === idx);
                     if (vcGroup) {
                         const isExpanded = expandedVoiceCallIds.has(vcGroup.startId);
-                        const groupMessages = projectedMessages.slice(vcGroup.startIdx, vcGroup.endIdx + 1).filter(item => !vcGroup.callId || item.mediaData?.callId === vcGroup.callId);
+                        const groupMessages = projectedMessages.slice(vcGroup.startIdx, vcGroup.endIdx + 1).filter(item => vcGroup.messageIds ? vcGroup.messageIds.includes(item.displaySourceId || item.id) : !vcGroup.callId || item.mediaData?.callId === vcGroup.callId);
                         const chatCount = groupMessages.filter(m => uiRole(m) !== "system").length;
                         return (
                             <div key={`vc-${vcGroup.startId}`} className="flex flex-col gap-2">
@@ -6305,6 +6328,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                         });
                                     })}
                                 </div>
+                                {vcGroup.manualId && <button className="chat-multi-select-forward-btn" type="button" onClick={()=>{removeManualCallGroup(vcGroup.manualId!);setManualGroups(loadManualCallGroups());}}>取消整理，恢复消息</button>}
                                 {isExpanded && (
                                     <div className="chat-vc-group-border">
                                         {groupMessages.map((gMsg) => (
@@ -6886,6 +6910,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         </span>
                     </div>
                     <button type="button" className="chat-multi-select-forward-btn" disabled={!selectedMessageIds.size} onClick={openForwardPicker}>合并转发</button>
+                    <button type="button" className="chat-multi-select-forward-btn" disabled={!selectedMessageIds.size} onClick={()=>setManualDialog(true)}>整理通话</button>
                     <button
                         type="button"
                         className="chat-multi-select-delete-btn"
@@ -6897,6 +6922,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     </button>
                 </div>
             )}
+            {favoriteVoice && <VoiceFavoriteDialog key={favoriteVoice.sourceKey} draft={favoriteVoice} onClose={()=>setFavoriteVoice(null)} onSaved={()=>showChatToast("已保存到设置 → 语音收藏")}/>}
+            {manualDialog && <ManualCallDialog count={selectedMessageIds.size} onClose={()=>setManualDialog(false)} onSave={(callType,duration)=>{
+                const ids=Array.from(selectedMessageIds);saveManualCallGroup({id:`manual_call_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,sessionId:session.id,messageIds:ids,callType,duration});setManualGroups(loadManualCallGroups());setManualDialog(false);setIsMultiSelectMode(false);setSelectedMessageIds(new Set());
+            }}/>}
             {!isMultiSelectMode && (offlineMode ? (
                 <OfflineComposer
                     sceneBusy={offlineSceneBusy}

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Square, Volume2 } from "lucide-react";
+import { Square, Volume2, Star } from "lucide-react";
 import { displayCallSpeech } from "@/lib/call-transcript";
 import { splitBilingualText } from "@/lib/bilingual-text";
 
-export function CallTranscriptBubble({ text, onPlay, playing = false, disabled = false, role }: {
+export function CallTranscriptBubble({ text, onPlay, playing = false, disabled = false, role, onFavorite }: {
     text: string;
+    onFavorite?:()=>void;
     role?: "user" | "assistant";
     onPlay: () => void;
     playing?: boolean;
@@ -30,5 +31,6 @@ export function CallTranscriptBubble({ text, onPlay, playing = false, disabled =
             </div>
             {bilingual && expanded && <div className="call-speech-translation">{bilingual.translated}</div>}
         </div>
+        {onFavorite && <button type="button" className="call-speech-audio" aria-label="收藏这句语音" onClick={onFavorite}><Star size={13}/></button>}
     </div>;
 }
