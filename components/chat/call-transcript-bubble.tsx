@@ -15,9 +15,10 @@ export function CallTranscriptBubble({ text, onPlay, playing = false, disabled =
     const [expanded, setExpanded] = useState(true);
     useEffect(() => setExpanded(true), [text]);
     const display = displayCallSpeech(text);
-    const bilingual = splitBilingualText(display);
+    const bilingual = role === "user" ? null : splitBilingualText(display);
+    const showTranslation = Boolean(bilingual && expanded);
 
-    return <div className="call-speech-row" data-role={role}>
+    return <div className="call-speech-row" data-role={role} data-translation={showTranslation ? "expanded" : "collapsed"}>
         <button type="button" className="call-speech-audio" onClick={onPlay} disabled={disabled}
             aria-label={playing ? "停止这段语音" : "播放这段话的原文"} title={playing ? "停止播放" : "播放原文"}>
             {playing ? <Square size={10} fill="currentColor" /> : <Volume2 size={13} />}

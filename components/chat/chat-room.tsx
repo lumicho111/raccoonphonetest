@@ -113,7 +113,7 @@ import { createOrGetStorySession, hydrateStoryStorage, loadStorySessionsForOwner
 // ── Call system message detection ──────────────────────────
 // Call messages are stored with user/assistant role for correct prompt alternation,
 // but should render as centered system notifications in the UI.
-const CALL_SYS_RE = /\[我(?:向.+)?(?:发起了|挂断了|拒绝了|取消了)(?:群?(?:语音|视频)通话)/;
+const CALL_SYS_RE = /^\[[^\]\n]*(?:(?:发起了|挂断了|拒绝了|取消了)群?(?:语音|视频)通话|(?:语音|视频)通话已结束)\]/;
 function isCallSysMsg(msg: ChatMessage): boolean {
     return CALL_SYS_RE.test(msg.content);
 }
@@ -5728,10 +5728,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     // Another call start → separate call, stop
                     if (c.includes("发起了语音通话") || c.includes("发起了视频通话")) break;
                     // Call end: 挂断/拒绝/取消（兼容"群语音通话"/"群视频通话"）
-                    if (c.includes(`挂断了${kw}`) || c.includes(`挂断了群${kw}`) || c.includes(`拒绝了${kw}`) || c.includes(`拒绝了群${kw}`) || c.includes(`取消了${kw}`) || c.includes(`取消了群${kw}`)) {
+                    if (c.includes(`${kw}已结束`) || c.includes(`挂断了${kw}`) || c.includes(`挂断了群${kw}`) || c.includes(`拒绝了${kw}`) || c.includes(`拒绝了群${kw}`) || c.includes(`取消了${kw}`) || c.includes(`取消了群${kw}`)) {
                         endIdx = j;
                         const match = c.match(/时长\s*(\d+:\d+)/);
-                        duration = match ? match[1] : "";
+                        duration = projectedMessages[j].mediaData?.callDuration || (match ? match[1] : "");
                         break;
                     }
                 }

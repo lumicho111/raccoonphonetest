@@ -1,4 +1,5 @@
 "use client";
+import { useCallEndRecord } from "./use-call-end-record";
 import { parseCallOutput, SINGLE_CALL_ACTIONS } from "@/lib/call-participation";
 import { useChatCallIdentity, useChatUserAvatar, useGlobalCallAppearance } from "./use-chat-user-avatar";
 
@@ -117,10 +118,11 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
     const userNameRef = useRef<string>(_initUi?.name || "你");
     const userAvatarRef = useRef<string | null>(resolveChatUserAvatar(session, _initUi?.avatarUrl) || null);
 
+    useCallEndRecord(session.id, "video", callDuration);
     useEffect(() => { stateRef.current = callState; }, [callState]);
     useEffect(() => {
         window.dispatchEvent(new CustomEvent("chat-call-state", { detail: { active: callState !== "ENDED", sessionId: session.id, type: "video", phase: callState === "CONNECTING" ? "ringing" : "connected" } }));
-        return () => { window.dispatchEvent(new CustomEvent("chat-call-state", { detail: { active: false, sessionId: session.id } })); };
+
     }, [callState, session.id]);
     useEffect(() => { minimizedRef.current = minimized; }, [minimized]);
 
@@ -679,6 +681,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
             audioTokenRef.current++;
             if (sttRef.current) { sttRef.current.abort(); sttRef.current = null; }
             if (audioAbortRef.current) { audioAbortRef.current(); audioAbortRef.current = null; }
+            window.dispatchEvent(new CustomEvent("chat-call-state", { detail: { active: false, sessionId: session.id } }));
             setCallAudioSessionActive(false);
         };
     }, []);
