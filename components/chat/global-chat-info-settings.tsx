@@ -1,4 +1,5 @@
 "use client";
+import { PhoneLockSettings } from "./phone-lock-settings";
 import { loadVoiceConfigs } from "@/lib/settings-storage";
 
 import { useEffect, useRef, useState } from "react";
@@ -333,6 +334,7 @@ export function GlobalChatInfoSettings({ onBack }: { onBack: () => void }) {
     return (
         <PageShell title="全局聊天信息" onBack={onBack} className="absolute inset-0 z-[100]">
             <div className="page-menu chat-info-menu">
+                <PhoneLockSettings />
                 <div className="px-4 pb-2 ts-12 text-[var(--c-text)] opacity-65">单独会话设置优先于这里；聊天、联系人和朋友圈优先使用全局聊天头像，不覆盖用户资料中的原头像。状态栏仍仅用于私聊。</div>
                 <div className="menu-group">
                     <div className="menu-item cursor-pointer" role="button" tabIndex={0} onClick={() => avatarInputRef.current?.click()} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") avatarInputRef.current?.click(); }}>
