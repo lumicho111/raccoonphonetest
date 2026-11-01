@@ -1,4 +1,7 @@
 "use client";
+import {calendarForWeverseProjection} from "@/lib/weverse-schedule-sync";
+import {calendarWallTimeToInstant} from "@/lib/calendar-time";
+import {formatZonedPromptTimestamp,getSystemTimeZone} from "@/lib/character-time";
 import { simpleLLMCall } from "@/lib/api-helpers";
 import { resolveAuxiliaryApiConfig } from "@/lib/settings-storage";
 import { recordWeverseReplaySummary } from "@/lib/weverse-memory";
@@ -84,7 +87,6 @@ import {
   generateWeverseOfficialNotice,
   generateWeverseLiveOpening,
   generateWeverseLiveContinuation,
-  generateWeverseScheduleBatch,
 } from "@/lib/weverse-engine";
 import { recordPreparedPhotoUse, resolveMediaForUse } from "@/lib/media-resolver";
 import {
@@ -762,19 +764,22 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
   const openScheduleEditor = (community: WeverseCommunity, item?: WeverseScheduleItem) => {
     const base = item ? new Date(item.startsAt) : new Date(`${selectedScheduleDate}T12:00:00`);
     const end = item?.endsAt ? new Date(item.endsAt) : new Date(base.getTime() + 60 * 60 * 1000);
+    const zone=loadCharacters().find(c=>c.id===(item?.memberCharacterIds[0]||community.memberCharacterIds[0]))?.timeZone||getSystemTimeZone();
+    const wall=formatZonedPromptTimestamp(base,zone),endWall=formatZonedPromptTimestamp(end,zone);
+    const original=item?calendarForWeverseProjection(item):undefined;
     const pad = (n: number) => String(n).padStart(2, "0");
     setScheduleEditor({
       id: item?.id,
       communityId: community.id,
-      visibility: item?.visibility || "public",
+      visibility: "public",
       type: item?.type || "performance",
       title: item?.title || "",
       contentDescription: item?.contentDescription || "",
-      publicAt: item?.publicAt ? `${formatIsoDate(new Date(item.publicAt))}T${pad(new Date(item.publicAt).getHours())}:${pad(new Date(item.publicAt).getMinutes())}` : "",
-      date: formatIsoDate(base),
-      startTime: `${pad(base.getHours())}:${pad(base.getMinutes())}`,
-      endTime: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
-      location: item?.location || "",
+      publicAt: item?.publicAt ? formatZonedPromptTimestamp(new Date(item.publicAt),zone).replace(" ","T") : "",
+      date: wall.slice(0,10),
+      startTime: wall.slice(11,16),
+      endTime: endWall.slice(11,16),
+      location: original?.location || "",
       memberCharacterIds: item?.memberCharacterIds?.length ? item.memberCharacterIds.slice() : community.memberCharacterIds.slice(),
       calendarSync: item?.visibility === "internal" ? true : (item?.calendarSync ?? true),
     });
@@ -786,10 +791,11 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
     if (!community) return;
     const title = scheduleEditor.title.trim();
     if (!title) return onNotice?.("请填写日程名称");
-    const startsAt = scheduleDateTime(scheduleEditor.date, scheduleEditor.startTime);
-    let endsAt = scheduleDateTime(scheduleEditor.date, scheduleEditor.endTime);
+    const zone=loadCharacters().find(c=>c.id===scheduleEditor.memberCharacterIds[0])?.timeZone||getSystemTimeZone();
+    const startsAt = calendarWallTimeToInstant(scheduleEditor.date,scheduleEditor.startTime,zone);
+    let endsAt = scheduleEditor.calendarSync?calendarWallTimeToInstant(scheduleEditor.date,scheduleEditor.endTime,zone):startsAt;
     if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt)) return onNotice?.("请填写有效日期和时间");
-    if (endsAt <= startsAt) endsAt = startsAt + 60 * 60 * 1000;
+    if (scheduleEditor.calendarSync && endsAt <= startsAt) return onNotice?.("结束时间需要晚于开始时间");
     const previous = scheduleEditor.id ? state.schedules.find((item) => item.id === scheduleEditor.id) : undefined;
     const item: WeverseScheduleItem = {
       id: scheduleEditor.id || createWeverseId("wvs_schedule"),
@@ -797,9 +803,9 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
       type: scheduleEditor.type,
       title,
       contentDescription: scheduleEditor.contentDescription?.trim(),
-      publicAt: scheduleEditor.publicAt ? new Date(scheduleEditor.publicAt).getTime() : undefined,
+      publicAt: scheduleEditor.calendarSync&&scheduleEditor.publicAt ? calendarWallTimeToInstant(scheduleEditor.publicAt.slice(0,10),scheduleEditor.publicAt.slice(11,16),zone) : undefined,
       startsAt,
-      endsAt,
+      endsAt:scheduleEditor.calendarSync?endsAt:undefined,
       location: scheduleEditor.location.trim() || undefined,
       memberCharacterIds: scheduleEditor.memberCharacterIds.filter((id) => community.memberCharacterIds.includes(id)),
       source: "manual",
@@ -809,7 +815,6 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
       createdAt: previous?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
-    setState(upsertWeverseScheduleItem(item));
     const applied = syncWeverseScheduleItemToCalendar(item);
     setState(loadWeverseState());
     setScheduleEditor(null);
@@ -826,48 +831,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
     onNotice?.("日程已删除");
   };
 
-  const refreshGeneratedSchedule = async (community: WeverseCommunity) => {
-    if (generatingScheduleCommunityId || generatingHistoryCommunityId || generatingCommunityId) return;
-    setGeneratingScheduleCommunityId(community.id);
-    onNotice?.(`正在刷新 ${community.name} Schedule…`);
-    try {
-      const current = loadWeverseState();
-      let savedCount = 0, pendingCount = 0;
-      const generated = await generateWeverseScheduleBatch(community, current.schedules, { now: new Date() });
-      if (!generated.length) { onNotice?.("这次没有生成新的日程"); return; }
-
-      for (const row of generated) {
-        const startsAt = scheduleDateTime(row.date, row.startTime);
-        let endsAt = scheduleDateTime(row.date, row.endTime);
-        if (!Number.isFinite(startsAt)) continue;
-        if (!Number.isFinite(endsAt) || endsAt <= startsAt) endsAt = startsAt + 60 * 60 * 1000;
-        const item: WeverseScheduleItem = {
-          id: createWeverseId("wvs_schedule"),
-          communityId: community.id,
-          type: row.type,
-          title: row.title,
-          startsAt,
-          endsAt,
-          location: row.location, contentDescription:row.contentDescription, publicAt:row.publicAt ? new Date(row.publicAt).getTime() : undefined,
-          memberCharacterIds: row.memberCharacterIds,
-          source: "generated",
-          visibility: row.visibility,
-          calendarSync: row.calendarSync, busyLevel: row.busyLevel,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        upsertWeverseScheduleItem(item);
-        const applied = syncWeverseScheduleItemToCalendar(item);
-        savedCount += applied.saved; pendingCount += applied.pending;
-      }
-      setState(loadWeverseState());
-      onNotice?.(`已添加 ${savedCount} 条，${pendingCount} 条时间冲突已存入日历待调整`);
-    } catch (error) {
-      onNotice?.(`Schedule 生成失败：${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setGeneratingScheduleCommunityId(null);
-    }
-  };
+  
 
   const scheduleLiveSegments = (
     defaultCharacterId: string,
@@ -1593,6 +1557,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
     setHistoryDraft({ communityId: community.id, kind, from: formatIsoDate(new Date(Date.now() - 90 * 86400000)), to: formatIsoDate(new Date(Date.now() - 86400000)), count: kind === "schedule" ? 6 : 8 });
   };
   const generateHistoryRange = async () => {
+    if(historyDraft?.kind==="schedule"){onNotice?.("请在手机日历补充历史日程");return;}
     if (!historyDraft || historyLock.current || generatingCommunityId || generatingHistoryCommunityId || generatingScheduleCommunityId) return;
     const draft = historyDraft; const community = communityMap.get(draft.communityId); if (!community) return;
     const start = new Date(`${draft.from}T00:00:00`).getTime();
@@ -1602,20 +1567,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
     historyLock.current = true; setGeneratingHistoryCommunityId(community.id);
     const before = loadWeverseState();
     try {
-      if (draft.kind === "schedule") {
-        const existing = before.schedules;
-        const rows = await generateWeverseScheduleBatch(community, existing, { now: new Date(start), startDate: draft.from, endDate: draft.to, count: draft.count });
-        let saved = 0;
-        for (const row of rows) {
-          const startsAt = scheduleDateTime(row.date, row.startTime);
-          if (!Number.isFinite(startsAt) || startsAt < start || startsAt > end) continue;
-          if (loadWeverseState().schedules.some(item => item.communityId === community.id && item.title === row.title && item.startsAt === startsAt)) continue;
-          const endsAtRaw = scheduleDateTime(row.date, row.endTime);
-          const item: WeverseScheduleItem = { id: createWeverseId("wvs_schedule"), communityId: community.id, type: row.type, title: row.title, startsAt, endsAt: Number.isFinite(endsAtRaw) && endsAtRaw > startsAt ? endsAtRaw : startsAt + 3600000, location: row.location, contentDescription:row.contentDescription, publicAt:row.publicAt ? new Date(row.publicAt).getTime() : undefined, memberCharacterIds: row.memberCharacterIds, visibility: row.visibility, calendarSync: row.calendarSync, busyLevel: row.busyLevel, source: "generated", createdAt: Date.now(), updatedAt: Date.now() };
-          upsertWeverseScheduleItem(item); syncWeverseScheduleItemToCalendar(item); saved++;
-        }
-        setHistoryProgress(`已补充 ${saved} 条历史日程`);onNotice(`已补充 ${saved} 条历史日程`);
-      } else {
+      {
         for (let i = 0; i < draft.count; i++) {
           const createdAt = historyTimestamp(start, end, i, draft.count);
           const kind = draft.kind === "mixed" ? (["artist", "official", "fan", "notice"] as const)[i % 4] : draft.kind;
@@ -2165,19 +2117,18 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
 
   const renderSchedule = (community: WeverseCommunity) => {
     const storedRows = state.schedules.filter((item) => item.communityId === community.id).map((item) => ({
-      id: item.id, title: item.title, startsAt: item.startsAt, endsAt: item.endsAt, type: item.type as WeverseScheduleType | "live",
-      location: item.location, contentDescription:unlockedScheduleContent(item), memberCharacterIds: item.memberCharacterIds, calendarSync: item.calendarSync, visibility: item.visibility, stored: item, liveId: undefined as string | undefined,
+      id: item.id, title: item.title, startsAt: item.startsAt, endsAt: item.endsAt, type: (item.linkedLiveId?"live":item.type) as WeverseScheduleType | "live",
+      location: item.location, contentDescription:unlockedScheduleContent(item), memberCharacterIds: item.memberCharacterIds, calendarSync: item.calendarSync, visibility: item.visibility, stored: item, liveId: item.linkedLiveId as string | undefined,
     }));
-    const liveRows = state.lives.filter((live) => live.communityId === community.id && live.status === "ended").map((live) => ({
-      id: `live:${live.id}`, title: live.title || "LIVE", startsAt: live.startedAt, endsAt: live.endedAt, type: "live" as const, location: undefined, contentDescription:"",
-      memberCharacterIds: live.hostCharacterIds, calendarSync: false, visibility: "public" as const, stored: undefined as WeverseScheduleItem | undefined, liveId: live.id,
-    }));
-    const allRows = [...storedRows, ...liveRows].sort((a,b) => a.startsAt-b.startsAt);
+    const allRows = storedRows.sort((a,b)=>a.startsAt-b.startsAt);
     const rows = allRows.filter((item) => item.visibility !== "internal");
+    const zone=loadCharacters().find(c=>c.id===community.memberCharacterIds[0])?.timeZone||getSystemTimeZone();
+    const scheduleDateKey=(ts:number)=>formatZonedPromptTimestamp(new Date(ts),zone).slice(0,10);
+    const scheduleTimeLabel=(ts:number)=>formatZonedPromptTimestamp(new Date(ts),zone).slice(11,16);
     const monthDays = getMonthMatrix(scheduleMonth);
-    const today = formatIsoDate(new Date());
+    const today = scheduleDateKey(Date.now());
     const selectedRows = rows.filter((item) => scheduleDateKey(item.startsAt) === selectedScheduleDate);
-    const selectedEnd = new Date(`${selectedScheduleDate}T23:59:59`).getTime();
+    const selectedEnd = calendarWallTimeToInstant(selectedScheduleDate,"23:59",zone)+59999;
     const nextRow = rows.find((item) => item.startsAt > selectedEnd);
     const shiftMonth = (delta: number) => {
       const d = parseIsoDate(scheduleMonth); d.setMonth(d.getMonth()+delta); d.setDate(1);
@@ -2194,7 +2145,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
     const memberNames = (ids: string[]) => ids.map((id) => resolveMember(community, id).displayName).join(" · ");
     const renderRow = (item: typeof rows[number], compact = false) => <button key={item.id} type="button" className={`${styles.scheduleEventCard} ${typeClass(item)} ${compact ? styles.scheduleNextCard : ""}`} onClick={() => item.liveId ? navigate({ type: "live", liveId: item.liveId }) : item.stored ? openScheduleEditor(community, item.stored) : undefined}>
       <span className={styles.scheduleEventRail} />
-      <div className={styles.scheduleEventBody}><div className={styles.scheduleEventTop}><b>{item.visibility === "internal" ? "内部行程" : (WVS_SCHEDULE_LABELS as Record<string,string>)[item.type]}</b><time>{scheduleTimeLabel(item.startsAt)}{item.endsAt ? ` - ${scheduleTimeLabel(item.endsAt)}` : ""}</time></div><h4>{item.title}</h4>{item.contentDescription ? <p>{item.contentDescription}</p> : null}{item.location ? <p>{item.location}</p> : null}{item.memberCharacterIds.length ? <small>{memberNames(item.memberCharacterIds)}</small> : null}</div>
+      <div className={styles.scheduleEventBody}><div className={styles.scheduleEventTop}><b>{item.visibility === "internal" ? "内部行程" : (WVS_SCHEDULE_LABELS as Record<string,string>)[item.type]}</b><time>{scheduleTimeLabel(item.startsAt)}{item.calendarSync&&item.endsAt ? ` - ${scheduleTimeLabel(item.endsAt)}` : ""}</time></div><h4>{item.title}</h4>{item.contentDescription ? <p>{item.contentDescription}</p> : null}{item.memberCharacterIds.length ? <small>{memberNames(item.memberCharacterIds)}</small> : null}</div>
       {item.visibility === "internal" ? <span className={`${styles.scheduleSyncBadge} ${styles.scheduleInternalBadge}`}>仅内部</span> : item.calendarSync ? <span className={styles.scheduleSyncBadge}>手机日历</span> : null}
     </button>;
     return <div className={styles.schedulePage}>
@@ -2205,7 +2156,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
           const dayRows = rows.filter((item) => scheduleDateKey(item.startsAt) === date);
           const selected = date === selectedScheduleDate;
           const current = date === today;
-          return <button type="button" key={date} data-muted={!isSameMonth(date, scheduleMonth) ? "true" : undefined} data-selected={selected ? "true" : undefined} data-today={current ? "true" : undefined} onClick={() => setSelectedScheduleDate(date)}><span>{Number(date.slice(-2))}</span><i>{dayRows.slice(0,3).map((item) => <em key={item.id} className={typeClass(item)} />)}</i></button>;
+          return <button type="button" key={date} data-muted={!isSameMonth(date, scheduleMonth) ? "true" : undefined} data-selected={selected ? "true" : undefined} data-today={current ? "true" : undefined} onClick={() => setSelectedScheduleDate(date)}><span>{Number(date.slice(-2))}</span><i>{dayRows.slice(0,3).map((item) => <em key={item.id} className={typeClass(item)} />)}{dayRows.length>3&&<small>+{dayRows.length-3}</small>}</i></button>;
         })}</div>
       </section>
       <div className={styles.scheduleManageBar}><button type="button" onClick={() => openScheduleEditor(community)}><Plus size={16}/> 手动添加</button></div>
@@ -2443,10 +2394,10 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
             {scheduleEditor.visibility === "public" ? <><label className={styles.fieldLabel}>公开分类</label><div className={styles.schedulePublicTypePicker}>{WVS_PUBLIC_SCHEDULE_TYPES.map(({ type, label }) => <button type="button" key={type} data-active={scheduleEditor.type === type ? "true" : undefined} onClick={() => setScheduleEditor({ ...scheduleEditor, type, calendarSync: autoSyncTypes.has(type) })}>{label}</button>)}</div></> : <p className={styles.editorHint}>电视剧 / 电影拍摄、综艺或团综录制、MV / Teaser / 画报 / 品牌拍摄、彩排、进组、内部会议与移动等都适合记为内部行程。系统生成时会自动判断具体工作类型。</p>}
             <label className={styles.fieldLabel}>日程名称</label>
             <input className={styles.select} value={scheduleEditor.title} onChange={(e) => setScheduleEditor({ ...scheduleEditor, title: e.target.value })} placeholder={scheduleEditor.visibility === "internal" ? "例如：团综录制 / 画报拍摄 / 剧组拍摄" : "例如：Music Bank / 团综 EP.12 更新 / 专辑发行"} />
-            <div className={styles.scheduleEditorGrid}><label><span>日期</span><input type="date" value={scheduleEditor.date} onChange={(e) => setScheduleEditor({ ...scheduleEditor, date: e.target.value })} /></label><label><span>开始</span><input type="time" value={scheduleEditor.startTime} onChange={(e) => setScheduleEditor({ ...scheduleEditor, startTime: e.target.value })} /></label><label><span>结束</span><input type="time" value={scheduleEditor.endTime} onChange={(e) => setScheduleEditor({ ...scheduleEditor, endTime: e.target.value })} /></label></div>
-            <label className={styles.fieldLabel}>地点 / 平台</label>
+            <div className={styles.scheduleEditorGrid} data-point={!scheduleEditor.calendarSync}><label><span>日期</span><input type="date" value={scheduleEditor.date} onChange={(e) => setScheduleEditor({ ...scheduleEditor, date: e.target.value })} /></label><label><span>{scheduleEditor.calendarSync?"开始":"发生时间"}</span><input type="time" value={scheduleEditor.startTime} onChange={(e) => setScheduleEditor({ ...scheduleEditor, startTime: e.target.value })} /></label>{scheduleEditor.calendarSync&&<label><span>结束</span><input type="time" value={scheduleEditor.endTime} onChange={(e) => setScheduleEditor({ ...scheduleEditor, endTime: e.target.value })} /></label>}</div>
+            <label className={styles.fieldLabel}>内部地点（不对外公开）</label>
             <input className={styles.select} value={scheduleEditor.location} onChange={(e) => setScheduleEditor({ ...scheduleEditor, location: e.target.value })} placeholder="可留空" />
-            {scheduleEditor.visibility === "public" && <><label className={styles.fieldLabel}>公开内容描述</label><textarea className={styles.textarea} rows={4} maxLength={4000} value={scheduleEditor.contentDescription || ""} onChange={e => setScheduleEditor({...scheduleEditor,contentDescription:e.target.value})} placeholder="一两句具体内容，到解锁时间后公开"/><label className={styles.fieldLabel}>内容解锁时间（留空按日程开始时间）</label><input className={styles.select} type="datetime-local" value={scheduleEditor.publicAt || ""} onChange={e => setScheduleEditor({...scheduleEditor,publicAt:e.target.value})}/></>}
+            {scheduleEditor.visibility === "public" && <><label className={styles.fieldLabel}>公开内容描述</label><textarea className={styles.textarea} rows={4} maxLength={4000} value={scheduleEditor.contentDescription || ""} onChange={e => setScheduleEditor({...scheduleEditor,contentDescription:e.target.value})} placeholder="一两句具体内容，到解锁时间后公开"/>{scheduleEditor.calendarSync&&<><label className={styles.fieldLabel}>内容解锁时间（留空按日程开始时间）</label><input className={styles.select} type="datetime-local" value={scheduleEditor.publicAt || ""} onChange={e => setScheduleEditor({...scheduleEditor,publicAt:e.target.value})}/></>}</>}
             <label className={styles.fieldLabel}>参与成员</label>
             <div className={styles.scheduleMemberPicker}>{community.memberCharacterIds.map((id) => { const m = resolveMember(community, id); const checked = scheduleEditor.memberCharacterIds.includes(id); return <button type="button" key={id} data-checked={checked ? "true" : undefined} onClick={() => setScheduleEditor({ ...scheduleEditor, memberCharacterIds: checked ? scheduleEditor.memberCharacterIds.filter((value) => value !== id) : [...scheduleEditor.memberCharacterIds, id] })}><Avatar text={m.displayName} imageUrl={m.avatarUrl} tone="soft"/><span>{m.displayName}</span></button>; })}</div>
             {scheduleEditor.visibility === "public" ? <label className={styles.scheduleSyncToggle}><span><b>实际占用角色时间</b><small>全部公开日程都会同步日历。作品上线、节目播出等节点不占用当时的时间，请关闭。</small></span><input type="checkbox" checked={scheduleEditor.calendarSync} onChange={(e) => setScheduleEditor({ ...scheduleEditor, calendarSync: e.target.checked })}/></label> : <div className={`${styles.scheduleSyncToggle} ${styles.scheduleInternalSync}`}><span><b>自动同步角色手机日历</b><small>内部工作行程不会对粉丝公开，但会作为角色真实安排写入 Calendar。</small></span><span>✓</span></div>}
@@ -2494,7 +2445,7 @@ export function WeverseApp({ onClose, onNotice: externalNotice }: Props) {
 
       {communityMenuId ? (() => { const community = communityMap.get(communityMenuId); if (!community) return null; return <div className={styles.sheetMask} onMouseDown={(event) => { if (event.currentTarget === event.target) setCommunityMenuId(null); }}><section className={`${styles.sheet} ${styles.actionSheet}`}><div className={styles.sheetHandle} /><div className={styles.sheetTitle}><h2>{community.name} 管理</h2><button type="button" className={styles.iconBtn} onClick={() => setCommunityMenuId(null)}><X size={19} /></button></div><button type="button" onClick={() => { setCommunityMenuId(null); openCommunityEditor(community); }}><Settings size={18} /> 管理 Community</button><button type="button" onClick={() => { setCommunityMenuId(null); openComposer("official", community.id); }}><Send size={18} /> 发布 Official Post</button><button type="button" onClick={() => { setCommunityMenuId(null); openNoticeEditor(community.id); }}><CalendarDays size={18} /> 发布官方公告</button>{!community.userIdentityId && <button type="button" onClick={() => { setCommunityMenuId(null); setPhotoPicker({ communityId: community.id, mode: "manageOfficial" }); }}><ImagePlus size={18} /> 管理官方媒体 · {community.officialMediaPhotoIds?.length || 0}</button>}{!community.userIdentityId && <button type="button" onClick={() => { setCommunityMenuId(null); openLiveCreator(community, undefined, true); }}><Radio size={18} /> 发起 Official Live</button>}<button type="button" onClick={() => setCommunityMenuId(null)}>取消</button></section></div>; })() : null}
 
-      {aiMenuContext ? <div className={styles.sheetMask} onMouseDown={(event) => { if (event.currentTarget === event.target) setAiMenuContext(null); }}><section className={`${styles.sheet} ${styles.actionSheet}`}><div className={styles.sheetHandle} /><div className={styles.sheetTitle}><h2>AI 生成</h2><button type="button" className={styles.iconBtn} onClick={() => setAiMenuContext(null)}><X size={19} /></button></div>{aiMenuContext.type === "post" ? (() => { const post = postMap.get(aiMenuContext.postId); return post ? <><button type="button" disabled={generatingCommentsPostId === post.id} onClick={() => generateMoreComments(post)}><MessageCircle size={18} /> {generatingCommentsPostId === post.id ? "正在加载评论…" : "加载更多评论"}</button><p className={styles.sheetHint}>只追加，不覆盖原评论；粉丝语言按“设置 → 粉丝语言”当前预设生成，艺人可能回复，也可能不回复。</p></> : null; })() : aiMenuContext.type === "community" ? (() => { const community = communityMap.get(aiMenuContext.communityId); return community ? <>{!community.userIdentityId && <button type="button" onClick={() => generateCommunityRound(community)}><Sparkles size={18} /> 生成一轮混合社区动态</button>}{!community.userIdentityId && <button type="button" onClick={() => generateArtistOnly(community)}><UserRound size={18} /> 只生成 Artist Post</button>}<button type="button" onClick={() => generateFanOnly(community)}><UsersRound size={18} /> 只刷新粉丝内容</button>{!community.userIdentityId && <button type="button" onClick={() => generateOfficialOnly(community)}><Send size={18} /> 生成 Official Post</button>}<button type="button" onClick={() => generateNoticeOnly(community)}><CalendarDays size={18} /> 生成 Official Notice</button><button type="button" onClick={() => { setAiMenuContext(null); void refreshGeneratedSchedule(community); }}><CalendarDays size={18}/> 生成近期日程</button>{!community.userIdentityId && <button type="button" onClick={() => openHistoryGenerator(community)}><History size={18}/> 补历史动态</button>}<button type="button" onClick={() => openHistoryGenerator(community, "schedule")}><CalendarDays size={18}/> 补历史日程</button></> : null; })() : <><p className={styles.sheetHint}>选择一个 Community 刷新，或按顺序刷新全部。</p>{state.communities.map((community) => <button type="button" key={community.id} onClick={() => setAiMenuContext({ type: "community", communityId: community.id })}><Sparkles size={18} /> {community.name}</button>)}{state.communities.length > 1 ? <button type="button" onClick={generateAllCommunities}><UsersRound size={18} /> 全部 Community 各生成一轮</button> : null}</>}<button type="button" onClick={() => setAiMenuContext(null)}>取消</button></section></div> : null}
+      {aiMenuContext ? <div className={styles.sheetMask} onMouseDown={(event) => { if (event.currentTarget === event.target) setAiMenuContext(null); }}><section className={`${styles.sheet} ${styles.actionSheet}`}><div className={styles.sheetHandle} /><div className={styles.sheetTitle}><h2>AI 生成</h2><button type="button" className={styles.iconBtn} onClick={() => setAiMenuContext(null)}><X size={19} /></button></div>{aiMenuContext.type === "post" ? (() => { const post = postMap.get(aiMenuContext.postId); return post ? <><button type="button" disabled={generatingCommentsPostId === post.id} onClick={() => generateMoreComments(post)}><MessageCircle size={18} /> {generatingCommentsPostId === post.id ? "正在加载评论…" : "加载更多评论"}</button><p className={styles.sheetHint}>只追加，不覆盖原评论；粉丝语言按“设置 → 粉丝语言”当前预设生成，艺人可能回复，也可能不回复。</p></> : null; })() : aiMenuContext.type === "community" ? (() => { const community = communityMap.get(aiMenuContext.communityId); return community ? <>{!community.userIdentityId && <button type="button" onClick={() => generateCommunityRound(community)}><Sparkles size={18} /> 生成一轮混合社区动态</button>}{!community.userIdentityId && <button type="button" onClick={() => generateArtistOnly(community)}><UserRound size={18} /> 只生成 Artist Post</button>}<button type="button" onClick={() => generateFanOnly(community)}><UsersRound size={18} /> 只刷新粉丝内容</button>{!community.userIdentityId && <button type="button" onClick={() => generateOfficialOnly(community)}><Send size={18} /> 生成 Official Post</button>}<button type="button" onClick={() => generateNoticeOnly(community)}><CalendarDays size={18} /> 生成 Official Notice</button>{!community.userIdentityId && <button type="button" onClick={() => openHistoryGenerator(community)}><History size={18}/> 补历史动态</button>}</> : null; })() : <><p className={styles.sheetHint}>选择一个 Community 刷新，或按顺序刷新全部。</p>{state.communities.map((community) => <button type="button" key={community.id} onClick={() => setAiMenuContext({ type: "community", communityId: community.id })}><Sparkles size={18} /> {community.name}</button>)}{state.communities.length > 1 ? <button type="button" onClick={generateAllCommunities}><UsersRound size={18} /> 全部 Community 各生成一轮</button> : null}</>}<button type="button" onClick={() => setAiMenuContext(null)}>取消</button></section></div> : null}
 
       {communityEditor ? <div className={`${styles.fullModal} wvs-community-dialog`}><div className={styles.modalHeader}><button type="button" className={styles.modalBackBtn} aria-label="返回" onPointerDown={(e) => e.stopPropagation()} onClick={() => { setCommunityEditorError(""); setCommunityEditor(null); }}><ChevronLeft size={22} /></button><b>{communityEditor.id ? "管理 Community" : "新建 Community"}</b><button type="button" className={styles.saveTextBtn} onPointerDown={(e) => e.stopPropagation()} onClick={saveCommunityEditor}>保存</button></div><div className={styles.modalScroll}>{communityEditorError ? <div className={styles.editorError}>{communityEditorError}</div> : null}<div className={styles.editorSection}><h3>Community</h3><label>名称<input value={communityEditor.name} onChange={(e) => setCommunityEditor({ ...communityEditor, name: e.target.value })} placeholder="例如 NCT WISH" /></label><label>简介<textarea value={communityEditor.description} onChange={(e) => setCommunityEditor({ ...communityEditor, description: e.target.value })} placeholder="这个 Community 的简介" /></label><label>当前粉丝数<input inputMode="numeric" value={communityEditor.fanCount} onChange={(e) => setCommunityEditor({ ...communityEditor, fanCount: e.target.value.replace(/[^0-9,，]/g, "") })} placeholder="例如 1850000" /></label><div className={styles.historyEditorRow}><label>历史状态<select value={communityEditor.historyMode} onChange={(e) => setCommunityEditor({ ...communityEditor, historyMode: e.target.value as WeverseHistoryMode })}><option value="new">新社区，不生成旧内容</option><option value="existing">已运营一段时间（默认约 1 年）</option><option value="custom">自定义开始运营日期</option></select></label>{communityEditor.historyMode === "custom" ? <label>开始运营日期<input type="date" value={communityEditor.historyStartDate} onChange={(e) => setCommunityEditor({ ...communityEditor, historyStartDate: e.target.value })} /></label> : null}{communityEditor.id && communityMap.get(communityEditor.id)?.historyInitializedAt ? <p className={styles.editorHint}>历史内容已初始化；以后在 Community Feed 底部可以继续「加载更早动态」。</p> : communityEditor.historyMode !== "new" ? <p className={styles.editorHint}>保存后会自动补一小批过去的 Official / Artist / Fan 内容，不会写进当前近期记忆。</p> : null}</div><div className={styles.imageEditRow}><Avatar text={communityEditor.name || "C"} imageUrl={communityEditor.avatarUrl || communityEditor.officialAvatarUrl} tone="soft" className={styles.editorAvatar} /><button type="button" onClick={() => communityAvatarInputRef.current?.click()}><Camera size={16} /> Community 图标</button>{communityEditor.avatarUrl ? <button type="button" onClick={() => setCommunityEditor({ ...communityEditor, avatarUrl: "" })}>恢复继承官号头像</button> : null}</div><div className={styles.imageEditRow}><button type="button" onClick={() => coverInputRef.current?.click()}><ImagePlus size={16} /> Community 背景图</button>{communityEditor.coverUrl ? <button type="button" onClick={() => setCommunityEditor({ ...communityEditor, coverUrl: "" })}>清除背景</button> : null}</div><input ref={communityAvatarInputRef} className={styles.hiddenInput} type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCommunityEditor({ ...communityEditor, avatarUrl: await fileToDataUrl(file, 500) }); e.currentTarget.value = ""; }} /><input ref={coverInputRef} className={styles.hiddenInput} type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCommunityEditor({ ...communityEditor, coverUrl: await fileToDataUrl(file, 1400) }); e.currentTarget.value = ""; }} /></div><div className={styles.editorSection}><h3>Official Account</h3><label>官号昵称<input value={communityEditor.officialName} onChange={(e) => setCommunityEditor({ ...communityEditor, officialName: e.target.value })} placeholder={communityEditor.name ? `${communityEditor.name} Official` : "Official Account"} /></label><label>官号简介<input value={communityEditor.officialBio} onChange={(e) => setCommunityEditor({ ...communityEditor, officialBio: e.target.value })} placeholder="公告 · Schedule · 官方 LIVE" /></label><div className={styles.imageEditRow}><Avatar text={communityEditor.officialName || communityEditor.name || "O"} imageUrl={communityEditor.officialAvatarUrl} tone="teal" className={styles.editorAvatar} /><button type="button" onClick={() => officialAvatarInputRef.current?.click()}><Camera size={16} /> Official 头像</button>{communityEditor.officialAvatarUrl ? <button type="button" onClick={() => setCommunityEditor({ ...communityEditor, officialAvatarUrl: "" })}>清除</button> : null}</div>{communityEditor.id && !communityEditor.userCommunity ? <button type="button" className={styles.mediaPoolButton} onClick={() => setPhotoPicker({ communityId: communityEditor.id!, mode: "manageOfficial" })}><ImagePlus size={17} /> 管理官方媒体池 · {communityMap.get(communityEditor.id)?.officialMediaPhotoIds?.length || 0} 张</button> : <p className={styles.editorHint}>保存 Community 后即可从 Photos 选择官号专用官方素材。</p>}<input ref={officialAvatarInputRef} className={styles.hiddenInput} type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCommunityEditor({ ...communityEditor, officialAvatarUrl: await fileToDataUrl(file, 500) }); e.currentTarget.value = ""; }} /></div><div className={styles.editorSection}><h3>绑定成员</h3><label className={styles.fieldLabel}>直播风格</label><textarea className={styles.textareaSmall} value={communityEditor.liveStyle || ""} onChange={e=>setCommunityEditor({...communityEditor,liveStyle:e.target.value})} placeholder="开播习惯、说话方式与常聊内容；留空按人设发挥"/><p className={styles.editorHint}>同一个角色可以同时加入多个 Community；底层仍是同一个角色、同一套记忆和相册。</p><div className={styles.memberPicker}><button type="button" className={`${styles.memberPickCard} ${communityEditor.userCommunity ? styles.memberPickActive : ""}`} onClick={()=>setCommunityEditor({...communityEditor,userCommunity:!communityEditor.userCommunity,selectedCharacterIds:[]})}><Avatar text={artistName} imageUrl={artistAvatar} tone="soft" className={styles.memberPickAvatar}/><span className={styles.memberPickName}>{artistName}</span><span className="wvs-self-badge">我</span><i>{communityEditor.userCommunity?"✓":"+"}</i></button>{characters.map((char) => { const checked = communityEditor.selectedCharacterIds.includes(char.id); return <button type="button" key={char.id} className={`${styles.memberPickCard} ${checked ? styles.memberPickActive : ""}`} onClick={() => setCommunityEditor({ ...communityEditor, userCommunity:false, selectedCharacterIds: checked ? communityEditor.selectedCharacterIds.filter((id) => id !== char.id) : [...communityEditor.selectedCharacterIds, char.id] })}><Avatar text={char.name} imageUrl={char.avatar} tone="soft" className={styles.memberPickAvatar} /><span className={styles.memberPickName}>{char.name}</span><i>{checked ? "✓" : "+"}</i></button>; })}</div>{!characters.length ? <div className={styles.emptyMini}>当前还没有角色，请先在「角色」App 建立角色。</div> : null}</div>{communityEditor.id ? <div className={styles.editorSection}><h3>危险操作</h3><button type="button" className={styles.dangerButton} onClick={() => { const community = communityMap.get(communityEditor.id!); if (community) removeCommunity(community); }}><Trash2 size={16} /> 删除 Community</button></div> : null}</div></div> : null}
 

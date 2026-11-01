@@ -20,3 +20,10 @@ export function replaceYtb(nav: YtbNavigation, screen: YtbScreen | null, patch: 
   const next = navigateYtb({ ...nav, history: [] }, screen, patch, ownChannelId);
   return { current: next.current, history: nav.history };
 }
+
+/** A deletion is not forward navigation. Drop destinations whose backing data no longer exists. */
+export function afterYtbChannelDeletion(nav:YtbNavigation,state:{channels:Array<{id:string}>;streams:Array<{id:string}>;threads:Array<{id:string}>;groups:Array<{id:string}>}):YtbNavigation{
+ const valid=(r:YtbRoute)=>{const s=r.screen;if(!s||s.type==='all')return true;if(s.type==='stream')return state.streams.some(x=>x.id===s.id);if(s.type==='thread')return state.threads.some(x=>x.id===s.id);if(s.type==='group')return state.groups.some(x=>x.id===s.id);return state.channels.some(x=>x.id===s.id);};
+ const history=nav.history.filter(valid),index=history.findIndex(r=>r.screen?.type==='all');
+ return {current:{...nav.current,screen:{type:'all'}},history:index>=0?history.slice(0,index):history};
+}

@@ -154,3 +154,5 @@ export function formatWeekRangeLabel(weekStart: string): string {
 export function getOwnerStorageKey(ownerType: string, ownerId: string): string {
   return `${ownerType}:${ownerId}`;
 }
+
+export function isCalendarItemTimeAllowed(item:{kind?:string;startTime:string;endTime:string}):boolean {return item.kind==="milestone"?Boolean(normalizeTime(item.startTime)):isCalendarTimeRangeAllowed(item.startTime,item.endTime);}

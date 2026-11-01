@@ -1,3 +1,4 @@
+import {isCalendarItemTimeAllowed} from "./calendar-utils";
 import { schedulePublicContentSuffix } from "./schedule-public-content";
 import { loadCharacters } from "./character-storage";
 import { reconcileCalendarMaster } from "./calendar-master";
@@ -117,7 +118,7 @@ export function loadCalendarWeekPlan(
   return {
     ...plan,
     items: sortScheduleItems((plan.items || [])
-      .filter(item => isCalendarTimeRangeAllowed(item.startTime, item.endTime))
+      .filter(item => isCalendarItemTimeAllowed(item))
       .map(item => ({
         ...item,
         weekday: item.weekday || getWeekdayLabel(item.date),
@@ -135,7 +136,7 @@ export function loadOwnerCalendarPlans(
     .filter(entry => entry.ownerType === ownerType && entry.ownerId === ownerId)
     .map(entry => ({
       ...entry,
-      items: sortScheduleItems((entry.items || []).filter(item => isCalendarTimeRangeAllowed(item.startTime, item.endTime))),
+      items: sortScheduleItems((entry.items || []).filter(item => isCalendarItemTimeAllowed(item))),
     }))
     .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 }
@@ -191,18 +192,19 @@ export function upsertCalendarScheduleItem(
     date: item.date,
     weekday: item.weekday || getWeekdayLabel(item.date),
     startTime: item.startTime,
-    endTime: item.endTime,
+    endTime: item.kind === "milestone" ? item.startTime : item.endTime,
     location: item.location.trim(),
     title: item.title.trim(),
     emoji: sanitizeScheduleEmoji(item.emoji),
     colorKey: item.colorKey || pickScheduleColorKey(item.startTime),
-    contentDescription:item.contentDescription?.trim().slice(0,4000), encounterScene:item.encounterScene, visibility: item.visibility || "private", kind: item.kind || "event", publicAt:item.publicAt, wvsType:item.wvsType,
+    contentDescription:item.contentDescription?.trim().slice(0,4000), encounterScene:item.encounterScene, visibility: item.visibility || "private", kind: item.kind || "event", publicAt:item.kind==="milestone"?undefined:item.publicAt, wvsType:item.wvsType,
     source: item.source,
     externalSource: item.externalSource,
     externalId: item.externalId,
+    linkedLiveId:item.linkedLiveId,
     sharedGroupId: item.sharedGroupId,
     sharedCharacterIds: item.sharedCharacterIds,
-    busyLevel: item.busyLevel,
+    busyLevel: item.kind === "milestone" ? 1 : item.busyLevel,
     createdAt: item.createdAt ?? now,
     updatedAt: now,
   };
@@ -229,7 +231,7 @@ export function checkCalendarSyncConflicts(
       || (existing.startTime === item.startTime && existing.endTime === item.endTime && existing.title === item.title && existing.location === item.location);
     const additions = dayItems.filter(existing => !isSameEvent(existing));
 
-    if (additions.some(existing => existing.startTime < item.endTime && item.startTime < existing.endTime)) {
+    if (item.kind!=="milestone" && additions.some(existing => existing.kind!=="milestone" && existing.startTime < item.endTime && item.startTime < existing.endTime)) {
       conflicts.push({ ownerId, date: item.date, reason: "overlap" });
     }
   }
@@ -464,22 +466,22 @@ export function normalizeGeneratedScheduleItems(
         date: item.date,
         weekday: getWeekdayLabel(item.date),
         startTime: normalizeTime(item.startTime) || item.startTime,
-        endTime: normalizeTime(item.endTime) || item.endTime,
+        endTime: item.kind==="milestone" ? (normalizeTime(item.startTime)||item.startTime) : normalizeTime(item.endTime) || item.endTime,
         location: item.location.trim(),
         title: item.title.trim(),
         emoji: sanitizeScheduleEmoji(item.emoji),
-        busyLevel: item.busyLevel === 1 || item.busyLevel === 2 || item.busyLevel === 3 || item.busyLevel === 4
+        busyLevel: item.kind==="milestone"?1 as const:item.busyLevel === 1 || item.busyLevel === 2 || item.busyLevel === 3 || item.busyLevel === 4
           ? item.busyLevel
           : fallbackBusyLevel(item.title),
         colorKey: isCalendarColorKey(item.colorKey) ? item.colorKey : pickScheduleColorKey(item.startTime),
         contentDescription: item.contentDescription?.trim().slice(0,4000),
         encounterScene: item.encounterScene?.trim().slice(0,100),
-        visibility: item.visibility === "public" ? "public" as const : "private" as const, kind: item.kind === "milestone" ? "milestone" as const : "event" as const, publicAt:item.publicAt,
+        visibility: item.visibility === "public" ? "public" as const : "private" as const, kind: item.kind === "milestone" ? "milestone" as const : "event" as const, publicAt:item.kind==="milestone"?undefined:item.publicAt,
         source: "generated" as const,
         createdAt: now,
         updatedAt: now,
       }))
-      .filter(item => isCalendarTimeRangeAllowed(item.startTime, item.endTime)),
+      .filter(item => isCalendarItemTimeAllowed(item)),
   );
 }
 
@@ -531,6 +533,7 @@ export function loadCalendarItemsByExternalId(externalSource: "weverse", externa
 }
 
 export function validateScheduleDraft(item: {
+  kind?: "event"|"milestone";
   date: string;
   startTime: string;
   endTime: string;
@@ -540,8 +543,8 @@ export function validateScheduleDraft(item: {
   const start = normalizeTime(item.startTime);
   const end = normalizeTime(item.endTime);
   if (!item.date || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) return "请选择日期";
-  if (!start || !end) return "请输入正确的时间格式";
-  if (start >= end) return "结束时间需要晚于开始时间";
+  if (!start || (item.kind!=="milestone"&&!end)) return "请输入正确的时间格式";
+  if (item.kind!=="milestone" && start! >= end!) return "结束时间需要晚于开始时间";
   if (!item.title.trim()) return "请输入事项";
   return null;
 }
@@ -557,6 +560,6 @@ export function getCalendarOwnerKey(ownerType: CalendarOwnerType, ownerId: strin
 /** Public user plans are shared facts; unreleased descriptions stay out of model input. */
 export function buildUserPublicCalendarContext(): string {
  const now=Date.now(),lower=new Date(now-7*86400000).toISOString().slice(0,10),upper=new Date(now+35*86400000).toISOString().slice(0,10);
- const rows=loadOwnerCalendarPlans("user","self").flatMap(p=>p.items).filter(i=>i.visibility==="public"&&i.date>=lower&&i.date<=upper).sort((a,b)=>(a.date+a.startTime).localeCompare(b.date+b.startTime)).slice(0,20).map(i=>`${i.date} ${i.startTime} ${i.title}${i.location?` @${i.location}`:""}${schedulePublicContentSuffix(i)}`);
+ const rows=loadOwnerCalendarPlans("user","self").flatMap(p=>p.items).filter(i=>i.visibility==="public"&&i.date>=lower&&i.date<=upper).sort((a,b)=>(a.date+a.startTime).localeCompare(b.date+b.startTime)).slice(0,20).map(i=>`${i.date} ${i.startTime} ${i.title}${schedulePublicContentSuffix(i)}`);
  return rows.length?`用户已公开的日程安排（仅作可知事实，按话题自然使用）：\n${rows.join("\n")}`.slice(0,6000):"";
 }

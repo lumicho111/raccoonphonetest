@@ -858,3 +858,6 @@
 .root :global(.wvs-community-dialog){top:max(76px,calc(env(safe-area-inset-top,0px) + 36px));bottom:max(32px,calc(env(safe-area-inset-bottom,0px) + 16px));max-height:calc(100% - 108px);min-height:0}
 .root :global(.wvs-community-dialog) .modalHeader{flex-shrink:0}
 .root :global(.wvs-self-badge){font-size:calc(10px * var(--app-text-scale,1));color:#8b9096;margin-left:auto}
+
+.scheduleEditorGrid[data-point="true"]{grid-template-columns:1.2fr .9fr}
+.scheduleMonthGrid>button>i>small{font-size:calc(8px * var(--app-text-scale,1));font-family:inherit;line-height:1;color:inherit}

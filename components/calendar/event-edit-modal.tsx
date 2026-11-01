@@ -82,11 +82,11 @@ export function CalendarEventEditModal({
           </div>
           <div className="flex flex-col gap-1">
             <label className="menu-desc ml-1" htmlFor="calendar-kind">类型</label>
-            <Select id="calendar-kind" value={draft.kind || "event"} onChange={e => onChange({ ...draft, kind: e.target.value as "event" | "milestone" })}>
-              <option value="event">实际行程 · 占用时间</option><option value="milestone">公开节点 · 不占用时间</option>
+            <Select id="calendar-kind" value={draft.kind || "event"} onChange={e => onChange({ ...draft, kind: e.target.value as "event" | "milestone",endDate:draft.date })}>
+              <option value="event">时段事项 · 占用时间</option><option value="milestone">定时事项 · 不占用时间</option>
             </Select>
           </div>
-          {draft.visibility === "public" && <div className="flex flex-col gap-1">
+          {draft.visibility === "public" && draft.kind!=="milestone" && <div className="flex flex-col gap-1">
             <span className="menu-desc ml-1">内容解锁时间</span>
             <div className="grid grid-cols-2 gap-3">
               <Input aria-label="内容解锁日期" type="date" value={draft.publicAt?.slice(0, 10) || ""} onChange={e => onChange({ ...draft, publicAt: e.target.value ? `${e.target.value}T${draft.publicAt?.slice(11, 16) || "00:00"}` : undefined })} />
@@ -96,7 +96,7 @@ export function CalendarEventEditModal({
           </div>}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="menu-desc ml-1">开始日期</label>
+              <label className="menu-desc ml-1">{draft.kind==="milestone"?"发生日期":"开始日期"}</label>
               <Input
                 type="date"
                 value={draft.date}
@@ -108,7 +108,7 @@ export function CalendarEventEditModal({
                 }}
               />
             </div>
-            <div className="flex flex-col gap-1">
+            {draft.kind!=="milestone"&&<div className="flex flex-col gap-1">
               <label className="menu-desc ml-1">结束日期</label>
               <Input
                 type="date"
@@ -116,26 +116,26 @@ export function CalendarEventEditModal({
                 min={draft.date}
                 onChange={e => onChange({ ...draft, endDate: e.target.value })}
               />
-            </div>
+            </div>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="menu-desc ml-1">开始时间</label>
+              <label className="menu-desc ml-1">{draft.kind==="milestone"?"发生时间":"开始时间"}</label>
               <Input
                 type="time"
                 value={draft.startTime}
                 onChange={e => onChange({ ...draft, startTime: e.target.value })}
               />
             </div>
-            <div className="flex flex-col gap-1">
+            {draft.kind!=="milestone"&&<div className="flex flex-col gap-1">
               <label className="menu-desc ml-1">结束时间</label>
               <Input
                 type="time"
                 value={draft.endTime}
                 onChange={e => onChange({ ...draft, endTime: e.target.value })}
               />
-            </div>
+            </div>}
           </div>
 
           <div className="flex flex-col gap-1">
@@ -152,15 +152,15 @@ export function CalendarEventEditModal({
             <textarea id="calendar-content-description" className="ui-input" rows={4} maxLength={4000} value={draft.contentDescription || ""} onChange={e => onChange({ ...draft, contentDescription:e.target.value })} placeholder="写一两句节目内容、选曲或企划看点；到解锁时间后供各平台参考。" />
           </div>}
           <div className="flex flex-col gap-1">
-            <label className="menu-desc ml-1">地点／发布平台（可选）</label>
+            <label className="menu-desc ml-1">内部地点（不对外公开）</label>
             <Input
               value={draft.location}
               onChange={e => onChange({ ...draft, location: e.target.value })}
-              placeholder="例如：拍摄场地 / YouTube、Weverse"
+              placeholder="可留空；公开平台信息请写在公开内容描述中"
             />
           </div>
 
-          {showBusyLevel && (
+          {showBusyLevel && draft.kind!=="milestone" && (
             <div className="flex flex-col gap-1">
               <label className="menu-desc ml-1">忙碌程度</label>
               <select

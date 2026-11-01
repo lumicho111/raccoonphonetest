@@ -1,3 +1,4 @@
+import {calendarWorldlineContext} from "./calendar-worldline-context";
 import { calendarGenerationPrompt } from "./calendar-generation-prompt";
 import type { Character } from "./character-types";
 import type { ApiConfig, PresetConfig, RegexConfig, WorldBookConfig } from "./settings-types";
@@ -42,6 +43,7 @@ type CalendarAssemblerResolved = {
 };
 
 export type CalendarRangeGenerationRequest = {
+  additionalPrompt?: string;
   characterIds: string[];
   fromDate: string;
   toDate: string;
@@ -310,7 +312,7 @@ function parseRangeScheduleResponse(
   const normalize = (rows: Array<Record<string, unknown>> | undefined) => normalizeGeneratedScheduleItems((rows || []).flatMap(row => {
     const date = String(row.date || "");
     const startTime = normalizeTime(String(row.startTime || ""));
-    const endTime = normalizeTime(String(row.endTime || ""));
+    const endTime = row.kind==="milestone" ? startTime : normalizeTime(String(row.endTime || ""));
     const title = String(row.title || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || formatIsoDate(new Date(`${date}T00:00:00`)) !== date
       || date < request.fromDate || date > request.toDate || !startTime || !endTime || !title) return [];
@@ -359,7 +361,7 @@ export async function generateCalendarScheduleRange(
   try {
     const bindings = loadBindingConfig();
     const bindingKey = (id: string) => {
-      const slot = resolveBinding(bindings, id, "calendar");
+      const slot = resolveBinding(bindings, id.startsWith("user:")?undefined:id, "calendar");
       return JSON.stringify({
         apiConfigId: slot.apiConfigId,
         presetId: slot.presetId,
@@ -372,7 +374,7 @@ export async function generateCalendarScheduleRange(
       return { success: false, error: "所选角色的日历 API、预设或上下文配置不同，暂时不能合并为一次生成；可先选择配置相同的角色。" };
     }
     const resolved = await Promise.all(ids.map(id => resolveCalendarAssemblerInput(
-      "character", id, getWeekStartIso(new Date(`${request.fromDate}T00:00:00`)), { skipWorldBooks: ids.length > 1, ...(request.existingMode === "replan" ? { replaceRange: { fromDate: request.fromDate, toDate: request.toDate } } : {}) },
+      id.startsWith("user:")?"user":"character", id.startsWith("user:")?"self":id, getWeekStartIso(new Date(`${request.fromDate}T00:00:00`)), { skipWorldBooks: ids.length > 1, ...(request.existingMode === "replan" ? { replaceRange: { fromDate: request.fromDate, toDate: request.toDate } } : {}) },
     )));
     const firstRegexIds = resolved[0].regexes.map(regex => regex.id).sort().join(",");
     if (resolved.some(item => item.apiConfig.id !== resolved[0].apiConfig.id
@@ -380,9 +382,9 @@ export async function generateCalendarScheduleRange(
       || item.regexes.map(regex => regex.id).sort().join(",") !== firstRegexIds)) {
       return { success: false, error: "所选角色的日历 API 或预设不同，暂时不能合并为一次生成；请改选兼容的角色。" };
     }
-    const owners = loadCharacters().filter(character => ids.includes(character.id));
+    const owners = [...loadCharacters().filter(character => ids.includes(character.id)),...ids.filter(id=>id.startsWith("user:")).map(id=>({...buildSyntheticUserCharacter(resolveUserIdentity(undefined,"calendar")),id}))];
     const existingContext = ids.map(id => {
-      const plans = loadOwnerCalendarPlans("character", id);
+      const plans = loadOwnerCalendarPlans(id.startsWith("user:")?"user":"character", id.startsWith("user:")?"self":id);
       const entries = plans.flatMap(plan => plan.items).filter(item => item.date >= request.fromDate && item.date <= request.toDate
         && !(request.existingMode === "replan" && item.source === "generated"));
       const lines = entries.map(item => `- [${item.visibility === "public" ? "公开" : "私人"}/${item.kind === "milestone" ? "不占用时间的节点" : "实际行程"}] ${item.date} ${item.startTime}-${item.endTime} ${item.title}${item.location ? ` @${item.location}` : ""}`);
@@ -399,7 +401,7 @@ export async function generateCalendarScheduleRange(
       const books = loadWorldBooks();
       const bindingsByBook = new Map<string, string[]>();
       for (const id of ids) {
-        const slot = resolveBinding(bindings, id, "calendar");
+        const slot = resolveBinding(bindings, id.startsWith("user:")?undefined:id, "calendar");
         for (const bookId of new Set(slot.worldBookIds || [])) {
           const owners = bindingsByBook.get(bookId) || [];
           owners.push(id);
@@ -434,6 +436,8 @@ export async function generateCalendarScheduleRange(
       "JSON 格式：{\"characters\":[{\"characterId\":\"角色ID\",\"items\":[{\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"contentDescription\":\"公开内容的一两句底稿\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}],\"sharedItems\":[{\"participantIds\":[\"角色ID\",\"角色ID\"],\"date\":\"YYYY-MM-DD\",\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"location\":\"地点\",\"emoji\":\"emoji\",\"title\":\"事项\",\"visibility\":\"private\",\"kind\":\"event\",\"contentDescription\":\"公开内容的一两句底稿\",\"publicAt\":\"\",\"encounterScene\":\"\",\"busyLevel\":1}]}",
       "只返回一个JSON对象。characters为每位所选角色各提供一项；无新增事项时items为空数组。共同事项只放sharedItems，不能再放入个人items。所有日期在请求范围内；未安排的日子不写占位项。",
       "角色背景：\n" + personaContext,
+      calendarWorldlineContext(),
+      request.additionalPrompt?.trim() ? `本次生成要求：${request.additionalPrompt.trim().slice(0,3000)}` : "",
       worldBookContext,
       peopleHistory,
       existingContext,

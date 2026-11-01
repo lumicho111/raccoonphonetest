@@ -80,7 +80,7 @@ function scheduleContext(settings: TheqooSourceSettings): string {
     if(seen.has(key))return;seen.add(key);
     dated.push({date,text:`${date} ${owner}：${title.slice(0,80)}${suffix.slice(0,260)}`});
   };
-  if (settings.includeCalendar) {
+  if (settings.includeCalendar || settings.includeWeverseSchedule) {
     const owners: ["user" | "character", string, string][] = [
       ["user", "self", "U"],
       ...loadCharacters().slice(0, 12).map(char => ["character" as const, char.id, char.name] as ["character", string, string]),
@@ -92,18 +92,6 @@ function scheduleContext(settings: TheqooSourceSettings): string {
             add(name, item.date, item.title, schedulePublicContentSuffix(item,now,loadCharacters().find(c=>c.id===id)?.timeZone));
           }
         }
-      }
-    }
-  }
-  if (settings.includeWeverseSchedule) {
-    const state = loadWeverseState();
-    for (const item of state.schedules) {
-      if (item.visibility !== "public" || item.startsAt < now - 7 * 86400000 || item.startsAt > now + 35 * 86400000) continue;
-      const community = state.communities.find(c => c.id === item.communityId);
-      for (const id of item.memberCharacterIds.length ? item.memberCharacterIds : [""]) {
-        const member = loadCharacters().find(c=>c.id===id);
-        const date = new Intl.DateTimeFormat("sv-SE", {timeZone:member?.timeZone || "Asia/Seoul"}).format(new Date(item.startsAt));
-        add(id.startsWith("user:") ? "U" : member?.name || community?.name || "社区", date, item.title, schedulePublicContentSuffix(item,now));
       }
     }
   }

@@ -271,6 +271,7 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
           "ai_phone_calendar_pending_v1",
           "ai_phone_calendar_public_clues_v1",
           "ai_phone_calendar_master_v1",
+          "ai_phone_calendar_master_v2",
           "ai_phone_calendar_config_v1",
           "ai_phone_diary_entries_v1",
           "ai_phone_diary_entry_timer_settings_v1",

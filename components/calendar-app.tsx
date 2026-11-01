@@ -1,4 +1,5 @@
 "use client";
+import {deleteWeverseLive} from "@/lib/weverse-storage";
 import { formatZonedPromptTimestamp, getSystemTimeZone } from "@/lib/character-time";
 import { useGenerationFeedback } from "@/components/generation-feedback";
 import { PendingCalendarEvents } from "./calendar/pending-events";
@@ -155,6 +156,7 @@ export function PhoneCalendarApp({
   const [isGenerating, setIsGenerating] = useState(false);
   const { onNotice, feedback: generationFeedback } = useGenerationFeedback(isGenerating ? "正在生成日历行程…" : null, externalNotice);
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+  const [generationPrompt,setGenerationPrompt]=useState("");
   const [generationFromDate, setGenerationFromDate] = useState(() => {
     const start = new Date(); start.setDate(start.getDate() - 7); return formatIsoDate(start);
   });
@@ -342,7 +344,7 @@ export function PhoneCalendarApp({
       return;
     }
     const startDate = editingItem.date;
-    const endDate = editingItem.endDate || editingItem.date;
+    const endDate = editingItem.kind==="milestone"?editingItem.date:editingItem.endDate || editingItem.date;
     if (endDate < startDate) {
       onNotice?.("结束日期不能早于开始日期");
       return;
@@ -396,16 +398,6 @@ export function PhoneCalendarApp({
         .flatMap(plan => plan.items).find(item => item.id === editingItem.id);
       if (saved) updateLinkedCalendarScheduleItem(editingItem.sharedGroupId, saved);
     }
-    if (editingItem.externalSource === "weverse" && editingItem.externalId && dayCount === 1) {
-      syncCalendarProjectionBackToWeverse(editingItem.externalId, {
-        date: editingItem.date,
-        startTime: editingItem.startTime,
-        endTime: editingItem.endTime,
-        location: editingItem.location,
-        title: editingItem.title,
-        contentDescription: editingItem.contentDescription, publicAt: editingItem.publicAt,
-      });
-    }
     setEditingItem(null);
     refreshPlans();
     onNotice?.(dayCount > 1 ? `已创建 ${dayCount} 天的日程` : "日程已保存");
@@ -413,6 +405,8 @@ export function PhoneCalendarApp({
 
   const handleDeleteItem = () => {
     if (!selectedOwner || !editingItem?.id) return;
+    const original=loadOwnerCalendarPlans(selectedOwner.ownerType,selectedOwner.ownerId).flatMap(p=>p.items).find(i=>i.id===editingItem.id);
+    if(original?.linkedLiveId){deleteWeverseLive(original.linkedLiveId);setEditingItem(null);refreshPlans();onNotice?.("直播回放及关联日程已删除");return;}
     const targetWeekStart = getWeekStartIso(parseIsoDate(editingItem.originalDate || editingItem.date));
     if (editingItem.sharedGroupId) {
       deleteLinkedCalendarScheduleItem(editingItem.sharedGroupId);
@@ -432,6 +426,7 @@ export function PhoneCalendarApp({
     setIsGenerating(true);
     try {
     const result = await generateCalendarScheduleRange({
+      additionalPrompt:generationPrompt,
       characterIds: generationCharacterIds,
       fromDate: generationFromDate,
       toDate: generationToDate,
@@ -458,7 +453,7 @@ export function PhoneCalendarApp({
     const end = parseIsoDate(getWeekStartIso(today)); end.setDate(end.getDate() + 27);
     setGenerationFromDate(formatIsoDate(previousWeekStart));
     setGenerationToDate(formatIsoDate(end));
-    setGenerationCharacterIds(selectedOwner?.ownerType === "character" ? [selectedOwner.ownerId] : []);
+    setGenerationCharacterIds(selectedOwner ? [selectedOwner.ownerType==="user"?"user:self":selectedOwner.ownerId] : []);
     setGenerationMode("separate");
     setGenerationSharedPairs([]);
     setGenerationExistingMode("supplement");
@@ -667,7 +662,7 @@ export function PhoneCalendarApp({
 
         {fabMenuOpen ? <div className="calendar-fab-backdrop" onClick={() => setFabMenuOpen(false)} /> : null}
         <div className="calendar-fab-stack">
-          {fabMenuOpen && selectedOwner?.ownerType === "character" ? (
+          {fabMenuOpen && selectedOwner ? (
             <div className="calendar-fab-menu" role="menu">
               <button
                 type="button"
@@ -712,14 +707,14 @@ export function PhoneCalendarApp({
             className="calendar-fab calendar-fab-primary"
             data-loading={isGenerating ? "true" : undefined}
             onClick={() => {
-              if (selectedOwner?.ownerType === "character") {
+              if (selectedOwner) {
                 setFabMenuOpen(prev => !prev);
               } else {
                 openNewDraft(view === "detail" ? selectedDate : todayIso);
               }
             }}
-            aria-label={selectedOwner?.ownerType === "character" ? "日程操作菜单" : "新增事项"}
-            aria-expanded={selectedOwner?.ownerType === "character" ? fabMenuOpen : undefined}
+            aria-label="日程操作菜单"
+            aria-expanded={fabMenuOpen}
           >
             <Plus size={20} style={{ transform: fabMenuOpen ? "rotate(45deg)" : undefined, transition: "transform 0.2s" }} />
           </button>
@@ -1025,12 +1020,14 @@ export function PhoneCalendarApp({
             <div className="calendar-generate-section">
               <span className="calendar-generate-label">选择角色（最多 3 位）</span>
               <div className="calendar-generate-people">
-                {owners.filter(owner => owner.ownerType === "character").map(owner => {
-                  const checked = generationCharacterIds.includes(owner.ownerId);
-                  return <button type="button" key={owner.ownerId} className="calendar-generate-person" data-active={checked ? "true" : undefined} disabled={!checked && generationCharacterIds.length >= 3} onClick={() => setGenerationCharacterIds(prev => checked ? prev.filter(id => id !== owner.ownerId) : [...prev, owner.ownerId])}><Avatar src={owner.avatar || undefined} name={owner.name} size="sm" /><span>{owner.name}</span>{checked ? <Check size={15} /> : null}</button>;
+                {owners.map(owner => {
+                  const generationId=owner.ownerType==="user"?"user:self":owner.ownerId;
+                  const checked = generationCharacterIds.includes(generationId);
+                  return <button type="button" key={owner.ownerId} className="calendar-generate-person" data-active={checked ? "true" : undefined} disabled={!checked && generationCharacterIds.length >= 3} onClick={() => setGenerationCharacterIds(prev => checked ? prev.filter(id => id !== generationId) : [...prev, generationId])}><Avatar src={owner.avatar || undefined} name={owner.name} size="sm" /><span>{owner.name}</span>{checked ? <Check size={15} /> : null}</button>;
                 })}
               </div>
             </div>
+            <div className="calendar-generate-section"><label className="calendar-generate-label" htmlFor="calendar-generation-extra">本次生成要求（可选）</label><textarea id="calendar-generation-extra" className="ui-input" rows={3} maxLength={3000} value={generationPrompt} onChange={e=>setGenerationPrompt(e.target.value)} placeholder="想补充的工作、企划或私人安排…"/></div>
             {generationCharacterIds.length > 1 ? <div className="calendar-generate-section">
               <span className="calendar-generate-label">生成方式</span>
               <div className="calendar-generate-mode-row">
@@ -1039,10 +1036,10 @@ export function PhoneCalendarApp({
               </div>
               {generationMode === "together" ? <div className="calendar-generate-pairs"><span>可选共同参与（默认不安排共同日程）</span>{generationCharacterIds.flatMap((id, i) => generationCharacterIds.slice(i + 1).map(otherId => {
                 const pair = [id, otherId].sort(); const active = generationSharedPairs.some(entry => entry.length === 2 && pair.every(value => entry.includes(value)));
-                return <label key={`${pair[0]}-${pair[1]}`}><input type="checkbox" checked={active} onChange={() => setGenerationSharedPairs(prev => active ? prev.filter(entry => !(entry.length === 2 && pair.every(value => entry.includes(value)))) : [...prev, pair])} />{owners.find(owner => owner.ownerId === id)?.name} + {owners.find(owner => owner.ownerId === otherId)?.name}</label>;
+                return <label key={`${pair[0]}-${pair[1]}`}><input type="checkbox" checked={active} onChange={() => setGenerationSharedPairs(prev => active ? prev.filter(entry => !(entry.length === 2 && pair.every(value => entry.includes(value)))) : [...prev, pair])} />{owners.find(owner => (owner.ownerType==="user"?"user:self":owner.ownerId) === id)?.name} + {owners.find(owner => (owner.ownerType==="user"?"user:self":owner.ownerId) === otherId)?.name}</label>;
               }))}</div> : null}
             </div> : null}
-            {generationCharacterIds.some(id => loadOwnerCalendarPlans("character", id).some(plan => plan.items.some(item => item.date >= generationFromDate && item.date <= generationToDate))) ? <div className="calendar-generate-section">
+            {generationCharacterIds.some(id => loadOwnerCalendarPlans(id.startsWith("user:")?"user":"character",id.startsWith("user:")?"self":id).some(plan => plan.items.some(item => item.date >= generationFromDate && item.date <= generationToDate))) ? <div className="calendar-generate-section">
               <span className="calendar-generate-label">这段时间已有日程</span>
               <div className="calendar-generate-mode-row">
                 <button type="button" data-active={generationExistingMode === "supplement" ? "true" : undefined} onClick={() => setGenerationExistingMode("supplement")}>在现有安排上补充</button>

@@ -1,7 +1,8 @@
 "use client";
+import {CalendarPointDetails} from "./point-details";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Columns2, Settings2 } from "lucide-react";
+import { Star, Columns2, Settings2 } from "lucide-react";
 import type { CalendarScheduleItem } from "@/lib/calendar-types";
 import type { MenstrualDayState } from "@/lib/menstrual-storage";
 import { formatIsoDate, parseIsoDate, timeToMinutes } from "@/lib/calendar-utils";
@@ -30,7 +31,7 @@ type PositionedEvent = {
 
 /** 重叠事件“列分配”布局 */
 function layoutDayEvents(items: CalendarScheduleItem[]): PositionedEvent[] {
-  const sorted = [...items]
+  const sorted = items.filter(item=>item.kind!=="milestone")
     .map(item => ({
       item,
       start: timeToMinutes(item.startTime),
@@ -109,6 +110,7 @@ export function CalendarDetailPage({
   onSelectedChange: (iso: string) => void;
   onEditItem: (item: CalendarScheduleItem) => void;
 }) {
+  const [pointItems,setPointItems]=useState<CalendarScheduleItem[]>([]);
   const [center, setCenter] = useState(initialDate);
   const [selectedIso, setSelectedIso] = useState(initialDate);
   const selectedRef = useRef(initialDate);
@@ -420,13 +422,17 @@ export function CalendarDetailPage({
             style={{ "--tl-day-w": `${100 / days.length}%` } as CSSProperties}
           >
             {days.map(iso => {
-              const positioned = layoutDayEvents(itemsByDate.get(iso) ?? []);
+              const dayItems=itemsByDate.get(iso)??[];
+              const positioned = layoutDayEvents(dayItems);
+              const points=new Map<string,CalendarScheduleItem[]>();
+              for(const item of dayItems.filter(i=>i.kind==="milestone")){const list=points.get(item.startTime)||[];list.push(item);points.set(item.startTime,list);}
               return (
                 <div key={iso} className="calendar-tl-day" data-today={iso === todayIso ? "true" : undefined}>
                   <div className="calendar-tl-body">
                     {iso === todayIso ? (
                       <i className="calendar-now-line" style={{ top: `${nowTop}px` }} aria-hidden="true" />
                     ) : null}
+                    {[...points.entries()].map(([time,items])=>{const minute=timeToMinutes(time),containing=positioned.find(p=>timeToMinutes(p.item.startTime)<=minute&&minute<timeToMinutes(p.item.endTime));return <button type="button" key={`point-${time}`} className="calendar-tl-point" style={{top:`${Math.max(0,Math.min(24*HOUR_H-28,minute/60*HOUR_H-14))}px`,left:`calc(${containing?containing.left+containing.width/2:50}% - 14px)`}} aria-label={`${time} ${items.map(i=>i.title).join('、')}`} title={items.map(i=>i.title).join('、')} onClick={e=>{e.stopPropagation();setPointItems(items);}}><Star size={19} fill="currentColor"/>{items.length>1&&<small>{items.length}</small>}</button>;})}
                     {positioned.map(pos => (
                       <button
                         key={pos.item.id}
@@ -463,6 +469,7 @@ export function CalendarDetailPage({
           今天
         </button>
       </div>
+      {pointItems.length>0&&<CalendarPointDetails items={pointItems} onClose={()=>setPointItems([])} onEdit={item=>{setPointItems([]);onEditItem(item);}}/>}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import {publicCalendarContext} from "./calendar-public-context";
 import { schedulePublicContentSuffix } from "./schedule-public-content";
 import {worldlineTimeLabel} from "./worldline-event-time";
 import { simpleLLMCall } from "./api-helpers";
@@ -10,16 +11,14 @@ import { loadWeverseState } from "./weverse-storage";
 export async function proposeWorldlineProgress(world: Worldline, direction: string): Promise<string> {
   const api = resolveAuxiliaryApiConfig("qaApiConfigId");
   if (!api) throw new Error("请先配置辅助 API 或全局默认 API。");
-  const publicSchedules = loadWeverseState().schedules.filter(item => item.visibility === "public")
-    .sort((a, b) => a.startsAt - b.startsAt).slice(-16)
-    .map(item => `${new Date(item.startsAt).toISOString()} ${item.title}${schedulePublicContentSuffix(item)}${item.location ? `（${item.location}）` : ""}`);
+  const publicSchedules=publicCalendarContext();
   const prompt = [
     `世界：${world.name}`,
     `世界档案：${world.archive.map(group => `${group.name}：${group.entries.map(item => `${item.title}：${item.content}`).join("；")}`).join("\n")}`,
     `此前广播历史：${(world.progressHistory || []).slice(0, -1).map(item => `${item.recordedAt} ${item.text}`).join("\n") || "无"}`,
     `当前广播：${world.progressHistory?.at(-1)?.text || world.currentState || "无"}`,
     `已公开事件：${world.events.filter(item => item.visibility === "public").sort((a,b) => a.occurredAt.localeCompare(b.occurredAt)).slice(-30).map(item => `${worldlineTimeLabel(item,true)} ${item.title}：${item.detail}`).join("\n") || "无"}`,
-    `已公开 Weverse 日程（供参考，不得自动创建或改动）：${publicSchedules.join("\n") || "无"}`,
+    `已公开日历安排（供参考，不得自动创建或改动）：${publicSchedules.join("\n") || "无"}`,
     `推进方向：${direction.trim() || "依据已确认的公开事实自然推进"}`,
     "请写一段新的当前公共进度草稿。它是全体角色及公开平台可知道的广播状态。不能参考或泄露未公开事件及内部日程，不能推翻既定事实，也不能声称已自动发布平台内容。只输出进度正文，等待用户审核后保存。",
   ].join("\n\n");
@@ -41,7 +40,7 @@ export async function proposeWorldlineEvent(world: Worldline, direction: string)
     `当前进度：${world.progressHistory.at(-1)?.text || world.currentState || "未记录"}`,
     `已经确认且锁定的事实（绝不可改写）：${locked.map(e => `${worldlineTimeLabel(e,true)} ${e.title}：${e.detail}`).join("\n") || "无"}`,
     `近期事件：${[...world.events].sort((a,b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0,12).map(e => `${worldlineTimeLabel(e,true)} ${e.title}：${e.detail}`).join("\n") || "无"}`,
-    `已公开 Weverse 日程（只作事实参考，不自动创建日程）：${loadWeverseState().schedules.filter(item => item.visibility === "public").sort((a,b) => a.startsAt - b.startsAt).slice(-16).map(item => `${new Date(item.startsAt).toISOString()} ${item.title}${schedulePublicContentSuffix(item)}`).join("\n") || "无"}`,
+    `已公开日历安排（只作事实参考，不自动创建日程）：${publicCalendarContext().join("\n") || "无"}`,
     `可参与角色：${characters.map(c => `${c.id}=${c.name}（${c.briefPersona || c.persona.slice(0,500)}）`).join("\n") || "无"}`,
     `管理者给的方向：${direction.trim()}`,
     "请仅提议接下来可能发生的一件事件。不得追改已发生事件、覆盖世界档案、添加未给出的角色知识、公开私密情节。角色只知道本人亲历或明确获知的信息。输出严格 JSON：{\"title\":\"\",\"detail\":\"\",\"occurredAt\":\"ISO开始日期时间\",\"endsAt\":\"可选ISO结束日期时间，具体时刻事件不填\",\"category\":\"\",\"people\":{\"角色ID\":{\"access\":\"witnessed或heard\",\"perspective\":\"该角色实际知道的内容\"}}}。这是草稿，须管理者审核才会保存。",

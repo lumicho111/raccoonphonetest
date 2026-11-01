@@ -54,6 +54,7 @@ export type WeverseNotice = {
 export type WeverseScheduleType = "media" | "anniversary" | "performance" | "recording" | "shoot" | "brand" | "release" | "other";
 export type WeverseScheduleVisibility = "public" | "internal";
 export type WeverseScheduleItem = {
+  linkedLiveId?: string;
   contentDescription?: string;
   publicAt?: number;
   id: string;
@@ -277,6 +278,7 @@ function normalizeSchedule(raw: unknown): WeverseScheduleItem | null {
     type,
     title: item.title.trim() || "Schedule",
     contentDescription: typeof item.contentDescription === "string" ? item.contentDescription.slice(0,4000) : undefined,
+    linkedLiveId: typeof item.linkedLiveId === "string" ? item.linkedLiveId : undefined,
     publicAt: typeof item.publicAt === "number" && Number.isFinite(item.publicAt) ? item.publicAt : undefined,
     startsAt,
     endsAt,
@@ -321,7 +323,7 @@ function normalizeState(raw: unknown): WeverseState {
   return { version: 8, communities, posts, notices, lives, schedules, userProfile: source.userProfile && typeof source.userProfile === "object" ? source.userProfile as WeverseUserProfile : {}, settings: normalizeSettings(source.settings) };
 }
 export function loadWeverseState(): WeverseState { reconcileCalendarMaster(); if (typeof window === "undefined") return EMPTY_STATE; try { const raw=kvGet(WEV_STATE_KEY); return raw ? normalizeState(JSON.parse(raw)) : cloneEmpty(); } catch { return cloneEmpty(); } }
-export function saveWeverseState(state: WeverseState): WeverseState { const normalized=normalizeState(state); if (typeof window !== "undefined") { kvSet(WEV_STATE_KEY, JSON.stringify(normalized)); reconcileCalendarMaster(); window.dispatchEvent(new CustomEvent(WEV_UPDATED_EVENT)); } return normalized; }
+export function saveWeverseState(state: WeverseState): WeverseState { const normalized=normalizeState(state); if (typeof window !== "undefined") { kvSet(WEV_STATE_KEY, JSON.stringify(normalized)); reconcileCalendarMaster(); window.dispatchEvent(new CustomEvent(WEV_UPDATED_EVENT)); } return typeof window!=="undefined"?normalizeState(JSON.parse(kvGet(WEV_STATE_KEY)||JSON.stringify(normalized))):normalized; }
 export function updateWeverseUserProfile(patch: Partial<WeverseUserProfile>): WeverseState { const state=loadWeverseState(); return saveWeverseState({...state,userProfile:{...(state.userProfile||{}),...patch}}); }
 
 export function getWeverseCommunitiesForCharacter(characterId: string): WeverseCommunity[] {

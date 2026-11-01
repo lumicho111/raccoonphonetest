@@ -9,7 +9,7 @@ export const DEFAULT_SCHEDULE_PROMPTS: Record<SchedulePromptKind, string> = {
 export function loadSchedulePrompts(): Record<SchedulePromptKind, string> {
  let raw: Partial<Record<SchedulePromptKind,string>> = {};
  try { raw = JSON.parse(kvGet(SCHEDULE_PROMPT_KEY) || "{}") || {}; } catch {}
- return { calendar: typeof raw.calendar === "string" && raw.calendar.trim() ? raw.calendar : DEFAULT_SCHEDULE_PROMPTS.calendar,
+ return { calendar: (typeof raw.calendar === "string" && raw.calendar.trim() ? raw.calendar : DEFAULT_SCHEDULE_PROMPTS.calendar) + (raw.weverse && raw.weverse!==DEFAULT_SCHEDULE_PROMPTS.weverse && !raw.calendar?.includes(raw.weverse) ? `\n职业构思补充：${raw.weverse}` : ""),
  weverse: typeof raw.weverse === "string" && raw.weverse.trim() ? raw.weverse : DEFAULT_SCHEDULE_PROMPTS.weverse };
 }
 export function saveSchedulePrompt(kind: SchedulePromptKind, text: string) {
