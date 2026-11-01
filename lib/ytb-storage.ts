@@ -5,10 +5,10 @@ export type YtbChannel = {
   id: string; ownerId: string; ownerType: "user" | "character" | "npc";
   name: string; handle: string; avatar: string; banner: string; description: string;
   style: string; disclosure: "none" | "partial" | "full"; subscribers: number; videos: number;
-  subscribed: boolean; community: boolean; totalViews?: number; totalNewSubscribers?: number; disclosedTo?: string[]; profileGenerated?: boolean;
+  subscribed: boolean; community: boolean; totalViews?: number; totalNewSubscribers?: number; disclosedTo?: string[]; disclosedAccounts?: string[]; mutualAccounts?: string[]; profileGenerated?: boolean;
 };
-export type YtbLine = { id: string; kind: "speech" | "action"; original: string; translated: string; at: number; speakerId?: string; replyTo?: string[] };
-export type YtbComment = { id: string; name: string; original: string; translated: string; at: number; tip?: { amount: number; currency: string }; channelId?: string; characterId?: string; readBy?: Record<string, boolean> };
+export type YtbLine = { id: string; kind: "speech" | "action"; original: string; translated: string; at: number; identitySnapshot?: Record<string, Record<string, boolean>>; speakerId?: string; replyTo?: string[] };
+export type YtbComment = { id: string; name: string; original: string; translated: string; at: number; tip?: { amount: number; currency: string }; channelId?: string; characterId?: string; identitySnapshot?: Record<string, Record<string, boolean>>; readBy?: Record<string, boolean> };
 export type YtbCall = { id: string; channelId?: string; name: string; avatar: string; at: number; status: "waiting" | "connected" | "ended" };
 export type YtbMemorySummary = { fingerprint: string; content: string; at: number };
 export type YtbVisit = { enteredAt: number; leftAt?: number; replay?: boolean; identities: Record<string, boolean> };
@@ -21,7 +21,7 @@ export type YtbStream = {
   watchedBy: string[]; watchedAt?: Record<string, number>; leftBy: string[]; linkedDealId?: string; lastRoundAt?: number; visits?: Record<string, YtbVisit>; memorySummaries?: Record<string, YtbMemorySummary>;
 };
 export type YtbDeal = { id: string; channelId: string; brand: string; title: string; product: string; brief: string; amount: number; currency: string; status: "pending" | "active" | "completed" | "declined" };
-export type YtbMessage = { id: string; senderId: string; name: string; avatar: string; original: string; translated: string; at: number; replayId?: string; readBy?: Record<string, boolean>; replyTo?: string[]; quote?: { id: string; name: string; original: string; translated: string } };
+export type YtbMessage = { identitySnapshot?: Record<string, Record<string, boolean>>; id: string; senderId: string; name: string; avatar: string; original: string; translated: string; at: number; replayId?: string; readBy?: Record<string, boolean>; replyTo?: string[]; quote?: { id: string; name: string; original: string; translated: string } };
 export type YtbThread = { id: string; userChannelId: string; peerChannelId: string; messages: YtbMessage[]; memorySummaries?: Record<string, YtbMemorySummary> };
 export type YtbGroup = { id: string; channelId: string; userChannelId: string; name: string; avatar: string; members: number; joined: boolean; messages: YtbMessage[]; memorySummaries?: Record<string, YtbMemorySummary> };
 export type YtbFanNote = YtbMessage & { channelId: string };
@@ -58,6 +58,12 @@ export function loadYtbState(): YtbState {
   } catch { return emptyYtbState(); }
 }
 export function saveYtbState(state: YtbState) {
+  const knows=(subject:YtbChannel,viewer:YtbChannel)=>subject.id===viewer.id||subject.disclosure!=="none"||Boolean(subject.disclosedAccounts?.includes(viewer.id)||subject.disclosedTo?.includes(viewer.ownerId));
+  const identities=Object.fromEntries(state.channels.map(v=>[v.id,Object.fromEntries(state.channels.map(c=>[c.id,knows(c,v)]))]));
+  const old=loadYtbState();const oldItems=old.streams.flatMap(s=>[...s.lines,...s.comments]);const existing=new Set(oldItems.map(i=>i.id));
+  state={...state,streams:state.streams.map(s=>({...s,lines:s.lines.map(l=>l.identitySnapshot?l:{...l,identitySnapshot:existing.has(l.id)?oldItems.find(i=>i.id===l.id)?.identitySnapshot:identities}),comments:s.comments.map(c=>c.identitySnapshot?c:{...c,identitySnapshot:existing.has(c.id)?oldItems.find(i=>i.id===c.id)?.identitySnapshot:identities})}))};
+  const stamp=(messages:YtbMessage[],prior:YtbMessage[])=>messages.map(m=>m.identitySnapshot?m:{...m,identitySnapshot:prior.some(p=>p.id===m.id)?prior.find(p=>p.id===m.id)?.identitySnapshot:identities});
+  state={...state,threads:state.threads.map(t=>({...t,messages:stamp(t.messages,old.threads.find(p=>p.id===t.id)?.messages||[])})),groups:state.groups.map(g=>({...g,messages:stamp(g.messages,old.groups.find(p=>p.id===g.id)?.messages||[])}))};
   kvSet(KEY, JSON.stringify(state));
   if (typeof window !== "undefined") window.dispatchEvent(new Event(YTB_UPDATED));
 }

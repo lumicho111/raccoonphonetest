@@ -1,7 +1,7 @@
 "use client";
 import { formatTwitterCount } from "@/lib/twitter-metrics";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useCheckPhoneRefresh } from "@/lib/checkphone-refresh-tracker";
 import {
   BarChart3,
@@ -32,7 +32,7 @@ import type {
 } from "@/lib/checkphone-config";
 import { clearPhoneSnapshot, loadPhoneSnapshot } from "@/lib/checkphone-storage";
 import { getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
-import { TWITTER_UPDATED_EVENT, loadTwitterState } from "@/lib/twitter-storage";
+import { twitterAccountEnabled, TWITTER_UPDATED_EVENT, loadTwitterState } from "@/lib/twitter-storage";
 import { projectCharacterTwitter, publishCharacterTwitterFromCheckPhone } from "@/lib/twitter-checkphone-bridge";
 
 type CheckPhoneXPageProps = {
@@ -217,6 +217,14 @@ function XImage({ imageRef }: { imageRef?: string }) {
 export function CheckPhoneXPage({ character, onBack }: CheckPhoneXPageProps) {
   const [snapshot, setSnapshot] = useState<CheckPhoneSnapshot<CheckPhoneXPayload> | null>(null);
   const [nativeState, setNativeState] = useState(() => loadTwitterState());
+  const [chosenAccount,setChosenAccount]=useState<string|null>(null);
+  const [accountMenu,setAccountMenu]=useState(false);
+  const holdStart=useRef({x:0,y:0});
+  const hold=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const accountIds=[...(twitterAccountEnabled(nativeState,character.id)?[character.id]:[]),...(nativeState.accounts[`${character.id}:alt`]? [`${character.id}:alt`]:[])];
+  const accountId=chosenAccount&&accountIds.includes(chosenAccount)?chosenAccount:accountIds[0]||character.id;
+  const cancelHold=()=>{if(hold.current)clearTimeout(hold.current);};
+  useEffect(()=>()=>cancelHold(),[]);
   const [refreshMenuOpen, setRefreshMenuOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState<XTabId>("posts");
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
@@ -278,7 +286,7 @@ export function CheckPhoneXPage({ character, onBack }: CheckPhoneXPageProps) {
     setDebugParseError(null);
     setDebugNormalizeError(null);
     try {
-      await publishCharacterTwitterFromCheckPhone(character);
+      await publishCharacterTwitterFromCheckPhone(character, accountId);
       setNativeState(loadTwitterState());
       setExpandedEntryId(null);
     } catch (cause) {
@@ -305,7 +313,7 @@ export function CheckPhoneXPage({ character, onBack }: CheckPhoneXPageProps) {
     setConfirmClearOpen(false);
   }
 
-  const payload = useMemo(() => projectCharacterTwitter(character, nativeState), [character, nativeState]);
+  const payload = useMemo(() => accountIds.length ? projectCharacterTwitter(character, nativeState, accountId) : null, [character, nativeState, accountId]);
   const currentEntries = useMemo(() => getEntries(payload, selectedTab), [payload, selectedTab]);
   const profileInitial = payload ? getInitial(payload.profile.name) : "X";
   const joinedAtLabel = payload ? getJoinLabel(payload.profile.joinedAt) : "";
@@ -387,7 +395,7 @@ export function CheckPhoneXPage({ character, onBack }: CheckPhoneXPageProps) {
 
               <div className="cp-x-profile-panel">
                 <div className="cp-x-avatar-row">
-                  <div className="cp-x-profile-avatar">{payload.profile.avatarUrl ? <XImage imageRef={payload.profile.avatarUrl} /> : profileInitial}</div>
+                  <div className="cp-x-profile-avatar" role="button" tabIndex={0} aria-label="长按切换账号" onPointerDown={e=>{holdStart.current={x:e.clientX,y:e.clientY};cancelHold();hold.current=setTimeout(()=>setAccountMenu(true),500);}} onPointerMove={e=>{if(Math.hypot(e.clientX-holdStart.current.x,e.clientY-holdStart.current.y)>10)cancelHold();}} onPointerUp={cancelHold} onPointerCancel={cancelHold} onPointerLeave={cancelHold} onContextMenu={e=>{e.preventDefault();cancelHold();setAccountMenu(true);}} onKeyDown={e=>{if(e.key==="Enter")setAccountMenu(true);}}>{payload.profile.avatarUrl ? <XImage imageRef={payload.profile.avatarUrl} /> : profileInitial}</div>
                 </div>
                 <div className="cp-x-profile-main">
                   <h3>{payload.profile.name}</h3>
@@ -520,6 +528,7 @@ export function CheckPhoneXPage({ character, onBack }: CheckPhoneXPageProps) {
         </>
       )}
 
+      {accountMenu && <div className="cp-x-choice-backdrop" onClick={()=>setAccountMenu(false)}><div className="cp-x-choice" role="dialog" aria-modal="true" aria-label="切换 X 账号" onClick={e=>e.stopPropagation()}><h3>切换账号</h3>{accountIds.map(id=><button key={id} onClick={()=>{setChosenAccount(id);setSelectedTab("posts");setExpandedEntryId(null);setAccountMenu(false);}}>{(nativeState.accounts[id]||nativeState.characterProfiles[id])?.name} · {id.endsWith(":alt")?"副号":"主号"}{id===accountId?" · 当前":""}</button>)}{!accountIds.length&&<p>请先在 X 启用主号或创建副号。</p>}<button className="cp-x-choice-cancel" onClick={()=>setAccountMenu(false)}>取消</button></div></div>}
       {refreshMenuOpen && <div className="cp-x-choice-backdrop" onClick={() => setRefreshMenuOpen(false)}>
         <div className="cp-x-choice" role="dialog" aria-modal="true" aria-label="刷新 X" onClick={event => event.stopPropagation()}>
           <h3>刷新 X</h3>

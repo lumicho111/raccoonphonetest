@@ -1,3 +1,5 @@
+import { publicIdentityBoundary } from "./social-identity";
+import { twitterRecognizes } from "./twitter-storage";
 import { photoStoryReplyContext } from "./photo-story-data";
 import { mediaPreferencePrompt, allowMediaIntent, recordMediaDecision } from "./media-preferences";
 import { loadCharacters } from "./character-storage";
@@ -39,7 +41,7 @@ export async function generateTwitterText(input: {
   conversation?: TwitterMessage[];
   replyToMessage?: TwitterMessage;
   anonymous?: boolean;
-  senderName?: string;
+  senderName?: string; senderAccountId?: string;
   accountProfile?: { name: string; operationStyle?: string; identity?: string; visibility?: "public" | "protected"; disclosure?: "independent" | "full" | "clues"; disclosureClues?: string; allowClueProgression?: boolean };
   accountKind?: "alternate" | "group";
   communityName?: string;
@@ -56,7 +58,7 @@ export async function generateTwitterText(input: {
   const preset = presets.find(row => row.id === slot.presetId) ?? presets.find(row => row.builtIn) ?? null;
   const worldBooks = selectedTwitterWorldBooks(input.state, false, character.id);
   const regexes = (slot.regexIds || []).map(id => loadRegexes().find(row => row.id === id)).filter(Boolean) as RegexConfig[];
-  const anonymous = input.anonymous === true;
+  const anonymous = input.kind === "dm" ? !twitterRecognizes(input.state,input.senderAccountId||"user",input.accountKind==="alternate"?`${character.id}:alt`:character.id) : false;
   const context = anonymous ? null : prepareShortTermContext(character.id, "twitter", { history: [], tokenBudgetOverride: 2800 });
   const memConfig = loadMemoryConfig();
   const [longMemories, coreMemories] = anonymous ? [[], []] : await Promise.all([
@@ -79,7 +81,9 @@ export async function generateTwitterText(input: {
   const linkedSources = anonymous ? "" : roleSocialContext(character.id, input.state.socialSourcesByCharacter[character.id]);
   const sourceRule = linkedSources ? `本人可参考关联来源：${linkedSources}。日历不是公开信息；发公开帖子或回复时只可提已公开的活动，不得泄漏私人安排。` : "";
   const stateRule = input.state.worldRules.trim() ? `补充世界观：${input.state.worldRules.slice(0, 2500)}` : "";
-  const shared = "以角色平常使用的语言写 original；如果不是中文，translated 给准确自然的简体中文译文，中文原文则两字段相同。原文中的 #话题标签保留原文，不翻译、不改写标签。只输出 JSON，不要解释。";
+  const selfAccount = input.accountKind === "alternate" ? `${character.id}:alt` : character.id;
+  const identityRules = publicIdentityBoundary + "\n" + Object.entries(input.state.accounts).filter(([id])=>id.endsWith(":alt")).map(([id,p])=>`${p.name}：${twitterRecognizes(input.state,id,selfAccount)?`你私下知道真实主人是${id.startsWith("user")?resolveUserIdentity()?.name:loadCharacters().find(c=>c.id===id.replace(/:alt$/,""))?.name||"已关联角色"}，但公开不得越界`:"你不认识真实主人，只认网名"}`).join("\n");
+  const shared = operationRule + "\n" + identityRules + "\n以角色平常使用的语言写 original；如果不是中文，translated 给准确自然的简体中文译文，中文原文则两字段相同。原文中的 #话题标签保留原文，不翻译、不改写标签。只输出 JSON，不要解释。";
   let instruction: string;
   if (input.kind === "post") {
     const recent = input.state.posts.filter(p => !p.replyToId && isPublicTwitterPost(input.state, p)).slice(-10).map(p => `${p.authorId === "user" ? twitterPublicAddress(input.state) : p.authorId === character.id ? character.name : "其他账号"}：${p.original}`).join("\n");

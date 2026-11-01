@@ -772,6 +772,7 @@ export function loadNativeTimeline(
     for (const twitterEntry of twitterEntries) {
         entries.push({
             id: twitterEntry.id,
+            shared: twitterEntry.shared,
             sourceApp: "twitter",
             sourceDetail: "twitter",
             authorType: "character",

@@ -1,4 +1,5 @@
 "use client";
+import { twitterAccountEnabled } from "@/lib/twitter-storage";
 import { useGenerationFeedback } from "@/components/generation-feedback";
 import { preparePhotoStoryCaption } from "@/lib/photo-story-caption";
 import type { PhotoStorySnapshot } from "@/lib/photo-story-data";
@@ -199,6 +200,7 @@ export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
   const [messageDraft, setMessageDraft] = useState("");
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [picker, setPicker] = useState<Picker>(null);
+  useEffect(()=>setSelectedAccounts([]),[picker]);
   const [busy, setBusy] = useState(false);
   const [generationKind, setGenerationKind] = useState("");
   const generationRef = useRef("");
@@ -212,9 +214,10 @@ export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
 
   const commit = useCallback((change: (current: TwitterState) => TwitterState) => {
     const next = change(stateRef.current);
-    stateRef.current = next;
-    setState(next);
     saveTwitterState(next);
+    const saved=loadTwitterState();
+    stateRef.current = saved;
+    setState(saved);
   }, []);
   useEffect(() => {
     const onStorage = () => { const next = loadTwitterState(); stateRef.current = next; setState(next); };
@@ -517,7 +520,7 @@ export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
       const speakingAccountId = kind === "dm" ? convo?.recipientAccountId || characterId : postAccountId;
       const communityCharacter = snapshot.communityCharacters[characterId];
       const generatedKind = kind === "post" && actionType === "reply" ? "reply" : kind;
-      const lines: TwitterGeneratedLine[] & { comments?: TwitterCommentDraft[] } = kind === "post" && actionType === "repost" ? [{ original: "", translated: "" }] : communityCharacter ? [await generateTwitterCommunityText(snapshot, communityCharacter, generatedKind, kind === "dm" ? (priorMessages || []).map(m => m.original).join("\n") : actionTarget?.original || snapshot.publicWorldContext).then(result => ({ original: result.original, translated: result.translated || "" }))] : kind === "dm" && convo?.stranger ? [await generateTwitterStrangerReply(snapshot, snapshot.accounts[speakingAccountId]?.name || "陌生人", priorMessages || [], convo.userAccountId || "user").then(reply => ({ original: reply.original, translated: reply.translated || "" }))] : await generateTwitterText({ characterId, state: snapshot, kind: generatedKind, targetPost: kind === "post" ? actionTarget : thread, conversation: priorMessages, replyToMessage: convo?.messages.find(msg => msg.id === requestedReplyId), anonymous: convo?.mode === "anonymous", senderName: snapshot.accounts[convo?.userAccountId || ""]?.name, accountProfile: snapshot.accounts[speakingAccountId] || snapshot.characterProfiles[speakingAccountId], accountKind: speakingAccountId.endsWith(":alt") ? "alternate" : undefined, communityName: snapshot.communities.find(c => c.id === communityId)?.name, withComments: kind === "post" && actionType !== "reply" && actionType !== "repost" && snapshot.accounts[postAccountId]?.visibility !== "protected" && snapshot.characterProfiles[postAccountId]?.visibility !== "protected" });
+      const lines: TwitterGeneratedLine[] & { comments?: TwitterCommentDraft[] } = kind === "post" && actionType === "repost" ? [{ original: "", translated: "" }] : communityCharacter ? [await generateTwitterCommunityText(snapshot, communityCharacter, generatedKind, kind === "dm" ? (priorMessages || []).map(m => m.original).join("\n") : actionTarget?.original || snapshot.publicWorldContext).then(result => ({ original: result.original, translated: result.translated || "" }))] : kind === "dm" && convo?.stranger ? [await generateTwitterStrangerReply(snapshot, snapshot.accounts[speakingAccountId]?.name || "陌生人", priorMessages || [], convo.userAccountId || "user").then(reply => ({ original: reply.original, translated: reply.translated || "" }))] : await generateTwitterText({ characterId, state: snapshot, kind: generatedKind, targetPost: kind === "post" ? actionTarget : thread, conversation: priorMessages, replyToMessage: convo?.messages.find(msg => msg.id === requestedReplyId), anonymous: convo?.mode === "anonymous", senderAccountId: convo?.userAccountId, senderName: snapshot.accounts[convo?.userAccountId || ""]?.name, accountProfile: snapshot.accounts[speakingAccountId] || snapshot.characterProfiles[speakingAccountId], accountKind: speakingAccountId.endsWith(":alt") ? "alternate" : undefined, communityName: snapshot.communities.find(c => c.id === communityId)?.name, withComments: kind === "post" && actionType !== "reply" && actionType !== "repost" && snapshot.accounts[postAccountId]?.visibility !== "protected" && snapshot.characterProfiles[postAccountId]?.visibility !== "protected" });
       if (kind === "post" && postAccountId.endsWith(":alt") && snapshot.accounts[postAccountId]?.disclosure !== "full") {
         const main = snapshot.characterProfiles[characterId] || characters.find(c => c.id === characterId);
         const publicName = main?.name?.trim() || "";
@@ -532,7 +535,7 @@ export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
         setReplyingToId(current => current === requestedReplyId ? null : current);
       } else {
         const id = createTwitterId();
-        const actorId = kind === "post" ? postAccountId : characterId;
+        const actorId = postAccountId;
         let photoLibraryId: string | undefined;
         let photoStoryContext: PhotoStorySnapshot | undefined;
         let photoRef: string | undefined;
@@ -633,7 +636,7 @@ export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
   const selectedCommunity = state.communities.find(c => c.id === communityId);
   const pickerCharacters = characters.filter(char => !selectedCommunity || picker !== "post" || selectedCommunity.characterIds.includes(char.id));
   const activeCommunityIds = Object.keys(state.communityCharacters).filter(id => state.communities.some(c => c.communityCharacterIds?.includes(id)));
-  const pickerAccountIds = picker === "post" ? [...pickerCharacters.flatMap(char => [char.id, ...(state.accounts[`${char.id}:alt`] ? [`${char.id}:alt`] : [])]), ...activeCommunityIds.filter(id => !selectedCommunity || selectedCommunity.communityCharacterIds?.includes(id))] : [];
+  const pickerAccountIds = picker !== "dm" ? [...pickerCharacters.flatMap(char => [...(twitterAccountEnabled(state,char.id)?[char.id]:[]), ...(state.accounts[`${char.id}:alt`] ? [`${char.id}:alt`] : [])]), ...activeCommunityIds.filter(id => !selectedCommunity || selectedCommunity.communityCharacterIds?.includes(id))] : [];
   const visibleNotices = state.notices.filter(notice => {
     const role = state.importedCharacterIds.includes(notice.actorId.replace(/:alt$/, "")) || !!state.communityCharacters[notice.actorId];
     if (role) return notice.kind === "reply" || notice.kind === "like";
@@ -757,9 +760,9 @@ export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
       {(imagePromptOpen || textImagePostId) && <div className={styles.overlay} onClick={() => { setImagePromptOpen(false); setTextImagePostId(null); setGeneratedPreview(null); setGeneratedPreviewUrl(""); }}><div className={styles.imagePromptDialog} onClick={event => event.stopPropagation()}><div className={styles.imagePromptTitle}><b>描述图片</b><button onClick={() => { setImagePromptOpen(false); setTextImagePostId(null); setGeneratedPreview(null); setGeneratedPreviewUrl(""); }} aria-label="关闭"><X size={21} /></button></div><div className={styles.imagePromptBody}><textarea value={imagePrompt} onChange={event => setImagePrompt(event.target.value)} placeholder="写下要发布的图片…" />{generatedPreviewUrl && <img src={generatedPreviewUrl} alt="生成预览" />}<div><button onClick={() => { if (!imagePrompt.trim()) return; if (textImagePostId) commit(current => ({ ...current, posts: current.posts.map(post => post.id === textImagePostId ? { ...post, imageDescription: imagePrompt.trim() } : post) })); else setTextImageDescription(imagePrompt.trim()); setImagePromptOpen(false); setTextImagePostId(null); setGeneratedPreview(null); setGeneratedPreviewUrl(""); }}>保存为文字卡片</button><button disabled={busy || !imagePrompt.trim()} onClick={() => { void generateComposerImage(); }}>{generatedPreview ? "重新生成" : "生成图片"}</button></div>{generatedPreview && <div><button onClick={() => { void attachGeneratedImage(false); }}>保存到相册</button><button onClick={() => { void attachGeneratedImage(); }}>{textImagePostId ? "替换这张文字图" : "添加到帖子"}</button></div>}</div></div></div>}
 
     {picker && <div className={styles.overlay} onClick={() => setPicker(null)}><div className={styles.sheet} onClick={event => event.stopPropagation()}>
-      <div className={styles.sheetHeader}><b>{picker === "post" ? "选择要发帖的角色账号" : picker === "reply" ? "选一个角色回复" : "开始私信"}</b><button onClick={() => setPicker(null)} aria-label="关闭"><X size={20} /></button></div>
-      <div className={styles.sheetList}>{picker === "post" ? pickerAccountIds.map(id => <label className={styles.pickRow} key={id}><Avatar label={display(id).name} image={display(id).avatarUrl} /><span><b>{display(id).name}</b><small>@{display(id).handle} · {state.communityCharacters[id] ? "社群角色" : id.endsWith(":alt") ? "副账号" : "主账号"}</small></span><input type="checkbox" checked={selectedAccounts.includes(id)} onChange={event => setSelectedAccounts(current => event.target.checked ? [...current, id] : current.filter(item => item !== id))} /></label>) : [...characters.map(c => c.id), ...activeCommunityIds].map(id => <div className={styles.pickRow} key={id}><Avatar label={display(id).name} image={display(id).avatarUrl} /><b>{display(id).name}</b>{picker === "dm" ? <><button onClick={() => openConversation(id, "real")}>主账号</button>{state.accounts[`${id}:alt`] && <button onClick={() => openConversation(id, "real", `${id}:alt`)}>副账号</button>}</> : <button onClick={() => { void aiGenerate(id, "reply"); }} disabled={busy}>选择</button>}</div>)}
-        {picker === "post" && <button className={styles.generateSelected} disabled={!selectedAccounts.length || busy} onClick={() => { const ids = selectedAccounts; setPicker(null); setSelectedAccounts([]); void (async () => { for (const id of ids) await aiGenerate(id.replace(/:alt$/, ""), "post", id); })(); }}>生成选中的 {selectedAccounts.length} 个账号</button>}
+      <div className={styles.sheetHeader}><b>{picker === "post" ? "选择要发帖的角色账号" : picker === "reply" ? "选择回复账号 · 可多选" : "开始私信"}</b><button onClick={() => setPicker(null)} aria-label="关闭"><X size={20} /></button></div>
+      <div className={styles.sheetList}>{picker !== "dm" ? pickerAccountIds.map(id => <label className={styles.pickRow} key={id}><Avatar label={display(id).name} image={display(id).avatarUrl} /><span><b>{display(id).name}</b><small>@{display(id).handle} · {state.communityCharacters[id] ? "社群角色" : id.endsWith(":alt") ? "副账号" : "主账号"}</small></span><input type="checkbox" checked={selectedAccounts.includes(id)} onChange={event => setSelectedAccounts(current => event.target.checked ? [...current, id] : current.filter(item => item !== id))} /></label>) : [...characters.map(c => c.id), ...activeCommunityIds].map(id => <div className={styles.pickRow} key={id}><Avatar label={display(id).name} image={display(id).avatarUrl} /><b>{display(id).name}</b>{picker === "dm" ? <>{twitterAccountEnabled(state,id)&&<button onClick={() => openConversation(id, "real")}>主账号</button>}{state.accounts[`${id}:alt`] && <button onClick={() => openConversation(id, "real", `${id}:alt`)}>副账号</button>}</> : <button onClick={() => { void aiGenerate(id, "reply"); }} disabled={busy}>选择</button>}</div>)}
+        {picker !== "dm" && <button className={styles.generateSelected} disabled={!selectedAccounts.length || busy} onClick={() => { const ids = selectedAccounts; setPicker(null); setSelectedAccounts([]); void (async () => { for (const id of ids) await aiGenerate(id.replace(/:alt$/, ""), picker === "reply" ? "reply" : "post", id); })(); }}>生成选中的 {selectedAccounts.length} 个账号</button>}
       </div>
     </div></div>}
 

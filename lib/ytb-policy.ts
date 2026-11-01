@@ -15,11 +15,11 @@ export function ytbRecognizes(subject: YtbChannel | undefined, viewer: YtbChanne
   if (!subject || subject.ownerType === "npc") return false;
   if (subject.id === viewer.id) return true;
   if (subject.disclosure !== "none") return true;
-  return Boolean(subject.disclosedTo?.includes(viewer.ownerId) && (subject.ownerType === "user" || ytbKnowEachOther(subject, viewer)));
+  return Boolean((subject.disclosedAccounts?.includes(viewer.id) || subject.disclosedTo?.includes(viewer.ownerId)) && (subject.ownerType === "user" || ytbKnowEachOther(subject, viewer)));
 }
 export function ytbCanVisit(host: YtbChannel, viewer: YtbChannel): boolean {
   return viewer.ownerType === "character" && host.id !== viewer.id && viewer.subscribed &&
-    ytbKnowEachOther(host, viewer) && ytbRecognizes(host, viewer);
+    ytbKnowEachOther(host, viewer);
 }
 export function ytbIdentityContext(state: YtbState, viewer: YtbChannel): string {
   return state.channels.filter(c => c.id !== viewer.id && c.ownerType !== "npc").map(c =>
@@ -37,4 +37,11 @@ export function ytbEnterStream(stream: YtbStream, viewer: YtbChannel, state: Ytb
 export function ytbReadMessages<T extends { senderId: string; readBy?: Record<string, boolean> }>(messages: T[], viewer: YtbChannel, state: YtbState): T[] {
   const eligible = new Set(messages.slice(-24));
   return messages.map(m => !eligible.has(m) ? m : ({ ...m, readBy: { ...m.readBy, [viewer.id]: m.readBy?.[viewer.id] ?? ytbRecognizes(state.channels.find(c => c.id === m.senderId), viewer) } }));
+}
+
+export function synchronizeYtbDisclosure(state: YtbState, channel: YtbChannel): YtbState {
+ const old=state.channels.find(c=>c.id===channel.id);
+ const touched=new Set([...(old?.mutualAccounts||[]),...(channel.mutualAccounts||[])]);
+ return {...state,channels:state.channels.map(c=>{if(c.id===channel.id)return channel;if(!touched.has(c.id))return c;
+ const both=channel.mutualAccounts?.includes(c.id);return {...c,disclosedTo:(c.disclosedTo||[]).filter(id=>id!==channel.ownerId),disclosedAccounts:[...(c.disclosedAccounts||[]).filter(id=>id!==channel.id),...(both?[channel.id]:[])],mutualAccounts:[...(c.mutualAccounts||[]).filter(id=>id!==channel.id),...(both?[channel.id]:[])]};})};
 }

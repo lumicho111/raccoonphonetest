@@ -1,3 +1,6 @@
+import { loadCharacters } from "./character-storage";
+import { socialRelated } from "./social-identity";
+import { resolveUserIdentity } from "./settings-storage";
 import type { PhotoStorySnapshot } from "./photo-story-data";
 import { kvGet, kvSet, registerKvMigration } from "./kv-db";
 import type { RoleSocialSources } from "./role-social-sources";
@@ -9,6 +12,7 @@ export const DEFAULT_TWITTER_WORLD = "现在是2025—2026年。这里是面向�
 export const TWITTER_LOCALES = ["简中（大陆）", "繁中（港澳台）", "日语（日本）", "韩语（韩国）", "英语国家", "泰语（泰国）"] as const;
 
 export type TwitterProfile = {
+  enabled?: boolean; disclosedTo?: string[]; mutualWith?: string[];
   name: string; handle: string; bio: string; avatarUrl?: string; bannerUrl?: string;
   publicAddress?: string; // Optional public form of address; defaults to the X nickname.
   followers?: number; followingCount?: number; visibility?: "public" | "protected";
@@ -37,6 +41,7 @@ export type TwitterPendingReply = { id: string; commentId: string; targetPostId:
 export type TwitterEngagement = { likes: number; reposts: number; views: number; comments: number };
 export type TwitterPost = {
   id: string;
+  identitySnapshot?: Record<string, boolean>;
   authorId: string; // "user" or character id
   original: string;
   translated?: string;
@@ -61,7 +66,7 @@ export type TwitterPost = {
   bookmarked?: boolean;
   reposted?: boolean;
 };
-export type TwitterMessage = { id: string; role: "user" | "character"; original: string; translated?: string; replyToId?: string; createdAt: number };
+export type TwitterMessage = { identitySnapshot?: Record<string,boolean>; id: string; role: "user" | "character"; original: string; translated?: string; replyToId?: string; createdAt: number };
 export type TwitterConversation = {
   id: string;
   characterId: string;
@@ -158,10 +163,10 @@ export function loadTwitterState(): TwitterState {
     const migrateProfile = (profile: TwitterProfile) => { if (row.version === 2) return profile; const next = { ...profile }; delete next.createdAt; return next; };
     const profiles = row.characterProfiles && typeof row.characterProfiles === "object" && !Array.isArray(row.characterProfiles) ? row.characterProfiles : {};
     const accounts = row.accounts && typeof row.accounts === "object" && !Array.isArray(row.accounts) ? row.accounts : {};
-    return {
+    const migrated: TwitterState = {
       version: 2,
       profile: migrateProfile(row.profile && typeof row.profile.name === "string" ? row.profile : fallback.profile),
-      characterProfiles: Object.fromEntries(Object.entries(profiles).map(([id, profile]) => [id, migrateProfile(profile)])),
+      characterProfiles: Object.fromEntries(Object.entries(profiles).map(([id, profile]) => [id, { ...migrateProfile(profile), enabled: profile.enabled !== false }])),
       worldRules: typeof row.worldRules === "string" ? row.worldRules : "",
       posts,
       conversations: Array.isArray(row.conversations) ? row.conversations.filter(c => c && typeof c.id === "string" && Array.isArray(c.messages)) : [],
@@ -188,11 +193,20 @@ export function loadTwitterState(): TwitterState {
       audienceLocales: Array.isArray(row.audienceLocales) ? row.audienceLocales.filter((value): value is string => typeof value === "string" && TWITTER_LOCALES.includes(value as typeof TWITTER_LOCALES[number])) : fallback.audienceLocales,
       alternateMediaPhotoIds: row.alternateMediaPhotoIds && typeof row.alternateMediaPhotoIds === "object" && !Array.isArray(row.alternateMediaPhotoIds) ? row.alternateMediaPhotoIds : {},
     };
+    if(Object.values(profiles).some(p=>p.enabled===undefined)) kvSet(TWITTER_STORAGE_KEY,JSON.stringify(migrated));
+    return migrated;
   } catch { return blankState(); }
 }
 
 export function saveTwitterState(state: TwitterState): void {
   if (typeof window === "undefined") return;
+  const previous=loadTwitterState(); const oldIds = new Set(previous.posts.map(p=>p.id));
+  state = {...state,posts:state.posts.map(p=>{ if(p.identitySnapshot)return p;if(oldIds.has(p.id))return {...p,identitySnapshot:previous.posts.find(t=>t.id===p.id)?.identitySnapshot}; const parent=state.posts.find(t=>t.id===p.replyToId);if(!parent)return p;return {...p,identitySnapshot:{[p.authorId]:twitterRecognizes(state,parent.authorId,p.authorId),[parent.authorId]:twitterRecognizes(state,p.authorId,parent.authorId)}};})};
+  state={...state,conversations:state.conversations.map(c=>({...c,messages:c.messages.map(m=>{
+   if(m.identitySnapshot)return m;const old=previous.conversations.find(t=>t.id===c.id)?.messages.find(t=>t.id===m.id);
+   if(old)return {...m,identitySnapshot:old.identitySnapshot};const a=c.userAccountId||"user",b=c.recipientAccountId||c.characterId;
+   return {...m,identitySnapshot:{[a]:twitterRecognizes(state,b,a),[b]:twitterRecognizes(state,a,b)}};
+  })}))};
   kvSet(TWITTER_STORAGE_KEY, JSON.stringify(state));
   window.dispatchEvent(new Event(TWITTER_UPDATED_EVENT));
 }
@@ -225,18 +239,40 @@ export function getTwitterPrivateAccountContext(characterId: string): string {
   return `你自己在 X 的小号是 @${alternate.handle}，对外身份为“${(alternate.identity || alternate.bio || "普通账号").slice(0, 600)}”。这条真实归属是私下信息，路人、评论者和公众默认不知道。用户在一对一聊天问起时，可按你的人设自行决定告诉、卖关子或拒绝；不要在公开发言中无端暴露关联。`;
 }
 
-export function loadTwitterProjectionEntries(characterId: string, afterTimestamp?: string): Array<{ id: string; timestamp: string; content: string }> {
-  const state = loadTwitterState();
-  const entries: Array<{ id: string; timestamp: string; content: string }> = [];
-  const ownIds = new Set(["user", characterId, `${characterId}:alt`]);
-  const visiblePosts = state.posts.filter(p => (ownIds.has(p.authorId) && (p.authorId !== "user" || isPublicTwitterPost(state, p))) || (p.replyToId && state.posts.some(parent => parent.id === p.replyToId && ownIds.has(parent.authorId) && isPublicTwitterPost(state, parent))));
-  for (const post of visiblePosts) {
-    if (!Number.isFinite(post.createdAt)) continue;
-    const author = post.authorId.startsWith("user") ? state.accounts[post.authorId]?.name || state.profile.name : post.authorId === characterId ? "角色" : post.authorId === `${characterId}:alt` ? "角色的小号" : "其他人";
-    entries.push({ id: `twitter_${post.id}`, timestamp: new Date(post.createdAt).toISOString(), content: `${author}在 X ${post.replyToId ? "评论" : "发帖"}：“${post.original.slice(0, 300)}”` });
-  }
-  for (const convo of state.conversations.filter(c => c.characterId === characterId && c.mode === "real" && (!c.userAccountId || c.userAccountId === "user"))) {
-    for (const msg of convo.messages.slice(-30)) if (Number.isFinite(msg.createdAt) && typeof msg.original === "string") entries.push({ id: `twitter_dm_${msg.id}`, timestamp: new Date(msg.createdAt).toISOString(), content: `X 私信：${msg.role === "user" ? state.profile.name : "角色"}说“${msg.original.slice(0, 260)}”` });
-  }
-  return entries.filter(e => !afterTimestamp || e.timestamp > afterTimestamp).sort((a, b) => a.timestamp.localeCompare(b.timestamp)).slice(-80);
+export function loadTwitterProjectionEntries(characterId: string, afterTimestamp?: string): Array<{ id: string; timestamp: string; content: string; shared?: boolean }> {
+ const state=loadTwitterState(); const own=new Set([characterId,`${characterId}:alt`]);
+ const entries:Array<{id:string;timestamp:string;content:string;shared?:boolean}>=[];
+ const label=(id:string,known:boolean)=>{ const p=id==="user"?state.profile:state.accounts[id]||state.characterProfiles[id];return `${p?.name||"网友"}${known?`（身份已知：${id.startsWith("user")?resolveUserIdentity()?.name||"User":loadCharacters().find(c=>c.id===id.replace(/:alt$/,""))?.name||"角色"}）`:"（仅知网名）"}`;};
+ const samples:Record<string,number>={};
+ for(const p of [...state.posts].sort((a,b)=>a.createdAt-b.createdAt)) {
+ const target=state.posts.find(t=>t.id===p.replyToId);if(!target||!Number.isFinite(p.createdAt))continue;
+ const sent=own.has(p.authorId),received=own.has(target.authorId);if(!sent&&!received)continue;
+ const viewer=sent?p.authorId:target.authorId,other=sent?target.authorId:p.authorId;
+ const answered=state.posts.some(t=>t.replyToId===p.id&&own.has(t.authorId));
+ const snapshot=p.identitySnapshot||{}; const mutual=viewer.replace(/:alt$/,"")!==other.replace(/:alt$/,"")&&snapshot[viewer]===true&&snapshot[other]===true;
+ const interaction=sent||answered||mutual;
+ if(!interaction){if((samples[target.id]||0)>=2)continue;samples[target.id]=(samples[target.id]||0)+1;}
+ entries.push({id:`twitter_${p.id}`,timestamp:new Date(p.createdAt).toISOString(),shared:interaction&&mutual,content:`${interaction?"X 实际回复互动":"X 留意到的评论（未互动）"}：${label(target.authorId,sent?snapshot[viewer]===true:true)}发帖“${target.original.slice(0,300)}”；${label(p.authorId,received?snapshot[viewer]===true:true)}回复“${p.original.slice(0,300)}”。仅供参与者记忆，不能据此公开隐藏身份。`});
+ }
+ for(const c of state.conversations.filter(c=>c.characterId===characterId)) {
+ const a=c.userAccountId||"user",b=c.recipientAccountId||characterId;
+ for(const m of c.messages.filter(m=>m.role==="character")) {
+ const index=c.messages.indexOf(m),prior=c.messages.slice(0,index).filter(t=>t.role==="user").at(-1);if(!prior)continue;
+ const snap=m.identitySnapshot||{};entries.push({id:`twitter_dm_${m.id}`,timestamp:new Date(m.createdAt).toISOString(),shared:snap[a]===true&&snap[b]===true,content:`X 私信互动：${label(a,snap[b]===true)}说“${prior.original.slice(0,260)}”，角色回复“${m.original.slice(0,260)}”。`});
+ }}
+ return entries.filter(e=>!afterTimestamp||e.timestamp>afterTimestamp).slice(-80);
+}
+
+export function twitterAccountEnabled(state: TwitterState, id: string): boolean { return id === "user" || Boolean(state.accounts[id] || (state.characterProfiles[id] && state.characterProfiles[id].enabled !== false)); }
+export function twitterRecognizes(state: TwitterState, subject: string, viewer: string): boolean {
+ if(subject===viewer) return true;
+ if(!subject.endsWith(":alt")) return true;
+ const p=state.accounts[subject]; return p?.disclosure==="full" || Boolean(p?.disclosedTo?.includes(viewer) && socialRelated(subject.startsWith("user")?`user:${resolveUserIdentity()?.id}`:subject.replace(/:alt$/,""),viewer.startsWith("user")?`user:${resolveUserIdentity()?.id}`:viewer.replace(/:alt$/,"")));
+}
+export function synchronizeTwitterDisclosure(state: TwitterState, id: string, profile: TwitterProfile): TwitterState {
+ const old=state.accounts[id]; const accounts={...state.accounts,[id]:profile};
+ for(const target of new Set([...(old?.mutualWith||[]),...(profile.mutualWith||[])])) {
+ const p=accounts[target]; if(!p) continue; const both=profile.mutualWith?.includes(target);
+ accounts[target]={...p,disclosedTo:[...(p.disclosedTo||[]).filter(x=>x!==id),...(both?[id]:[])],mutualWith:[...(p.mutualWith||[]).filter(x=>x!==id),...(both?[id]:[])]}; }
+ return {...state,accounts};
 }

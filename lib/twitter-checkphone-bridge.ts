@@ -6,7 +6,7 @@ import { generateTwitterText } from "./twitter-engine";
 import { generateTwitterComments } from "./twitter-world-engine";
 import { recordPreparedPhotoUse, resolveMediaForUse } from "./media-resolver";
 import { loadPhotoLibrary } from "./photo-library-storage";
-import { createTwitterId, loadTwitterState, saveTwitterState, type TwitterEngagement, type TwitterPost, type TwitterState } from "./twitter-storage";
+import { createTwitterId, loadTwitterState, saveTwitterState, type TwitterEngagement, type TwitterPost, type TwitterState, twitterAccountEnabled } from "./twitter-storage";
 
 const strangerAvatar = "https://imgbed.heliar.top/i/Q3w-VKasJ0oD-MB1_%E2%9A%AB%EF%B8%8F_1_see3lvy__%E6%9D%A5%E8%87%AA%E5%B0%8F%E7%BA%A2%E4%B9%A6%E7%BD%91%E9%A1%B5%E7%89%88.jpg";
 const handle = (value: string) => value.replace(/^@/, "").replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 28).toLowerCase() || "visitor";
@@ -19,8 +19,8 @@ const metrics = (post: TwitterPost, state: TwitterState) => ({
 });
 
 /** Check Phone shows the actual main account, never an independently generated copy. */
-export function projectCharacterTwitter(character: Character, state: TwitterState): CheckPhoneXPayload {
-  const profile = state.characterProfiles[character.id];
+export function projectCharacterTwitter(character: Character, state: TwitterState, accountId = character.id): CheckPhoneXPayload {
+  const profile = state.accounts[accountId] || state.characterProfiles[accountId];
   const name = profile?.name || character.name;
   const account = {
     name,
@@ -32,7 +32,7 @@ export function projectCharacterTwitter(character: Character, state: TwitterStat
     followerCount: profile?.followers || 0,
     joinedAt: profile?.createdAt ? `${new Date(profile.createdAt).getFullYear()}年${new Date(profile.createdAt).getMonth() + 1}月` : undefined,
   };
-  const own = state.posts.filter(post => post.authorId === character.id).sort((a, b) => b.createdAt - a.createdAt);
+  const own = state.posts.filter(post => post.authorId === accountId).sort((a, b) => b.createdAt - a.createdAt);
   const posts = own.filter(post => !post.replyToId && !post.repostOfId).map(post => ({
     id: post.id, body: body(post), imageRef: post.imageRef || post.imageRefs?.[0],
     mediaDescription: post.imageDescription,
@@ -48,7 +48,7 @@ export function projectCharacterTwitter(character: Character, state: TwitterStat
       body: body(post), createdAt: new Date(post.createdAt).toISOString(), ...metrics(post, state), note: "",
     };
   });
-  const likes = state.actions.filter(action => action.kind === "like" && action.actorId === character.id)
+  const likes = state.actions.filter(action => action.kind === "like" && action.actorId === accountId)
     .sort((a, b) => b.createdAt - a.createdAt).flatMap(action => {
       const post = state.posts.find(item => item.id === action.targetPostId);
       if (!post) return [];
@@ -65,10 +65,12 @@ function engagement(id: string, followers: number, comments: number): TwitterEng
 }
 
 /** Explicitly publish to the native X store; both phone views then read this post ID. */
-export async function publishCharacterTwitterFromCheckPhone(character: Character): Promise<string> {
+export async function publishCharacterTwitterFromCheckPhone(character: Character, accountId = character.id): Promise<string> {
   const snapshot = loadTwitterState();
-  const account = snapshot.characterProfiles[character.id];
-  const lines = await generateTwitterText({ characterId: character.id, state: snapshot, kind: "post", withComments: account?.visibility !== "protected" });
+  if (!twitterAccountEnabled(snapshot,accountId)) throw new Error("请先在 X 启用主号或创建副号。");
+  const account = snapshot.accounts[accountId] || snapshot.characterProfiles[accountId];
+  const alternate=accountId.endsWith(":alt");
+  const lines = await generateTwitterText({ characterId: character.id, state: snapshot, kind: "post", accountProfile: account, accountKind: alternate ? "alternate" : undefined, withComments: account?.visibility !== "protected" });
   const line = lines[0];
   const id = createTwitterId();
   let photoLibraryId: string | undefined;
@@ -76,20 +78,20 @@ export async function publishCharacterTwitterFromCheckPhone(character: Character
   let imageRef: string | undefined;
   let imageDescription: string | undefined;
   if (line.photoDescription) {
-    const media = await resolveMediaForUse({ deferUsage: true, actor: { type: "character", characterId: character.id }, description: line.photoDescription, intentKind: /自拍|人像|selfie|portrait/i.test(line.photoDescription) ? "portrait" : "other", channel: "twitter_main", appId: "twitter", targetId: id }).catch(() => null);
+    const media = await resolveMediaForUse({ deferUsage: true, actor: { type: "character", characterId: character.id, ...(alternate && account?.disclosure!=="full" ? {photoIds:snapshot.alternateMediaPhotoIds[accountId]||[]} : {}) }, description: line.photoDescription, intentKind: /自拍|人像|selfie|portrait/i.test(line.photoDescription) ? "portrait" : "other", channel: alternate?"twitter_alt":"twitter_main", accountId, appId: "twitter", targetId: id }).catch(() => null);
     const prefs = loadPhotoLibrary().preferences;
     if (!media && prefs.importedStrategy === "album_only" && prefs.enabledCharacterIds.includes(character.id)) throw new Error("这次没有适合发布的照片。");
     imageRef = media?.imageUrl?.replace(/^asset:\/\//, "");
     imageDescription = media?.placeholderDescription;
     photoLibraryId = media?.photoLibraryId;
     if (media?.imageUrl) {
-      const revised = await preparePhotoStoryCaption({ photoId: photoLibraryId, characterId: character.id, appId: "twitter", original: line.original, translated: line.translated });
+      const revised = await preparePhotoStoryCaption({ photoId: photoLibraryId, characterId: character.id, appId: "twitter", original: line.original, translated: line.translated, ...(alternate?{allowedPhotoIds:snapshot.alternateMediaPhotoIds[accountId]||[],accountContext:"身份隔离的小号，不得泄漏真实身份或私人关系。"}:{}) });
       line.original = revised.original; line.translated = revised.translated; photoStoryContext = revised.photoStoryContext;
       if (photoStoryContext) lines.comments = [];
     }
   }
   const now = Date.now();
-  const post: TwitterPost = { id, authorId: character.id, original: line.original, translated: line.translated, imageRef, imageDescription, photoLibraryId, photoStoryContext, createdAt: now, engagement: engagement(id, account?.followers || 0, lines.comments?.length || 0), commentsGenerated: false };
+  const post: TwitterPost = { id, authorId: accountId, original: line.original, translated: line.translated, imageRef, imageDescription, photoLibraryId, photoStoryContext, createdAt: now, engagement: engagement(id, account?.followers || 0, lines.comments?.length || 0), commentsGenerated: false };
   let comments = lines.comments || [];
   if (account?.visibility !== "protected" && comments.length < 5) {
     try { comments = [...comments, ...await generateTwitterComments(snapshot, post, account?.name || character.name, comments.map(item => item.original))].slice(0, 10); }
@@ -105,7 +107,7 @@ export async function publishCharacterTwitterFromCheckPhone(character: Character
   });
   post.commentsGenerated = replyPosts.length > 0;
   post.engagement = engagement(id, account?.followers || 0, replyPosts.length);
-  recordPreparedPhotoUse(photoLibraryId, "twitter_main", character.id, id);
+  recordPreparedPhotoUse(photoLibraryId, alternate?"twitter_alt":"twitter_main", character.id, id, accountId);
   saveTwitterState({ ...latest, accounts, posts: [...latest.posts, post, ...replyPosts] });
   return id;
 }

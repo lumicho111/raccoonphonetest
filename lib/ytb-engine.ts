@@ -6,6 +6,7 @@ import type { Character } from "./character-types";
 import { buildCharacterTimeContext } from "./character-time";
 import { buildCalendarScheduleMarker } from "./calendar-storage";
 import { getWeekStartIso } from "./calendar-utils";
+import { publicIdentityBoundary } from "./social-identity";
 import { loadMemoryConfig } from "./memory-storage";
 import { retrieveMemoriesForPrompt, retrieveCoreMemoriesForPrompt } from "./memory-service";
 import { formatLongTermMemories, formatCoreMemories } from "./memory-injector";
@@ -22,7 +23,7 @@ function parse(raw: string): Record<string, unknown> {
   if (start < 0 || end <= start) throw new Error("生成内容格式有误，请重试。");
   return JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
 }
-export function channelPublic(ch: YtbChannel) { return `频道 ${ch.id}：${ch.name} ${ch.handle}；简介：${ch.description || "无"}；频道风格、身份披露和直播习惯：${ch.style || "未填写"}；人设参考程度 ${ch.disclosure}`; }
+export function channelPublic(ch: YtbChannel) { return `频道 ${ch.id}：${ch.name} ${ch.handle}；简介：${ch.description || "无"}；频道风格、身份披露和直播习惯：${ch.style || "未填写"}；${publicIdentityBoundary}；人设参考程度 ${ch.disclosure}`; }
 export async function generateYtb<T extends Record<string, unknown>>(channel: YtbChannel | null, instruction: string, context: string, options: { publicOnly?: boolean } = {}): Promise<T> {
   const real = !options.publicOnly && channel?.ownerType === "character" ? loadCharacters().find(c => c.id === channel.ownerId) : undefined;
   const slot = resolveBinding(loadBindingConfig(), real?.id, "ytb");
@@ -33,7 +34,7 @@ export async function generateYtb<T extends Record<string, unknown>>(channel: Yt
   const state = loadYtbState();
   const userChannel = state.channels.find(c => c.ownerType === "user" && c.ownerId === identity?.id);
   const recognizesUser = !options.publicOnly && Boolean(channel && userChannel && (channel.ownerType === "user" ? channel.disclosure !== "none" : ytbRecognizes(userChannel, channel)));
-  const permitted = !options.publicOnly && channel?.disclosure !== "none";
+  const permitted = !options.publicOnly;
   const character: Character = real ? { ...real, id: permitted ? real.id : `youtube:${channel!.id}`, name: channel!.name, userRelationship: permitted ? real.userRelationship : undefined, userKnowledgeLevels: permitted ? real.userKnowledgeLevels : undefined, persona: permitted ? real.persona : channel!.style, personality: permitted ? real.personality : "", briefPersona: permitted ? real.briefPersona : channel!.style } : {
     id: channel?.id || "youtube-generator", name: channel?.name || "Youtube", avatar: channel?.avatar || null,
     persona: channel?.ownerType === "user" && permitted ? `${identity?.bio || ""}\n${identity?.occupation || ""}\n${identity?.customSettings || ""}` : channel?.style || "按世界背景生成普通互联网用户", createdAt: "", updatedAt: "",
@@ -54,7 +55,7 @@ export async function generateYtb<T extends Record<string, unknown>>(channel: Yt
     "这是虚构手机里的 Youtube 文字直播平台。只返回合法 JSON，不要 Markdown。",
     channel ? channelPublic(channel) : "生成符合世界背景的陌生频道，不自动认识用户，也不编造已发生的私聊。",
     "频道风格决定开播主题：推歌频道始终围绕推歌，不能因为主播是演员就擅自变成拍摄花絮。频道简介是辅助信息。",
-    "必须区分主播内部认知与观众可知信息。人设不参考=只按频道介绍；部分参考=只公开频道介绍明确允许的身份信息；全部参考=人设身份可公开，但私人记忆、未公开事件和秘密仍不属于观众知识。角色彼此认识不等于网友知道他们是谁。",
+    "必须区分主播内部认知与观众可知信息。不披露=观众只按频道形象理解，本人仍参考完整人设；部分披露=只公开频道介绍明确允许的身份信息；完全披露=人设身份可公开，但私人记忆、未公开事件和秘密仍不属于观众知识。角色彼此认识不等于网友知道他们是谁。",
     "动作只用中文。台词遵循说话人的母语、沟通语言和频道设定，提供对应中文翻译；语音只读 original。翻译保留原语言语感。",
     "观众分布可以包含各个国家。不要依据语言单独推断国家。不要编造用户没说过的话或没做过的动作。",
     options.publicOnly ? "本次只处理给定公开素材，不参考任何用户私人资料或角色记忆。" : channel ? ytbIdentityContext(state, channel) : "",
@@ -83,7 +84,7 @@ export async function generateYtbRound(channel: YtbChannel, stream: YtbStream | 
     const entered = stream?.visits?.[c.id]?.enteredAt ?? now;
     const witnessed = (stream?.lines || []).filter(l => l.at >= entered && l.at <= now).map(l => l.original).join("\n");
     const visibility = `该观众入场时间${entered}，只见过：${witnessed || "刚入场，没看过此前内容"}。不得回应入场前的话题。\n${ytbIdentityContext(state,c)}`;
-    if (c.ownerType !== "character" || c.disclosure === "none") return `${channelPublic(c)}\n${visibility}`;
+    if (c.ownerType !== "character") return `${channelPublic(c)}\n${visibility}`;
     const person = loadCharacters().find(char => char.id === c.ownerId);
     const cfg = loadMemoryConfig();
     const [long, core] = await Promise.all([retrieveMemoriesForPrompt(c.ownerId, contextLines || stream?.theme || c.style || "Youtube直播", cfg), retrieveCoreMemoriesForPrompt(c.ownerId, cfg)]);
