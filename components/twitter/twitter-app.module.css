@@ -464,7 +464,10 @@
 .replyChainItem[data-linked-after="false"]{border-bottom:1px solid #e9edf0}
 .replyChainItem[data-linked-after="true"]::after{content:"";position:absolute;left:32px;top:52px;bottom:-14px;width:2px;background:#d7e0e5;z-index:-1;pointer-events:none}
 .replyChainItem .avatarButton{position:relative;z-index:1;background:#fff;border-radius:50%}
-.bottomComposer{position:relative;border:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));gap:7px;background:#fff}
+.bottomComposer{position:absolute;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:9;border:0;padding:0;gap:7px;background:transparent;box-shadow:none;pointer-events:none}
+.bottomComposer>*{pointer-events:auto}
+.threadScroll{padding-bottom:calc(var(--tw-reply-reserve,84px) + env(safe-area-inset-bottom,0px));scroll-padding-bottom:calc(var(--tw-reply-reserve,84px) + env(safe-area-inset-bottom,0px))}
+.bottomComposer>button.replyingTo{width:fit-content;max-width:100%;padding:6px 11px;border-radius:14px;background:#f2f4f5;box-shadow:0 2px 10px #0001}
 .replyCapsule{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-width:0;min-height:54px;padding:7px 11px;border:1px solid #d6dde1;border-radius:30px;background:#f2f4f5;box-shadow:0 3px 12px #00000008}
 .replyCapsule input:not([type="file"]){flex:1;min-width:0;border:0;padding:7px 0;background:transparent;border-radius:0;font:inherit}
 .replyCapsule input[type="file"]{display:none}
