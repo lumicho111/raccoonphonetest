@@ -1,4 +1,5 @@
 "use client";
+import { VinylLyricsWidget } from "./vinyl-lyrics-widget";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -26,7 +27,7 @@ export function WidgetRenderer({ widget, preview, onConfigChange }: WidgetRender
   const [rows, cols] = WIDGET_SIZE_CELLS[widget.size];
   const sizeClass = `widget-${widget.size}`;
   const isKawaii = ["kawaiiCat", "kawaiiBubble", "kawaiiWeather", "kawaiiDate", "kawaiiBattery", "kawaiiMusicIcon"].includes(widget.type);
-  const isFullBleed = ["kawaiiMusicPlayer", "iosMenu", "mySpace", "socialPost", "photoViewer", "largeTime", "moodPill"].includes(widget.type);
+  const isFullBleed = ["vinylLyrics", "kawaiiMusicPlayer", "iosMenu", "mySpace", "socialPost", "photoViewer", "largeTime", "moodPill"].includes(widget.type);
 
   const catalogEntry = WIDGET_CATALOG.find((e) => e.type === widget.type);
   const isFreestyle = catalogEntry?.track === "freestyle" || widget.type.startsWith("diy-");
@@ -87,6 +88,8 @@ function WidgetContent({
 
   const props = { config, widgetId, onConfigChange, preview };
   switch (type) {
+    case "vinylLyrics":
+      return <VinylLyricsWidget />;
     case "music":
       return <MusicWidget config={config} widgetId={widgetId} onConfigChange={onConfigChange} />;
     case "calendar":

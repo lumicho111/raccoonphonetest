@@ -1,4 +1,5 @@
 export type WidgetType =
+  | "vinylLyrics"
   | "music"
   | "calendar"
   | "clock"
@@ -94,6 +95,7 @@ export const WIDGET_SIZE_CELLS: Record<WidgetSize, [number, number]> = {
 };
 
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
+  {type:"vinylLyrics",name:"黑胶歌词播放器",desc:"同步音乐APP · 滚动歌词与旋转唱片",size:"2x4"},
   // 2×4 wide
   { type: "music", name: "\u97F3\u4E50\u64AD\u653E\u5668", desc: "\u5C01\u9762 + \u6B4C\u540D + \u64AD\u653E\u63A7\u5236", size: "2x4" },
   { type: "interviewMagazine", name: "在场摘录", desc: "照片 + 本期访谈摘录翻页卡", size: "2x4" },
