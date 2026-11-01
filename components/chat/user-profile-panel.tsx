@@ -1,4 +1,5 @@
 "use client";
+import {RoutineSettings} from "./routine-settings";
 import { useChatUserAvatar } from "./use-chat-user-avatar";
 
 import { useState, useEffect, useMemo, useRef, type CSSProperties } from "react";
@@ -632,59 +633,13 @@ function FollowUpSettingsEditor({ onBack }: { onBack: () => void }) {
         <PageShell title="追发设置" onBack={onBack} className="absolute inset-0 z-[100]">
             <div className="page-menu profile-settings-menu">
                 <p className="menu-group-desc mx-2">
-                    延迟计算：焦虑值={config.anxietyThreshold} → {config.anxietyMaxDelay}秒，焦虑值=100 → {config.anxietyMinDelay}秒，中间线性插值。焦虑值&lt;{config.anxietyThreshold}时不追发。
+                    追发不依赖状态栏。每次在等待范围内重新抽取机会，连续未回复会逐渐放缓；角色可以选择不发。
                 </p>
                 <div className="menu-group">
-                    <div className="menu-item">
-                        <ProfileSettingsIcon icon={SlidersHorizontal} color={BINDING_ACCENTS.preset} />
-                        <div className="menu-label-group">
-                            <span className="menu-label">状态值字段名</span>
-                            <span className="menu-desc">用于读取角色状态中的焦虑值</span>
-                        </div>
-                        <div className="menu-right">
-                            <input
-                                value={config.anxietyFieldName}
-                                onChange={e => updateConfig({ anxietyFieldName: e.target.value })}
-                                className="w-[100px] text-right border-none outline-none ts-13 text-[var(--c-text)] bg-transparent"
-                            />
-                        </div>
-                    </div>
-                    <ProfileSettingsSliderItem
-                        icon={Heart}
-                        color={CONTENT_APP_ACCENTS.moments}
-                        label="焦虑阈值"
-                        desc={`低于 ${config.anxietyThreshold} 时不触发追发`}
-                        value={config.anxietyThreshold}
-                        valueLabel={`${config.anxietyThreshold}%`}
-                        min={0}
-                        max={100}
-                        step={5}
-                        onChange={v => updateConfig({ anxietyThreshold: v })}
-                    />
-                    <ProfileSettingsSliderItem
-                        icon={Clock}
-                        color={CONTENT_APP_ACCENTS.calendar}
-                        label="最短等待"
-                        desc="焦虑=100时使用"
-                        value={config.anxietyMinDelay}
-                        valueLabel={`${config.anxietyMinDelay}秒`}
-                        min={5}
-                        max={300}
-                        step={5}
-                        onChange={v => updateConfig({ anxietyMinDelay: v })}
-                    />
-                    <ProfileSettingsSliderItem
-                        icon={Clock}
-                        color={BINDING_ACCENTS.voice}
-                        label="最长等待"
-                        desc="焦虑=阈值时使用"
-                        value={config.anxietyMaxDelay}
-                        valueLabel={`${config.anxietyMaxDelay}秒`}
-                        min={15}
-                        max={600}
-                        step={15}
-                        onChange={v => updateConfig({ anxietyMaxDelay: v })}
-                    />
+                    <div className="menu-item"><span className="menu-label">启用追发</span><Toggle checked={config.enabled!==false} onChange={enabled=>updateConfig({enabled})}/></div>
+                    <ProfileSettingsSliderItem icon={Clock} color={BINDING_ACCENTS.voice} label="最短等待" desc="随机等待范围下限" value={config.anxietyMinDelay} valueLabel={`${config.anxietyMinDelay}秒`} min={5} max={300} step={5} onChange={v=>updateConfig({anxietyMinDelay:v,anxietyMaxDelay:Math.max(v,config.anxietyMaxDelay)})}/>
+                    <ProfileSettingsSliderItem icon={Clock} color={BINDING_ACCENTS.voice} label="最长等待" desc="随机等待范围上限" value={config.anxietyMaxDelay} valueLabel={`${config.anxietyMaxDelay}秒`} min={15} max={600} step={15} onChange={v=>updateConfig({anxietyMaxDelay:v,anxietyMinDelay:Math.min(v,config.anxietyMinDelay)})}/>
+                    <ProfileSettingsSliderItem icon={Send} color={BINDING_ACCENTS.preset} label="连续追发上限" desc="你回复后重新计数" value={config.maxConsecutive??3} valueLabel={`${config.maxConsecutive??3}次`} min={1} max={10} step={1} onChange={v=>updateConfig({maxConsecutive:v})}/>
                 </div>
 
                 {/* Reset button */}
@@ -1283,7 +1238,8 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
     const [tmCharId, setTmCharId] = useState("");
     const [tmValue, setTmValue] = useState("60");
     const [tmUnit, setTmUnit] = useState<"minute" | "hour" | "day">("minute");
-    const [tmIdleValue, setTmIdleValue] = useState("5");
+    const [tmIdleValue, setTmIdleValue] = useState("60");
+    const [tmIdleMax,setTmIdleMax]=useState("240");
     const [tmIdleUnit, setTmIdleUnit] = useState<"minute" | "hour" | "day">("minute");
     const [tmHint, setTmHint] = useState<string | null>(null);
     const [tmBusy, setTmBusy] = useState(false);
@@ -1351,6 +1307,8 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
         const totalMinutes = Math.max(1, Math.round(amount * UNIT_MS[tmIdleUnit] / 60000));
         if (totalMinutes < 1) { setTmHint("沉默阈值至少 1 分钟。"); return; }
         if (totalMinutes > 72 * 60) { setTmHint("最长 72 小时。"); return; }
+        const maxMinutes=Number(tmIdleMax)*UNIT_MS[tmIdleUnit]/60000;
+        if(!Number.isFinite(maxMinutes)||maxMinutes<totalMinutes||maxMinutes>4320){setTmHint("最长等待需不小于最短等待，且不超过72小时。");return;}
         addChatContact(tmCharId);
         const session = createOrGetSession(tmCharId);
         const rule: IdleReconnectRule = {
@@ -1358,6 +1316,7 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
             characterId: tmCharId,
             sessionId: session.id,
             intervalMinutes: totalMinutes,
+            maxIntervalMinutes: maxMinutes,
             intent: "",
             consecutiveCount: 0,
             createdAt: Date.now(),
@@ -1368,7 +1327,7 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
         const armResult = await armIdleReconnectBailout(rule);
         setTmBusy(false);
         setTmHint(armResult.ok
-            ? `已创建：超过 ${amount}${UNIT_LABEL[tmIdleUnit]}没消息时，TA 会主动来找你；服务端离线推送已预约。`
+            ? `已创建：每次在 ${amount}～${tmIdleMax}${UNIT_LABEL[tmIdleUnit]}内随机等待，再决定是否联系；服务端离线推送已预约。`
             : `已创建本地规则，但离线推送未预约成功：${armResult.reason}`);
         refreshTimedSchedules();
     };
@@ -1539,6 +1498,7 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
                         </p>
                     </>
                 )}
+                <RoutineSettings/>
                 <p className="menu-group-desc mx-2">定时主动消息</p>
                 <div className="menu-group">
                     <div className="menu-item">
@@ -1604,7 +1564,7 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
                         <div className="menu-item">
                             <ProfileSettingsIcon icon={Clock} color={BINDING_ACCENTS.voice} />
                             <div className="menu-label-group">
-                                <span className="menu-label">沉默超过</span>
+                                <span className="menu-label">随机等待范围</span>
                             </div>
                             <div className="menu-right flex items-center gap-1 ts-13">
                                 <input
@@ -1613,7 +1573,7 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
                                     className="w-[64px] text-right border-none outline-none ts-13 text-[var(--c-text)] bg-transparent"
                                     value={tmIdleValue}
                                     onChange={e => setTmIdleValue(e.target.value)}
-                                />
+                                /><span>至</span><input type="number" min={1} className="w-[64px] text-right bg-transparent" value={tmIdleMax} onChange={e=>setTmIdleMax(e.target.value)}/>
                                 <select
                                     className="border-none outline-none ts-13 text-[var(--c-text)] bg-transparent"
                                     value={tmIdleUnit}
@@ -1647,11 +1607,12 @@ function OfflinePushSettingsPage({ onBack }: { onBack: () => void }) {
                                 const hours = Math.floor(rule.intervalMinutes / 60);
                                 const minutes = rule.intervalMinutes % 60;
                                 const intervalLabel = `${hours ? `${hours}小时` : ""}${minutes ? `${minutes}分钟` : hours ? "" : "0分钟"}`;
+                                const max=rule.maxIntervalMinutes??rule.intervalMinutes;const maxLabel=`${Math.floor(max/60)?`${Math.floor(max/60)}小时`:""}${max%60?`${max%60}分钟`:max>=60?"":"0分钟"}`;
                                 return (
                                     <div key={rule.id} className="menu-item">
                                         <div className="menu-label-group" style={{ minWidth: 0, flex: 1 }}>
-                                            <span className="menu-label">{charName} · 沉默超过 {intervalLabel}（连发 {rule.consecutiveCount}/{IDLE_RECONNECT_MAX_CONSECUTIVE}）</span>
-                                            <span className="menu-desc" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>长时间没消息时主动来找你</span>
+                                            <span className="menu-label">{charName} · 随机 {intervalLabel}～{maxLabel}（连发 {rule.consecutiveCount}/{IDLE_RECONNECT_MAX_CONSECUTIVE}）</span>
+                                            <span className="menu-desc" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>每轮重新抽取机会，有待回复时优先处理</span>
                                         </div>
                                         <button className="ui-btn ui-btn-outline py-1 px-3 ts-12" style={{ whiteSpace: "nowrap", color: "var(--c-danger)" }} onClick={() => handleDeleteIdleRule(rule)}>删除</button>
                                     </div>

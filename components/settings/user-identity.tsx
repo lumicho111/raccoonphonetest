@@ -208,7 +208,7 @@ export function UserIdentitySettings() {
 
             {editingId && (
                 <div className="modal-overlay modal-overlay-bottom">
-                    <div className="modal-sheet" data-ui="modal-sheet">
+                    <div className="modal-sheet user-identity-dialog" data-ui="modal-sheet">
                         <div className="modal-header" data-ui="modal-header">
                             <button onClick={() => { if (isNewIdentity && editingId) removeIdentity(editingId); setIsNewIdentity(false); setEditingId(null); }} className="modal-header-btn modal-header-btn-muted"><X size={18} /></button>
                             <span className="modal-header-title">{isNewIdentity ? "添加身份" : "编辑身份"}</span>

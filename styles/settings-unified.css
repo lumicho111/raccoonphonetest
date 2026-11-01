@@ -57,3 +57,8 @@
 .voice-feature-dialog .settings-dialog-heading button { background:transparent;color:inherit;border:0; }
 /* In the unified collection, removing a phone favorite must not delete its source call. */
 .voice-favorites-page [aria-label="删除通话记录"] { display:none; }
+
+/* Identity editor is centered, so clip all four corners, including its scrolling body. */
+.settings-unified .user-identity-dialog{border-radius:22px;overflow:hidden;min-height:0}
+.settings-unified .user-identity-dialog > .modal-header{flex-shrink:0}
+.settings-unified .user-identity-dialog > .modal-body{min-height:0;overflow-y:auto}

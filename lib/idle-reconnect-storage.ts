@@ -16,6 +16,8 @@ export type IdleReconnectRule = {
     sessionId: string;
     /** 沉默阈值（分钟），1 分钟 ~ 72 小时 */
     intervalMinutes: number;
+    maxIntervalMinutes?: number;
+    nextCheckAt?: number;
     /** 用户附加意图（可空） */
     intent: string;
     /** 自上次用户消息以来已连发次数 */
@@ -73,6 +75,7 @@ export function markIdleReconnectFired(id: string, firedAtMs: number): void {
     if (!rule.lastFiredAt || firedAtMs > rule.lastFiredAt) {
         rule.lastFiredAt = firedAtMs;
         rule.consecutiveCount = Math.min(IDLE_RECONNECT_MAX_CONSECUTIVE, rule.consecutiveCount + 1);
+        rule.nextCheckAt = randomIdleDue(rule, firedAtMs);
         saveRules(rules);
     }
 }
@@ -96,6 +99,17 @@ export function resetIdleReconnectForSession(sessionId: string): IdleReconnectRu
         rule.consecutiveCount = 0;
     }
     rule.suppressedUntil = undefined;
+    rule.nextCheckAt = randomIdleDue(rule, Date.now());
     saveRules(rules);
     return rule;
 }
+
+export function randomIdleDue(rule:IdleReconnectRule,anchor:number):number {
+ const lo=Math.max(1,rule.intervalMinutes),hi=Math.max(lo,rule.maxIntervalMinutes??lo);
+ return anchor+(lo+Math.random()*(hi-lo))*(1+rule.consecutiveCount*.5)*60000;
+}
+export function ensureIdleDue(rule:IdleReconnectRule,anchor:number):number {
+ if(rule.nextCheckAt)return Math.max(rule.nextCheckAt,rule.suppressedUntil||0);
+ rule.nextCheckAt=randomIdleDue(rule,Math.max(anchor,rule.lastFiredAt||0));upsertIdleReconnectRule(rule);return rule.nextCheckAt;
+}
+export function deferIdleCheck(rule:IdleReconnectRule,anchor=Date.now()):void {rule.nextCheckAt=randomIdleDue(rule,anchor);upsertIdleReconnectRule(rule);}

@@ -1,3 +1,5 @@
+import {loadCharacterRoutine} from "./character-routine";
+import {ensureIdleDue} from "./idle-reconnect-storage";
 // 离线推送·兜底预约（客户端侧）：
 // 追问排期时把「组装好的完整请求快照」预约到服务端；本地正常触发就撤销，
 // App 被杀则由服务端 cron 到点接管生成并推送。组装用的就是前台同一条
@@ -259,6 +261,7 @@ export async function armFollowUpBailout(
         if (isWithinPushQuietHours(fireAt + FOLLOWUP_BAILOUT_GRACE_MS)) return; // 安静时段不打扰
         const session = loadChatSessions().find(s => s.id === sessionId);
         if (!session || session.isGroup) return; // 第一期只覆盖单聊追问
+        if(loadCharacterRoutine(session.contactId).enabled){await cancelFollowUpBailout(sessionId);return;}
         const latestMessages = loadChatMessages(sessionId);
         const count = prevCount + 1;
         const messagesWithHint = buildFollowUpSilenceMessages(session, latestMessages, fireAt);
@@ -395,12 +398,9 @@ export async function armIdleReconnectBailout(rule: IdleReconnectRule): Promise<
             return { ok: false, reason: "已达到连续主动联系上限" };
         }
 
+        if(loadCharacterRoutine(rule.characterId).enabled){await cancelBailoutPrefix(`idle:${rule.id}:`);return {ok:false,reason:"已启用动态作息，恢复网页后按当前状态检查，不预约过期回复快照"};}
         const intervalMs = Math.max(1, rule.intervalMinutes) * 60_000;
-        const nextDueAt = Math.max(
-            lastUserAt + intervalMs,
-            rule.lastFiredAt ? rule.lastFiredAt + intervalMs : 0,
-            rule.suppressedUntil ?? 0,
-        );
+        const nextDueAt=ensureIdleDue(rule,lastUserAt);
         const fireAt = Math.max(nextDueAt, Date.now() + 30_000);
         if (isWithinPushQuietHours(fireAt)) {
             // 首发落在安静时段就不挂（本地醒着时会择机触发），存量任务一并清掉
@@ -439,7 +439,7 @@ export async function armIdleReconnectBailout(rule: IdleReconnectRule): Promise<
                 appTags: ["chat", "text", "idle_wake"],
                 armAt: new Date(fireAt).toISOString(),
                 idleReconnect: { ruleId: rule.id, firedAt: fireAt },
-                ...(remaining > 0 ? { idleRepeat: { intervalMs, remaining, quietWin: buildQuietWindowMeta() } } : {}),
+                ...(remaining > 0 ? {idleRepeat:{intervalMs,maxIntervalMs:Math.max(rule.intervalMinutes,rule.maxIntervalMinutes??rule.intervalMinutes)*60000,growthCount:effectiveConsecutive+1,remaining,quietWin:buildQuietWindowMeta()}} : {}),
             },
         });
         if (!posted) return { ok: false, reason: "服务端预约接口没有确认成功" };

@@ -1,3 +1,4 @@
+import {getCharacterSleep} from "./character-routine";
 import { kvGet, kvRemove, kvSet, registerDynamicPrefix } from "./kv-db";
 import { loadOwnerCalendarPlans } from "./calendar-storage";
 import type { CalendarBusyLevel, CalendarScheduleItem } from "./calendar-types";
@@ -13,12 +14,14 @@ export type BusyHoldPending = {
   queued: boolean;
   eventId?: string;
   attempts?: number;
+  wakeCheckedId?: string;
 };
 
 export type ActiveCalendarBusy = {
   item: CalendarScheduleItem;
   level: CalendarBusyLevel;
   endsAt: number;
+  sleeping?: boolean;
 };
 
 function keyFor(sessionId: string): string { return `${BUSY_HOLD_PREFIX}${sessionId}`; }
@@ -61,7 +64,12 @@ export function getActiveCalendarBusy(characterId: string, at = new Date()): Act
     if(end<=start)end+=86400000;
     return start<=localStamp&&localStamp<end?[{item,level:inferredLevel(item),endsAt:at.getTime()+end-localStamp}]:[];
   });
-  return active.sort((a,b)=>b.level-a.level||b.endsAt-a.endsAt)[0]||null;
+  const calendar=active.sort((a,b)=>b.level-a.level||b.endsAt-a.endsAt)[0]||null;
+  const sleep=getCharacterSleep(characterId,at);
+  if(calendar&&calendar.level>1)return calendar;
+  if(sleep?.sleeping)return {item:{id:sleep.cycleId,title:"正在休息"} as CalendarScheduleItem,level:4,endsAt:sleep.endsAt,sleeping:true};
+  if(sleep?.briefAwake)return {item:{id:sleep.cycleId+":wake",title:"夜间短暂醒来"} as CalendarScheduleItem,level:2,endsAt:sleep.endsAt,sleeping:true};
+  return calendar;
 }
 
 /** Randomized once and persisted with the pending item, so polling never moves the deadline. */

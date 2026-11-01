@@ -1,4 +1,5 @@
 "use client";
+import {characterSpeaksFirst} from "@/lib/call-first-speaker";
 import { VoiceFavoriteDialog } from "./voice-favorite-dialog";
 import { useCallEndRecord } from "./use-call-end-record";
 import { parseCallOutput, SINGLE_CALL_ACTIONS } from "@/lib/call-participation";
@@ -455,6 +456,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
 
     const queueUserText = useCallback((text: string, kind: "speech" | "action" = "speech") => {
         if (!text.trim() || stateRef.current === "ENDED" || minimizedRef.current) return;
+        firstSpeakerDone.current=true;
         const userMsg = pushChatMessage({ sessionId: session.id, role: "user", content: kind === "action" ? `【动作】${text.trim()}` : text.trim(), mediaData: { callLineKind: kind } });
         messagesRef.current = [...messagesRef.current, userMsg];
         setSubtitles(prev => [...prev, { id: userMsg.id, role: "user", text: text.trim(), kind }]);
@@ -463,6 +465,8 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
         setCallState("IDLE");
     }, [session.id]);
 
+    const firstSpeakerDone=useRef(false);
+    const firstSpeakerChoice=useRef<boolean|null>(null);
     const runConversationTurn = useCallback(async (reroll = false) => {
         setCallState("PROCESSING");
         setInterimText("");
@@ -475,7 +479,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
             const frame = captureCameraFrame();
             const aiResponseText = flattenCompletionResult(await generateChatCompletion(session, history, {
                 appTags: ["chat", "video"],
-                callFormatInstruction: `${VIDEO_CALL_FORMAT}\n${SINGLE_CALL_ACTIONS}`,
+                callFormatInstruction: `${VIDEO_CALL_FORMAT}\n${SINGLE_CALL_ACTIONS}\n通话已接通；若本次通话还没有对话，请按既有关系自然先开口，不假装用户刚说过话。`,
                 attachedImages: frame ? [frame] : undefined,
             }));
             if (stateRef.current === "ENDED") return;
@@ -504,6 +508,13 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
             }
         }
     }, [session, processAIResponse, captureCameraFrame, callIdentity.name, callDuration, onEnd]);
+
+    useEffect(()=>{
+        if(callState!=="IDLE" || firstSpeakerDone.current || minimized)return;
+        if(firstSpeakerChoice.current===null)firstSpeakerChoice.current=characterSpeaksFirst(session.contactId);
+        const timer=setTimeout(()=>{if(stateRef.current!=="IDLE")return;firstSpeakerDone.current=true;if(firstSpeakerChoice.current)void runConversationTurn();},0);
+        return ()=>clearTimeout(timer);
+    },[callState,minimized,session.contactId,runConversationTurn]);
 
     const playSubtitle = useCallback(async (subtitle: SubtitleEntry) => {
         if (playingSubtitleId === subtitle.id) { audioTokenRef.current++; audioAbortRef.current?.(); setPlayingSubtitleId(null); if (stateRef.current !== "ENDED") { stateRef.current="IDLE";setCallState("IDLE"); } return; }

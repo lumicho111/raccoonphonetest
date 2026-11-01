@@ -87,7 +87,7 @@
 .aiReply { display:flex; margin:16px auto; gap:7px; align-items:center; border:1px solid #bfddf1; border-radius:21px; padding:10px 15px; background:#f3faff; color:var(--tw-blue)!important; }
 .bottomComposer,.dmBottom { flex:none; display:flex; align-items:center; gap:9px; padding:10px 13px calc(10px + env(safe-area-inset-bottom, 0px)); border-top:1px solid #e9edf0; background:#fff; }
 .bottomComposer { flex-wrap:wrap; }
-.nestedComment { margin-left:24px; border-left:2px solid #e5eaed; }
+
 .bottomComposer>button.replyingTo { width:100%; border-radius:0; padding:3px 7px; background:transparent; color:#197db5!important; text-align:left; font-size:.86em!important; }
 .bottomComposer input,.dmBottom input { flex:1; min-width:0; border:1px solid #e2e8ed; background:#f6f8fa; border-radius:20px; outline:0; padding:10px 13px; font:inherit; }
 .bottomComposer>button,.dmBottom button { border:0; border-radius:50%; padding:8px; background:var(--tw-blue); color:#fff!important; }
@@ -350,8 +350,8 @@
 .drawerAvatars .drawerAltAvatar .avatar { width:100%; height:100%; }
 .drawerIdentity { padding-top:0; }
 .commentPost::before { display:none; }
-.nestedComment { position:relative; margin-left:24px; border-left:2px solid #d7e0e5; }
-.nestedComment::before { content:""; position:absolute; left:0; top:31px; width:11px; border-top:2px solid #d7e0e5; }
+
+
 .repostMenuButton { margin-left:auto; border:0; padding:2px; background:none; color:#677985; }
 .searchBox button[type="submit"] { flex:none; border:0; background:none; color:var(--tw-blue); font-weight:700; }
 .resultHeading { display:flex; flex-direction:column; gap:11px; padding:12px 17px; border-bottom:1px solid #e8ecf0; }
@@ -457,3 +457,19 @@
 .imagePromptDialog .imagePromptBody img { max-height:33vh; }
 
 .profileTopSpacer{flex:1}.profileJoined{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px}.profileJoined>span{display:inline-flex;align-items:center;gap:4px;line-height:1.5;margin:0}.profileJoined svg{flex:none}
+
+/* Replies share the avatar axis. Segments connect only members of the same reply tree. */
+.replyChainItem{position:relative;isolation:isolate}
+.replyChainItem .post{position:relative;border-bottom:0;background:transparent;padding-bottom:22px}
+.replyChainItem[data-linked-after="false"]{border-bottom:1px solid #e9edf0}
+.replyChainItem[data-linked-after="true"]::after{content:"";position:absolute;left:32px;top:52px;bottom:-14px;width:2px;background:#d7e0e5;z-index:-1;pointer-events:none}
+.replyChainItem .avatarButton{position:relative;z-index:1;background:#fff;border-radius:50%}
+.bottomComposer{position:relative;border:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));gap:7px;background:#fff}
+.replyCapsule{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-width:0;min-height:54px;padding:7px 11px;border:1px solid #d6dde1;border-radius:30px;background:#f2f4f5;box-shadow:0 3px 12px #00000008}
+.replyCapsule input:not([type="file"]){flex:1;min-width:0;border:0;padding:7px 0;background:transparent;border-radius:0;font:inherit}
+.replyCapsule input[type="file"]{display:none}
+.replyCapsule>button{display:grid;place-items:center;flex:none;padding:4px;border:0;background:transparent;color:#536873;border-radius:50%}
+.replyCapsule .replyAvatar{padding:0}.replyAvatar .avatar{width:34px;height:34px}
+.replyAccountPicker{position:absolute;bottom:calc(100% + 10px);left:0;width:min(290px,85vw);padding:7px;border-radius:17px;background:#fff;border:1px solid #e4e8eb;box-shadow:0 8px 30px #0002;z-index:8}
+.replyAccountPicker button{width:100%;display:flex;align-items:center;gap:9px;text-align:left;padding:10px;border:0;border-radius:11px;background:transparent}
+.replyAttachments{display:flex;gap:7px;width:100%}.replyAttachments button{position:relative;width:54px;height:54px;padding:0;overflow:hidden;border-radius:10px}.replyAttachments img{width:100%;height:100%;object-fit:cover}.replyAttachments span{position:absolute;right:2px;top:0;background:#fff;color:#333}

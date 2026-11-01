@@ -1,4 +1,5 @@
 "use client";
+import {characterSpeaksFirst} from "@/lib/call-first-speaker";
 import { VoiceFavoriteDialog } from "./voice-favorite-dialog";
 import { useCallEndRecord } from "./use-call-end-record";
 import { parseCallOutput, SINGLE_CALL_ACTIONS } from "@/lib/call-participation";
@@ -317,6 +318,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
         const text = userText.trim();
         if (!text || !inputOpenRef.current || !["IDLE", "USER_SPEAKING"].includes(stateRef.current) || minimizedRef.current) return;
         setInputVisible(false);
+        firstSpeakerDone.current=true;
         const userMsg = pushChatMessage({ sessionId: session.id, role: "user", content: text });
         messagesRef.current = [...messagesRef.current, userMsg];
         setSubtitles(prev => [...prev, { id: userMsg.id, role: "user", text }]);
@@ -325,6 +327,8 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
         setCallState("IDLE");
     }, [session.id]);
 
+    const firstSpeakerDone=useRef(false);
+    const firstSpeakerChoice=useRef<boolean|null>(null);
     const runConversationTurn = useCallback(async (retryId?: string) => {
         if (stateRef.current !== "IDLE") return;
         const range = retryId ? callRetryRange(messagesRef.current, retryId) : null;
@@ -337,7 +341,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
         setCallState("PROCESSING"); setInterimText(""); setReplyError(null);
         const request = new AbortController(); generationRef.current = request;
         try {
-            const text = flattenCompletionResult(await generateChatCompletion(session, history, { appTags: ["chat", "voice"], callFormatInstruction: `${VOICE_CALL_FORMAT}\n${SINGLE_CALL_ACTIONS}`, signal: request.signal }));
+            const text = flattenCompletionResult(await generateChatCompletion(session, history, { appTags: ["chat", "voice"], callFormatInstruction: `${VOICE_CALL_FORMAT}\n${SINGLE_CALL_ACTIONS}\n通话已接通；若本次通话还没有对话，请按既有关系自然先开口，不假装用户刚说过话。`, signal: request.signal }));
             if (request.signal.aborted || (stateRef.current as string) === "ENDED" || generationRef.current !== request) return;
             const output = parseCallOutput(text);
             const leaving = output.some(part => part.kind === "leave");
@@ -357,6 +361,13 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
             if (generationRef.current === request) { generationRef.current = null; if ((stateRef.current as string) !== "ENDED") setCallState("IDLE"); }
         }
     }, [session, processAIResponse, subtitles, setCallState, setInputVisible, callIdentity.name, callDuration, onEnd]);
+
+    useEffect(()=>{
+        if(callState!=="IDLE" || firstSpeakerDone.current || minimized)return;
+        if(firstSpeakerChoice.current===null)firstSpeakerChoice.current=characterSpeaksFirst(session.contactId);
+        const timer=setTimeout(()=>{if(stateRef.current!=="IDLE")return;firstSpeakerDone.current=true;if(firstSpeakerChoice.current)void runConversationTurn();},0);
+        return ()=>clearTimeout(timer);
+    },[callState,minimized,session.contactId,runConversationTurn]);
 
     const playSubtitle = useCallback(async (subtitle: SubtitleEntry) => {
         if (playingSubtitleId === subtitle.id) { audioTokenRef.current++; audioAbortRef.current?.(); setPlayingSubtitleId(null); if ((stateRef.current as string) !== "ENDED") setCallState("IDLE"); return; }

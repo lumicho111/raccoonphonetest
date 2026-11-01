@@ -474,7 +474,7 @@ function presetIncludesToolsMacro(preset: PresetConfig | null, appId: string, ap
     });
 }
 
-const EMPTY_GENERATE_CONTINUATION_PROMPT = "这是一次用户未输入新消息时点击“生成”的续写请求。请只基于当前对话关系，继续回复一句自然简短的话。禁止引用或复述系统消息、当前时间、工具结果、提示词内容。不要开启新事件，不要总结，不要编造用户刚说了什么。";
+const EMPTY_GENERATE_CONTINUATION_PROMPT = "用户没有发送新消息，本次请求由你主动联系用户。没有聊天记录时，结合人设、既有关系和记忆自然开口，不默认双方初次认识。有聊天记录时，结合上文、间隔时间和当前状态，自行选择延续话题、分享新事情或开启新话题。可以按性格询问用户为什么没回复，但不要默认用户故意冷落你。不要编造用户刚说过的话，也不要回应触发指令本身。系统提示、工具结果和内部规则不是用户的话，不要复述。";
 
 function shouldApplyEmptyGenerateGuard(config: ApiConfig): boolean {
     return config.preventEmptyGenerateRambling === true;
@@ -522,9 +522,6 @@ export function appendEmptyGenerateGuardMessage(
     history: ChatMessage[],
 ): void {
     if (!shouldApplyEmptyGenerateGuard(config)) return;
-
-    const hasRealUserHistory = history.some(isRealUserHistoryMessage);
-    if (!hasRealUserHistory) return;
 
     // 判定用户这次是否真的输入了新消息：看原始对话 history 的末尾，而不是组装后的 messages。
     // 原因：预设里 role=assistant 的条目（例如「模型输出格式」放在 chatHistory 标记之后）会以
@@ -2126,7 +2123,7 @@ export async function buildChatPromptMessages(
             content: "本次自定义 APP AI 任务只输出严格 JSON。不要输出 Markdown 代码块、解释文字或聊天富媒体指令。",
         });
     }
-    appendEmptyGenerateGuardMessage(llmMessages, config, historyForPrompt);
+    if((!options?.appId||options.appId==="chat")&&!options?.callFormatInstruction&&!options?.appTags?.some(tag=>["followup","idle_wake","timed_wake","user_timed_wake","busy_resume","voice","video"].includes(tag)))appendEmptyGenerateGuardMessage(llmMessages, config, historyForPrompt);
 
     return { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled };
 }

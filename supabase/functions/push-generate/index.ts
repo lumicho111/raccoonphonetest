@@ -847,10 +847,11 @@ Deno.serve(async (req: Request) => {
 
     // 冷场重连的下一发：连发上限内自动排队（用户回来后客户端会撤销并按新周期重挂）
     const idleRepeat = payload.merge?.idleRepeat as
-      | { intervalMs?: number; remaining?: number; quietWin?: { startMin: number; endMin: number; tzOffsetMin: number } | null }
+      | { intervalMs?: number; maxIntervalMs?: number; growthCount?: number; remaining?: number; quietWin?: { startMin: number; endMin: number; tzOffsetMin: number } | null }
       | undefined;
     if (idleRepeat && Number(idleRepeat.remaining) > 0 && Number(idleRepeat.intervalMs) > 0) {
-      const intervalMs = Number(idleRepeat.intervalMs);
+      const minMs=Number(idleRepeat.intervalMs),maxMs=Math.max(minMs,Number(idleRepeat.maxIntervalMs)||minMs);
+      const intervalMs=(minMs+Math.random()*(maxMs-minMs))*(1+(Number(idleRepeat.growthCount)||0)*.5);
       let nextFire = Date.now() + intervalMs;
       // 落在安静时段内则顺延到时段结束
       const quiet = idleRepeat.quietWin;
@@ -861,7 +862,7 @@ Deno.serve(async (req: Request) => {
           : localMinutes >= quiet.startMin || localMinutes < quiet.endMin;
         if (inQuiet) {
           const untilEnd = (quiet.endMin - localMinutes + 1440) % 1440;
-          nextFire += untilEnd * 60000;
+          nextFire += untilEnd * 60000 + (1+Math.floor(Math.random()*20))*60000;
         }
       }
       const nextMerge = {
@@ -869,7 +870,7 @@ Deno.serve(async (req: Request) => {
         armAt: new Date(nextFire).toISOString(),
         idleReconnect: { ...(payload.merge?.idleReconnect as Record<string, unknown> ?? {}), firedAt: nextFire },
         idleRepeat: Number(idleRepeat.remaining) - 1 > 0
-          ? { ...idleRepeat, remaining: Number(idleRepeat.remaining) - 1 }
+          ? { ...idleRepeat, growthCount:(Number(idleRepeat.growthCount)||0)+1, remaining: Number(idleRepeat.remaining) - 1 }
           : undefined,
       };
       const nextPayload = { ...payload, merge: nextMerge };

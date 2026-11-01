@@ -1,4 +1,6 @@
 "use client";
+import {callSafeWindowStart} from "@/lib/call-record-window";
+import {finishOpenCall} from "./use-call-end-record";
 import { loadManualCallGroups, saveManualCallGroup, removeManualCallGroup } from "@/lib/manual-call-groups";
 import { ManualCallDialog } from "./manual-call-dialog";
 import { VoiceFavoriteDialog, type FavoriteVoiceDraft } from "./voice-favorite-dialog";
@@ -1562,9 +1564,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         const firstVisibleIndex = firstVisibleId
             ? allMsgs.findIndex(msg => msg.id === firstVisibleId)
             : -1;
-        const startIndex = firstVisibleIndex >= 0
+        const startIndex = callSafeWindowStart(allMsgs,firstVisibleIndex >= 0
             ? firstVisibleIndex
-            : Math.max(0, allMsgs.length - currentVisibleCount);
+            : Math.max(0, allMsgs.length - currentVisibleCount));
 
         return {
             nextMessages: allMsgs.slice(startIndex),
@@ -1724,8 +1726,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 syncMessagesFromStorage();
             }
         };
+        const onCallBoundary=(event:Event)=>{const m=(event as CustomEvent).detail?.message as ChatMessage|undefined;if(m?.sessionId===session.id&&(isCallSysMsg(m)||m.mediaData?.callEvent))syncMessagesFromStorage();};
+        window.addEventListener("chat-message-pushed",onCallBoundary);
         window.addEventListener("chat-messages-updated", onExternalMessageUpdate);
-        return () => window.removeEventListener("chat-messages-updated", onExternalMessageUpdate);
+        return () => {window.removeEventListener("chat-messages-updated", onExternalMessageUpdate);window.removeEventListener("chat-message-pushed",onCallBoundary);};
     }, [session.id, syncMessagesFromStorage]);
 
     // --- Background generation: reload messages when a bg API call completes ---
@@ -1995,14 +1999,19 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
         // Prewarm sticker cache for all relevant characters, then load messages
         const allMsgs = loadChatMessages(session.id);
-        const msgs = allMsgs.length > INITIAL_LOAD ? allMsgs.slice(-INITIAL_LOAD) : allMsgs;
-        const nextHasMore = allMsgs.length > INITIAL_LOAD;
+        const initialStart=callSafeWindowStart(allMsgs,Math.max(0,allMsgs.length-INITIAL_LOAD));
+        const msgs=allMsgs.slice(initialStart);
+        const nextHasMore=initialStart>0;
         hasMoreRef.current = nextHasMore;
         setHasMore(nextHasMore);
         const charIds = session.isGroup && session.participantIds
             ? session.participantIds
             : [session.contactId];
+        let initialCancelled=false;
         Promise.all(charIds.map(id => prewarmStickerCache(id))).then(() => {
+            if(initialCancelled)return;
+            const fresh=loadChatMessages(session.id),freshStart=callSafeWindowStart(fresh,Math.max(0,fresh.length-INITIAL_LOAD)),msgs=fresh.slice(freshStart);
+            hasMoreRef.current=freshStart>0;setHasMore(freshStart>0);
             setStickerReady(true);
             needsInitialScrollRef.current = true;
             prevMsgCountRef.current = 0;
@@ -2056,6 +2065,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             kvRemove(pendingKey);
             void runManagedGeneration({ history: msgs, onDecline: triggerReply });
         }
+        return ()=>{initialCancelled=true;};
     }, [session.id]);
 
     // The small “1” is session display state. A side's unanswered groups stay
@@ -3988,7 +3998,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     setUnreadKktBatches(previous => new Set([...previous].filter(key => !key.startsWith("user:"))));
                 }
                 setPendingGenerate(false);
-                showChatToast("对方正在忙碌中");
+                showChatToast(activeBusy.sleeping&&activeBusy.level>=3?"对方正在休息，醒来后再回复":"对方正在忙碌中");
                 return true;
             }
 
@@ -5726,8 +5736,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             }
             if (uiRole(msg) !== "system") { i++; continue; }
             // Detect call START precisely: "发起了语音通话" / "发起了视频通话"
-            const isVoiceStart = msg.content.includes("发起了语音通话");
-            const isVideoStart = msg.content.includes("发起了视频通话");
+            const isVoiceStart = /发起了群?语音通话/.test(msg.content);
+            const isVideoStart = /发起了群?视频通话/.test(msg.content);
             if (isVoiceStart || isVideoStart) {
                 const callType = isVideoStart ? "video" : "voice";
                 const kw = isVideoStart ? "视频通话" : "语音通话";
@@ -5737,7 +5747,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     if (uiRole(projectedMessages[j]) !== "system") continue;
                     const c = projectedMessages[j].content;
                     // Another call start → separate call, stop
-                    if (c.includes("发起了语音通话") || c.includes("发起了视频通话")) break;
+                    if (/发起了群?(?:语音|视频)通话/.test(c)) break;
                     // Call end: 挂断/拒绝/取消（兼容"群语音通话"/"群视频通话"）
                     if (c.includes(`${kw}已结束`) || c.includes(`挂断了${kw}`) || c.includes(`挂断了群${kw}`) || c.includes(`拒绝了${kw}`) || c.includes(`拒绝了群${kw}`) || c.includes(`取消了${kw}`) || c.includes(`取消了群${kw}`)) {
                         endIdx = j;
@@ -5939,9 +5949,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         const currentStartIndex = currentFirstVisibleId
             ? allMsgs.findIndex(msg => msg.id === currentFirstVisibleId)
             : -1;
-        const startIndex = currentStartIndex >= 0
+        const startIndex = callSafeWindowStart(allMsgs,currentStartIndex >= 0
             ? Math.min(computedStartIndex, currentStartIndex)
-            : computedStartIndex;
+            : computedStartIndex);
         const nextMessages = allMsgs.slice(startIndex);
         const targetMsg = allMsgs[targetIndex];
         const batchKey = targetMsg?.role === "assistant" && targetMsg.responseBatchId && targetMsg.rawResponseText?.trim()
@@ -5975,12 +5985,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     // Shared handler: reload messages + re-trigger scroll-to-bottom after call ends
     const returnFromCall = (hide: () => void) => {
+        if(!session.isGroup)finishOpenCall(session.id,showVideoCall?"video":"voice","");
         hide();
         setCallMinimized(false);
         needsInitialScrollRef.current = true;
         prevMsgCountRef.current = 0;
         syncMessagesFromStorage();
-        triggerReply();
+        if(session.isGroup)triggerReply();
     };
 
     const editingMessage = editingMessageId ? messages.find(m => m.id === editingMessageId) : null;
@@ -7426,7 +7437,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
             {/* Chat toast notification (overlay, does not affect layout) */}
             {chatToast && (
-                <div className={`chat-toast-overlay${chatToast === "对方正在忙碌中" ? " chat-busy-toast-overlay" : ""}`}>
+                <div className={`chat-toast-overlay${(chatToast === "对方正在忙碌中" || chatToast === "对方正在休息，醒来后再回复") ? " chat-busy-toast-overlay" : ""}`}>
                     <div className="wp-toast chat-toast-floating">
                         {chatToast === "加载音乐中..." ? (
                             <span className="ui-loading-toast-content">

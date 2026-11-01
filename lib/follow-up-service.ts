@@ -1,3 +1,5 @@
+import {getCharacterSleep} from "./character-routine";
+import {ensureIdleDue,deferIdleCheck} from "./idle-reconnect-storage";
 /**
  * Background follow-up service.
  * Runs independently of any React component — fires follow-ups
@@ -92,6 +94,8 @@ function resolveTimedWakeElapsedMinutes(sched: TimedWakeSchedule, history: ChatM
 // ── Module state ───────────────────────────────────────────
 let stopInterval: (() => void) | null = null;
 let periodCareUpdateHandler: (() => void) | null = null;
+const activeCallSessions=new Set<string>();
+const callStateHandler=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.sessionId){if(d.active)activeCallSessions.add(d.sessionId);else activeCallSessions.delete(d.sessionId);}};
 const firingSet = new Set<string>(); // sessions currently mid-API-call
 const cancelledWhileFiring = new Set<string>(); // cancelled during in-flight API call
 const timedWakeFiringSet = new Set<string>();
@@ -140,6 +144,7 @@ export function startFollowUpService() {
             lastPeriodCarePollAt = 0;
             pollMenstrualPeriodCare(Date.now());
         };
+        window.addEventListener("chat-call-state",callStateHandler);
         window.addEventListener("menstrual-period-care-updated", periodCareUpdateHandler);
         scheduledOutboxVisibilityHandler = () => {
             if (!document.hidden) extendScheduledOutboxGrace();
@@ -153,6 +158,8 @@ export function startFollowUpService() {
 }
 
 export function stopFollowUpService() {
+    if(typeof window!=="undefined")window.removeEventListener("chat-call-state",callStateHandler);
+    activeCallSessions.clear();
     if (stopInterval) { stopInterval(); stopInterval = null; }
     if (typeof window !== "undefined" && periodCareUpdateHandler) {
         window.removeEventListener("menstrual-period-care-updated", periodCareUpdateHandler);
@@ -175,38 +182,15 @@ export function stopFollowUpService() {
 }
 
 /** Schedule a follow-up for a session (called by ChatRoom after AI replies).
- *  Purely anxiety-driven: no anxiety field or below threshold → no follow-up. */
+ *  Random opportunity; independent of optional status generation. */
 export function scheduleFollowUp(sessionId: string, count: number, stateValues?: StateValue[]) {
     const config = loadFollowUpConfig();
 
-    if (!stateValues || stateValues.length === 0) {
-        console.log(`[FollowUp] No state values, not scheduling.`);
-        clearFollowUpSchedule(sessionId);
-        cancelFollowUpBailout(sessionId);
-        return;
-    }
-
-    const anxietyEntry = stateValues.find(sv => sv.name === config.anxietyFieldName);
-    if (!anxietyEntry) {
-        console.log(`[FollowUp] No "${config.anxietyFieldName}" field found, not scheduling.`);
-        clearFollowUpSchedule(sessionId);
-        cancelFollowUpBailout(sessionId);
-        return;
-    }
-
-    if (anxietyEntry.value < config.anxietyThreshold) {
-        console.log(`[FollowUp] Anxiety ${anxietyEntry.value} < threshold ${config.anxietyThreshold}, not scheduling.`);
-        clearFollowUpSchedule(sessionId);
-        cancelFollowUpBailout(sessionId);
-        return;
-    }
-
-    // Linear interpolation: threshold → maxDelay, 100 → minDelay
-    const range = 100 - config.anxietyThreshold;
-    const t = range > 0 ? (anxietyEntry.value - config.anxietyThreshold) / range : 1;
-    const delaySec = Math.round(config.anxietyMaxDelay + t * (config.anxietyMinDelay - config.anxietyMaxDelay));
-    const fireAt = Date.now() + delaySec * 1000;
-    console.log(`[FollowUp] Anxiety-driven: value=${anxietyEntry.value}, delay=${delaySec}s, session=${sessionId}, count=${count}`);
+    const session=loadChatSessions().find(s=>s.id===sessionId);
+    if(!session || session.isGroup || config.enabled===false || count>=(config.maxConsecutive??3)) {clearFollowUpSchedule(sessionId);cancelFollowUpBailout(sessionId);return;}
+    const lo=Math.min(config.anxietyMinDelay,config.anxietyMaxDelay),hi=Math.max(config.anxietyMinDelay,config.anxietyMaxDelay);
+    const delaySec=Math.round((lo+Math.random()*(hi-lo))*(1+count*.5));
+    const fireAt=Date.now()+delaySec*1000;
     saveFollowUpSchedule({ sessionId, fireAt, count, delaySec });
     // 离线推送兜底：把本轮追问的完整请求快照预约到服务端，App 被杀时由服务端接管
     void armFollowUpBailout(sessionId, count, delaySec, fireAt);
@@ -269,10 +253,14 @@ async function requestBusyHoldReply(sessionId: string): Promise<void> {
         const latestMessages = loadChatMessages(sessionId);
         backgroundGeneratingSessions.add(sessionId);
         window.dispatchEvent(new CustomEvent("followup-started", { detail: { sessionId } }));
-        const rounds = await generateBackgroundCompletionRounds(session, latestMessages, {
-            appTags: session.isGroup ? undefined : ["chat", "text"],
+        const wake=getCharacterSleep(session.contactId);
+        const history=wake?.briefAwake?[...latestMessages,{id:`night-wake-${Date.now()}`,sessionId:session.id,role:"system" as const,status:"sent" as const,createdAt:new Date().toISOString(),content:"你在睡眠中短暂醒来，只快速看一下待回复消息。按性格简短回应一两句，随后继续休息。"}]:latestMessages;
+        const rounds = await generateBackgroundCompletionRounds(session, history, {
+            appTags: session.isGroup ? undefined : ["chat", "text", "busy_resume"],
         });
-        if (busyHoldFiringSet.has(sessionId)) {
+        const newestUser=(items:ChatMessage[])=>[...items].reverse().find(m=>m.role==="user")?.id;
+        if(newestUser(loadChatMessages(sessionId))!==newestUser(latestMessages)){const current=loadBusyHoldPending(sessionId);if(current)saveBusyHoldPending({...current,dueAt:Date.now()+15000});return;}
+        if (busyHoldFiringSet.has(sessionId) && !isBackgroundGenerationCancelled(sessionId)) {
             const { hasVisible, stateValues } = await saveBackgroundCompletionRounds(rounds, sessionId, 0, undefined, latestMessages);
             if (hasVisible) scheduleFollowUp(sessionId, 0, stateValues);
         }
@@ -287,6 +275,7 @@ async function requestBusyHoldReply(sessionId: string): Promise<void> {
     } finally {
         backgroundGeneratingSessions.delete(sessionId);
         busyHoldFiringSet.delete(sessionId);
+        cancelledBackgroundSessions.delete(sessionId);
     }
 }
 
@@ -297,6 +286,7 @@ export function cancelFollowUp(sessionId: string) {
     // 用户发了消息：冷场重连计数清零，按新周期重挂服务端预约
     const idleRule = resetIdleReconnectForSession(sessionId);
     if (idleRule) void armIdleReconnectBailout({ ...idleRule, consecutiveCount: 0 });
+    if(backgroundGeneratingSessions.has(sessionId))cancelledBackgroundSessions.add(sessionId);
     // If an API call is already in-flight, mark it for cancellation
     if (firingSet.has(sessionId)) {
         cancelledWhileFiring.add(sessionId);
@@ -404,14 +394,15 @@ function pollSchedules() {
                 if (remainSec % 10 === 0) console.log(`[FollowUp] Waiting: session=${sched.sessionId}, ${remainSec}s remaining`);
                 continue;
             }
+            if (activeCallSessions.has(sched.sessionId))continue;
             if (firingSet.has(sched.sessionId)) continue; // already in-flight
             console.log(`[FollowUp] Firing now for session=${sched.sessionId}, count=${sched.count}`);
             fireFollowUp(sched); // intentionally not awaited — fire & forget
         }
         pollTimedWakeSchedules(now);
         pollMenstrualPeriodCare(now);
-        pollIdleReconnect(now);
         pollBusyHoldReplies(now);
+        pollIdleReconnect(now);
     } catch (e) {
         console.error("[FollowUp] pollSchedules error:", e);
     }
@@ -419,13 +410,19 @@ function pollSchedules() {
 
 function pollBusyHoldReplies(now: number): void {
     for (const session of loadChatSessions()) {
-        if (session.isGroup) continue;
+        if (session.isGroup || activeCallSessions.has(session.id)) continue;
         const pending = loadBusyHoldPending(session.id);
         if (!pending) continue;
         if (!session.busyHoldEnabled) {
             if (!pending.queued) { clearBusyHoldPending(session.id); continue; }
         if (busyHoldFiringSet.has(session.id) || firingSet.has(session.id) || backgroundReplyFiringSet.has(session.id)) continue;
             void requestBusyHoldReply(session.id);
+            continue;
+        }
+        const sleep=session.busyHoldEnabled?getCharacterSleep(session.contactId,new Date(now)):null;
+        if(sleep?.briefAwake&&pending.queued&&pending.wakeCheckedId!==sleep.cycleId){
+            saveBusyHoldPending({...pending,wakeCheckedId:sleep.cycleId});
+            if(Math.random()<.4&&!busyHoldFiringSet.has(session.id)&&!backgroundReplyFiringSet.has(session.id)&&!firingSet.has(session.id)&&getActiveCalendarBusy(session.contactId)?.item.title==="夜间短暂醒来"){void requestBusyHoldReply(session.id);}
             continue;
         }
         if (pending.dueAt > now) continue;
@@ -505,11 +502,8 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
         if (!session) return;
 
         await cancelFollowUpBailout(session.id,sched.count+1);
-        const before=latestContactAt(session.contactId);
-        const plan=await planContact(session.contactId,true,"这是已有聊天的可选追问机会，未回复不等于冷落。可等待。");
-        deferContactCheck(session.contactId,plan.nextCheckMinutes);
-        if(latestContactAt(session.contactId)>before)return;
-        if(plan.channel!=="chat"){void cancelFollowUpBailout(session.id,sched.count+1);await deliverPlannedContact(session.contactId,plan);return;}
+        const busy=getActiveCalendarBusy(session.contactId);
+        if(isWithinPushQuietHours(Date.now()) || busy&&busy.level>=3 || loadBusyHoldPending(session.id)?.queued)return;
         const latestMessages = loadChatMessages(session.id);
 
         const count = sched.count + 1;
@@ -590,7 +584,7 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
         }
 
         // Notify any mounted UI
-        noteContact(session.contactId,"chat",plan.reason);
+        noteContact(session.contactId,"chat","接续当前聊天");
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: session.id } }));
 
     } catch (error: any) {
@@ -621,6 +615,7 @@ function pollIdleReconnect(now: number) {
     lastIdleReconnectPollAt = now;
 
     for (const rule of loadIdleReconnectRules()) {
+        if (activeCallSessions.has(rule.sessionId))continue;
         if (idleReconnectFiringSet.has(rule.id)) continue;
         if ((loadContactRuntime().checked[rule.characterId]||0)>now || now-latestContactAt(rule.characterId)<5*60000) continue;
         if (firingSet.has(rule.sessionId)) continue;
@@ -635,15 +630,13 @@ function pollIdleReconnect(now: number) {
         const effectiveConsecutive = rule.lastFiredAt && rule.lastFiredAt > lastUserAt ? rule.consecutiveCount : 0;
         if (effectiveConsecutive >= IDLE_RECONNECT_MAX_CONSECUTIVE) continue;
 
-        const intervalMs = Math.max(1, rule.intervalMinutes) * 60_000;
-        const nextDueAt = Math.max(
-            lastUserAt + intervalMs,
-            rule.lastFiredAt ? rule.lastFiredAt + intervalMs : 0,
-            rule.suppressedUntil ?? 0,
-        );
+        const nextDueAt=ensureIdleDue(rule,lastUserAt);
         if (now < nextDueAt) continue;
         if (now < scheduledOutboxGraceUntil) continue;
-        if (isWithinPushQuietHours(now)) continue; // 安静时段本地也不打扰，出时段后自然触发
+        if (isWithinPushQuietHours(now)) {deferIdleCheck(rule);continue;}
+        const active=getActiveCalendarBusy(rule.characterId);
+        if(loadBusyHoldPending(rule.sessionId)?.queued || backgroundReplyFiringSet.has(rule.sessionId) || busyHoldFiringSet.has(rule.sessionId))continue;
+        if(active&&active.level>=3){deferIdleCheck(rule,active.endsAt);continue;}
 
         console.log(`[IdleReconnect] Firing for session=${rule.sessionId}, idle=${Math.round((now - lastUserAt) / 60000)}min`);
         void fireIdleReconnect(rule, lastUserAt);
@@ -660,11 +653,7 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
         // 本地接手当前这次生成，先撤销服务端同规则排队任务；生成成功后才记连发次数。
         void cancelBailoutPrefix(`idle:${rule.id}:`);
 
-        const before=latestContactAt(rule.characterId);
-        const plan=await planContact(rule.characterId,true,rule.intent);
-        deferContactCheck(rule.characterId,plan.nextCheckMinutes);
-        if(latestContactAt(rule.characterId)>before)return;
-        if(plan.channel!=="chat"){if(await deliverPlannedContact(rule.characterId,plan))markIdleReconnectFired(rule.id,Date.now());return;}
+        deferIdleCheck(rule);
         const latestMessages = loadChatMessages(session.id);
         const elapsedMinutes = Math.max(1, Math.round((Date.now() - lastUserAt) / 60000));
 
@@ -673,7 +662,7 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
 
         const rounds = await generateBackgroundCompletionRounds(
             session,
-            latestMessages,
+            [...latestMessages,{id:`idle-opportunity-${Date.now()}`,sessionId:session.id,role:"system",status:"sent",createdAt:new Date().toISOString(),content:"这是一次可选的主动联系机会。结合当前生活、关系、上文和间隔时间，自行选择分享新事情、开启话题、接着聊或保持沉默。未回复不等于故意冷落。没有自然内容可以不输出聊天消息；不必生成状态栏。"}],
             {
                 appTags: ["chat", "text", "idle_wake"],
                 timedWakeElapsedMinutes: elapsedMinutes,
@@ -696,7 +685,7 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
             latestMessages,
         );
         markIdleReconnectFired(rule.id, Date.now());
-        if(hasVisible)noteContact(rule.characterId,"chat",plan.reason);
+        if(hasVisible)noteContact(rule.characterId,"chat","随机主动联系");
         if (hasVisible) scheduleFollowUp(session.id, 0, stateValues);
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: session.id } }));
 

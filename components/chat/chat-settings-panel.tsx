@@ -1414,7 +1414,7 @@ export function ChatSettingsPanel({
                             <ChatInfoIcon icon={Sparkles} color={BINDING_ACCENTS.api} />
                             <div className="menu-label-group">
                                 <span className="menu-label">忙时挂起</span>
-                                <span className="menu-desc">开启后按当前日程的忙碌程度决定是否延迟回复；关闭时忙碌状态不影响回复。</span>
+                                <span className="menu-desc">开启后参考日历与角色作息决定是否延迟回复；关闭时不限制召唤回复。</span>
                             </div>
                             <div className="menu-right">
                                 <Toggle checked={busyHoldEnabled} onChange={checked => {

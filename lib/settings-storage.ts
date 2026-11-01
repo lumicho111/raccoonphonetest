@@ -1177,6 +1177,8 @@ type LegacyOverride = {
 // --- Follow-up Config ──────────────────────────────────────────
 
 export type FollowUpConfig = {
+    enabled?: boolean;
+    maxConsecutive?: number;
     prompt: string;              // 追发提示词，支持 {{count}} {{delay}} 占位符
     anxietyThreshold: number;    // 触发阈值（默认 50，0-100）
     anxietyFieldName: string;    // 状态值字段名（默认 "焦虑值"）
@@ -1190,12 +1192,14 @@ export type ChatSendConfig = {
 
 const DEFAULT_FOLLOW_UP_PROMPT = `你已经在未收到{{user}}回复的情况下主动发送了{{count}}条消息。距你上次发消息已过{{delay}}秒。请根据{{char}}的性格决定是静默还是继续发消息。
 如果继续发消息，内容应该自然，遵循chat_output_format的格式，不要重复之前说过的话。
-如果决定静默，只输出状态值和内心想法，不输出任何聊天消息。`;
+如果没有自然内容就保持沉默，不输出聊天消息；状态栏按用户的开关设置。`;
 
 
 export function getDefaultFollowUpConfig(): FollowUpConfig {
     return {
         prompt: DEFAULT_FOLLOW_UP_PROMPT,
+        enabled: true,
+        maxConsecutive: 3,
         anxietyThreshold: 50,
         anxietyFieldName: "焦虑值",
         anxietyMinDelay: 15,
@@ -1217,7 +1221,9 @@ export function loadFollowUpConfig(): FollowUpConfig {
         const parsed = JSON.parse(raw) as Partial<FollowUpConfig>;
         const defaults = getDefaultFollowUpConfig();
         return {
-            prompt: typeof parsed.prompt === "string" && parsed.prompt.trim() ? parsed.prompt : defaults.prompt,
+            enabled: parsed.enabled !== false,
+            maxConsecutive: Math.max(1,Math.min(10,parsed.maxConsecutive??3)),
+            prompt: typeof parsed.prompt === "string" && parsed.prompt.trim() ? (parsed.prompt.includes("如果决定静默，只输出状态值和内心想法") ? defaults.prompt : parsed.prompt) : defaults.prompt,
             anxietyThreshold: typeof parsed.anxietyThreshold === "number" ? Math.max(0, Math.min(100, parsed.anxietyThreshold)) : defaults.anxietyThreshold,
             anxietyFieldName: typeof parsed.anxietyFieldName === "string" && parsed.anxietyFieldName.trim() ? parsed.anxietyFieldName : defaults.anxietyFieldName,
             anxietyMinDelay: typeof parsed.anxietyMinDelay === "number" ? Math.max(5, Math.min(300, parsed.anxietyMinDelay)) : defaults.anxietyMinDelay,

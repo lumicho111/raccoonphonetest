@@ -437,7 +437,7 @@ export function ApiSettings() {
                                         <div className="ui-toggle-row mt-2">
                                             <span className="flex min-w-0 flex-col">
                                                 <span className="menu-label font-medium">防胡言乱语</span>
-                                                <span className="menu-desc">防止没有用户输入时胡言乱语</span>
+                                                <span className="menu-desc">没有新消息时，结合人设与关系主动开口，可续聊或开启新话题</span>
                                             </span>
                                             <Toggle
                                                 checked={config.preventEmptyGenerateRambling === true}
