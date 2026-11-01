@@ -1,5 +1,6 @@
 "use client";
 
+import { ensureBuiltinAppleFont } from "@/lib/builtin-apple-font";
 import { useEffect, useState } from "react";
 
 import { AccountGate } from "@/components/auth/account-gate";
@@ -245,6 +246,7 @@ export function MainApp() {
 
       let nextPreparedTheme: PreparedDesktopTheme | null = null;
       try {
+        ensureBuiltinAppleFont();
         nextPreparedTheme = await prepareDesktopThemeForFirstPaint();
       } catch (error) {
         console.warn("[MainApp] desktop theme preload failed:", error);

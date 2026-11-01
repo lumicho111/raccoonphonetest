@@ -1545,7 +1545,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   // Without an uploaded font, legacy theme/custom CSS can provide the normal app font.
   // Once a font file is uploaded, that file becomes the authoritative global font.
   const resolvedFontFamily = useMemo(() => {
-    if (fontDataUrl) return themeFontFamily;
+    if (fontDataUrl || themeFontFamily.includes("PhoneAppleBuiltIn")) return themeFontFamily;
     // Check if globalCustomCSS contains --app-font-family
     const cssText = draftTheme.globalCustomCSS || "";
     const match = cssText.match(/--app-font-family\s*:\s*([^;}]+)/);
@@ -1596,7 +1596,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     return `:root {\n${vars.join("\n")}\n}`;
   }, [cssOverrides, resolvedFontFamily]);
   const uploadedFontOverrideCSS = useMemo(() => {
-    if (!fontDataUrl) return "";
+    if (!fontDataUrl && !themeFontFamily.includes("PhoneAppleBuiltIn")) return "";
     const family = `${themeFontFamily}, ${EMOJI_FONTS}`;
     return [
       `:root {`,

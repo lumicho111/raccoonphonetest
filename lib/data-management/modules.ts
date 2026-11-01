@@ -127,6 +127,8 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
           "ai_phone_sleep_cycles_v1",
           "ai_phone_call_first_speaker_v1",
           "ai_phone_lock_v1",
+          "ai_phone_builtin_apple_font_v1",
+          "ai_phone_before_builtin_apple_theme_v1",
           "ai_phone_qa_feedback_v1",
           "ai_phone_qa_github_v1",
           "ai_phone_media_maintenance_config_v1",

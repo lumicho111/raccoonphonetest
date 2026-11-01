@@ -137,7 +137,7 @@ export type ThemeProfile = {
    Default font family
    ═══════════════════════════════════════════ */
 export const DEFAULT_FONT_FAMILY =
-  '"PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "SF Pro Text", "Inter", "Segoe UI", sans-serif';
+  'PhoneAppleBuiltIn, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "SF Pro Text", "Inter", "Segoe UI", sans-serif';
 
 /* ═══════════════════════════════════════════
    Helpers

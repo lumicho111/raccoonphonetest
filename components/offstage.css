@@ -10,3 +10,4 @@
 .off-app .off-composer>button{height:38px;min-width:38px;justify-content:center;flex-shrink:0;padding:8px;margin:0}
 .off-app .off-send,.off-app .off-send:hover,.off-app .off-send:active,.off-app .off-send:focus-visible{background:var(--off-text);color:var(--off-bg)}
 .off-history-row{display:flex;align-items:center;gap:4px}.off-history-row>button:first-child{flex:1;min-width:0}.off-history-row>button:last-child{width:30px;flex-shrink:0;padding:7px}
+.off-heading strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.off-message-tools{gap:9px}.off-app article[data-role=assistant] .off-message-tools button{padding:6px}.off-app .off-composer{margin-bottom:2px}
