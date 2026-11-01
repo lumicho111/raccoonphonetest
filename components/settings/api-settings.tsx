@@ -429,6 +429,7 @@ export function ApiSettings() {
                                             </span>
                                         </div>
 
+                                        <div className="ui-toggle-row mt-2"><span className="menu-label font-medium">实况音频输入（仅兼容模型）</span><Toggle checked={config.enableAudioInput === true} onChange={v=>updateConfig(config.id,{enableAudioInput:v})}/></div>
                                         <div className="ui-toggle-row mt-2">
                                             <span className="menu-label font-medium">启用图像识别</span>
                                             <Toggle checked={config.enableImageRecognition} onChange={(v) => updateConfig(config.id, { enableImageRecognition: v })} />

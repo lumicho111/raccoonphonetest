@@ -340,6 +340,8 @@ export async function cleanChatXiaohongshuShareImage(message: ChatMessage, nowIs
 async function runChatImageMaintenance(result: MediaMaintenanceResult, nowMs: number, nowIso: string): Promise<void> {
   const messages = await chatDb.messages.toArray().catch(() => []);
   for (const message of messages) {
+    // Live photos retain their video, contact sheet and optional audio as one record.
+    if (message.mediaData?.liveVideoId) continue;
     const isRegularImage = isChatImageMessage(message);
     const isXiaohongshuShareImage = isChatXiaohongshuShareImage(message);
     if (!isRegularImage && !isXiaohongshuShareImage) continue;

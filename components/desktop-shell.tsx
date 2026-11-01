@@ -1,4 +1,6 @@
 "use client";
+import { PhoneLockScreen } from "./phone-lock-screen";
+import { OffstageApp } from "./offstage-app";
 import { isRingtoneSource } from "@/lib/ringtone-source";
 import { chatContactDisplayName, chatPokeDisplayName } from "@/lib/communication-display-name";
 
@@ -137,6 +139,7 @@ import {
   ensureNativeTheqooIcon,
   ensureNativeQuestionBoxIcon,
   ensureNativeWorldlineIcon,
+  ensureNativeOffstageIcon,
 } from "@/lib/desktop-layout-storage";
 import { WidgetRenderer } from "@/components/widgets/widget-renderer";
 import type { DIYWidgetTemplate } from "@/lib/widget-types";
@@ -1069,6 +1072,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     musicOverlayControllerRef.current = controller;
   }, []);
   useAndroidCaretKeyboardLift();
+  const [startupLocked,setStartupLocked] = useState(true);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [layout, setLayout] = useState<DesktopLayout>(DEFAULT_LAYOUT);
   // Dock is an ordered icon-id list (max DOCK_MAX), kept disjoint from `layout`.
@@ -1662,7 +1666,9 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
           const withTheqoo = ensureNativeTheqooIcon(withPhone.layout, hydratedWidgets, hydratedDock, sane.folders);
           const withQuestionBox = ensureNativeQuestionBoxIcon(withTheqoo.layout, hydratedWidgets, hydratedDock, sane.folders);
           setFolders(sane.folders);
-          const withWorldline = ensureNativeWorldlineIcon(withQuestionBox.layout, hydratedWidgets, hydratedDock, sane.folders);
+          const withWorldlineBase = ensureNativeWorldlineIcon(withQuestionBox.layout, hydratedWidgets, hydratedDock, sane.folders);
+          const withOffstage = ensureNativeOffstageIcon(withWorldlineBase.layout, hydratedWidgets, hydratedDock, sane.folders);
+          const withWorldline = {layout:withOffstage.layout,changed:withWorldlineBase.changed||withOffstage.changed};
           setLayout(withWorldline.layout);
           if (sane.changed || withSms.changed || withTwitter.changed || withPhone.changed || withTheqoo.changed || withQuestionBox.changed || withWorldline.changed) {
             writeDesktopFolders(sane.folders);
@@ -1687,7 +1693,9 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
           const withPhone = ensureNativePhoneIcon(withTwitter.layout, hydratedWidgets, hydratedDock, hydratedFolders);
           const withTheqoo = ensureNativeTheqooIcon(withPhone.layout, hydratedWidgets, hydratedDock, hydratedFolders);
           const withQuestionBox = ensureNativeQuestionBoxIcon(withTheqoo.layout, hydratedWidgets, hydratedDock, hydratedFolders);
-          const withWorldline = ensureNativeWorldlineIcon(withQuestionBox.layout, hydratedWidgets, hydratedDock, hydratedFolders);
+          const withWorldlineBase = ensureNativeWorldlineIcon(withQuestionBox.layout, hydratedWidgets, hydratedDock, hydratedFolders);
+          const withOffstage = ensureNativeOffstageIcon(withWorldlineBase.layout, hydratedWidgets, hydratedDock, hydratedFolders);
+          const withWorldline = {layout:withOffstage.layout,changed:withWorldlineBase.changed||withOffstage.changed};
           setLayout(withWorldline.layout);
           kvSet(ICON_LAYOUT_STORAGE_KEY, JSON.stringify(withWorldline.layout));
           kvRemove(ICON_LAYOUT_STORAGE_KEY_V1);
@@ -4161,6 +4169,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     if (activeApp === "calendar") {
       return <PhoneCalendarApp onClose={() => setActiveApp(null)} onNotice={setNotice} />;
     }
+    if (activeApp === "offstage") return <OffstageApp onClose={() => setActiveApp(null)} />;
     if (activeApp === "qa") {
       return (
         <ChatPluginPageBoundary page="工坊" onClose={() => setActiveApp(null)}>
@@ -4269,6 +4278,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
                 "--desktop-shadow-strength": draftTheme.cssOverrides["--desktop-global-shadow"] ?? (draftTheme.enableGlobalShadows ? "0.5" : "0")
               } as React.CSSProperties}
             >
+              {startupLocked && <div style={{position:"absolute",inset:0,zIndex:12000}}><PhoneLockScreen ready={true} onEnter={() => setStartupLocked(false)} /></div>}
               <RelationshipSuggestionPrompt />
               <div className="phone-wallpaper" style={wallpaperStyle} />
 

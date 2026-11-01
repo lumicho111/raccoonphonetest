@@ -93,6 +93,7 @@ type DataManagementProps = {
 const ALL_MODULE_IDS = DATA_MODULES.map((module) => module.id);
 
 const MODULE_ICONS: Record<DataModuleId, LucideIcon> = {
+  offstage: MessageCircle,
   voice_favorites: Archive,
   chat: MessageCircle,
   settings: Settings2,
@@ -107,6 +108,7 @@ const MODULE_ICONS: Record<DataModuleId, LucideIcon> = {
 };
 
 const MODULE_ACCENTS: Record<DataModuleId, string> = {
+  offstage: CONTENT_APP_ACCENTS.chat,
   voice_favorites: BINDING_ACCENTS.voice,
   chat: CONTENT_APP_ACCENTS.chat,
   settings: BINDING_ACCENTS.api,

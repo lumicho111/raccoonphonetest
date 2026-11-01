@@ -1,4 +1,5 @@
 "use client";
+import { LivePhotoBubble } from "./live-photo";
 import { ForwardedChatBubble } from "./forwarded-chat-record";
 import { chatContactDisplayName, chatPokeDisplayName } from "@/lib/communication-display-name";
 
@@ -101,6 +102,7 @@ function PluginKindBubble({ msg, kind }: { msg: ChatMessage; kind: string }) {
  * Falls back to ReactMarkdown for plain text messages.
  */
 export const MessageBubble = memo(function MessageBubble({ msg, photoGroup, onUpdate, charName, userName, quoteCharacterName, quoteUserName, isGroup = false, onSystemMessage, groupSize, onShowDetail, characterId, onMusicPlay, onActionSelect, onMeetingInviteAction, displayContent, defaultTranslationExpanded = false, inlineKktMeta }: MessageBubbleProps) {
+    if (msg.mediaData?.liveVideoId) return <LivePhotoBubble msg={msg} />;
     if (photoGroup && photoGroup.length > 1) return <ChatPhotoDeck messages={photoGroup} onUpdate={onUpdate} characterId={characterId} />;
     switch (msg.mediaType) {
         case "chat_record":

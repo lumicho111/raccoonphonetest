@@ -8321,3 +8321,6 @@
 .chat-multi-select-bar[data-ui="multi-select"] > .chat-multi-select-summary { grid-row:1;grid-column:2 / -1; }
 .chat-multi-select-bar[data-ui="multi-select"] > .chat-multi-select-forward-btn,
 .chat-multi-select-bar[data-ui="multi-select"] > .chat-multi-select-delete-btn { min-width:0;min-height:44px;font-size:calc(12px * var(--app-text-scale,1));padding:8px;white-space:normal; }
+
+/* Native nine-photo Moments grid; single-photo framing stays unchanged. */
+.moments-post-photo-row:has(>:nth-child(4)) .moments-post-photo-tile>button:first-child{aspect-ratio:1}.moments-post-photo-row .moments-post-photo-tile{max-width:none}

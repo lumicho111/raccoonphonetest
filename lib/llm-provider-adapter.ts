@@ -255,7 +255,8 @@ export function buildProviderRequest(
 
     // 图像识别关闭时的总闸：无论哪条路径塞入了 image_url part，一律降级为
     // "[图片]" 文本，避免不支持视觉的模型（如 DeepSeek）收到 multipart 返回 400。
-    const guardedMessages = config.enableImageRecognition === true ? messages : stripVisionParts(messages);
+    const audioGuarded = messages.map(message => {if(!Array.isArray(message.content))return message;return {...message,content:message.content.map(part=>part.type === "input_audio" && config.enableAudioInput !== true ? {type:"text" as const,text:"[未向模型提供实况声音，不要推测听到了什么]"}:part)}}) as LlmRequestMessage[];
+    const guardedMessages = config.enableImageRecognition === true ? audioGuarded : stripVisionParts(audioGuarded);
     const providerMessages = ensureProviderHasUserMessage(normalizeNativeToolMessageAdjacency(guardedMessages));
 
     if (providerKind === "anthropic") {
@@ -356,6 +357,7 @@ function debugTextFromUnknownContent(content: unknown): string {
             const item = asRecord(part);
             if (typeof item.text === "string") return item.text;
             if (item.type === "text" && typeof item.text === "string") return item.text;
+            if (item.type === "input_audio" || item.input_audio) return "[实况音频]";
             if (item.type === "image_url" || item.image_url) return "[图片]";
             if (item.type === "image" || item.inlineData || item.inline_data) return "[图片]";
             if (item.type === "tool_result") return `[tool_result]\n${String(item.content ?? "")}`;
@@ -451,6 +453,7 @@ function anthropicContentFromParts(content: string | LLMContentPart[]): unknown[
     if (typeof content === "string") return content ? [{ type: "text", text: content }] : [];
     return content.flatMap<unknown>((part) => {
         if (part.type === "text") return part.text ? [{ type: "text", text: part.text }] : [];
+        if(part.type === "input_audio")return [{type:"text",text:"[当前接口不接收实况声音，请仅分析画面]"}];
         const parsed = parseDataUrl(part.image_url.url);
         if (!parsed) return [{ type: "text", text: "[image omitted: unsupported image URL]" }];
         return [{
@@ -468,6 +471,7 @@ function geminiContentFromParts(content: string | LLMContentPart[]): unknown[] {
     if (typeof content === "string") return content ? [{ text: content }] : [];
     return content.flatMap<unknown>((part) => {
         if (part.type === "text") return part.text ? [{ text: part.text }] : [];
+        if(part.type === "input_audio")return [{inlineData:{mimeType:part.input_audio.format==="wav"?"audio/wav":"audio/mpeg",data:part.input_audio.data}}];
         const parsed = parseDataUrl(part.image_url.url);
         if (!parsed) return [{ text: "[image omitted: unsupported image URL]" }];
         return [{

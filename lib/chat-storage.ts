@@ -167,6 +167,11 @@ export type ChatMessage = {
         amount?: number;          // 红包/转账金额
         count?: number;           // 红包个数
         label?: string;           // 红包留言/转账备注/照片描述/位置名/表情名
+        liveVideoId?: string;
+        liveCover?: string;
+        liveDuration?: number;
+        liveAudio?: string;
+        liveMuted?: boolean;
         photoBatchId?: string;    // 一次选中的多张照片，独立消息共用此 id
         callId?: string; // One call instance, independent of the group roster
         callType?: "voice" | "video";

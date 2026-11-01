@@ -1409,16 +1409,10 @@ function buildMomentUiSnapshot(
     return parts.join("\n");
 }
 
-async function resolveMomentPhotoForVision(post: MomentPost): Promise<string | null> {
-    const photoUrl = post.photoUrl?.trim();
-    if (!photoUrl) return null;
-    if (!photoUrl.startsWith("asset://")) return photoUrl;
-
-    try {
-        return await getChatImageFromIndexedDB(photoUrl.slice(8));
-    } catch {
-        return null;
-    }
+async function resolveMomentPhotosForVision(post: MomentPost): Promise<string[]> {
+    const urls=(post.photoUrls?.length?post.photoUrls:post.photoUrl?[post.photoUrl]:[]).slice(0,9);
+    const results=await Promise.all(urls.map(async url=>{try{return url.startsWith("asset://")?await getChatImageFromIndexedDB(url.slice(8)):url}catch{return null}}));
+    return results.filter((url):url is string=>Boolean(url));
 }
 
 async function buildMomentSnapshotMessage(
@@ -1437,11 +1431,11 @@ async function buildMomentSnapshotMessage(
     const text = options?.prefixLines?.length
         ? [...options.prefixLines, snapshot].join("\n")
         : snapshot;
-    const imageUrl = apiConfig?.enableImageRecognition
-        ? await resolveMomentPhotoForVision(post)
-        : null;
+    const imageUrls = apiConfig?.enableImageRecognition
+        ? await resolveMomentPhotosForVision(post)
+        : [];
 
-    if (!imageUrl) {
+    if (!imageUrls.length) {
         return {
             role: "user",
             content: text,
@@ -1453,7 +1447,7 @@ async function buildMomentSnapshotMessage(
         role: "user",
         content: [
             { type: "text", text },
-            { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
+            ...imageUrls.map(url=>({ type: "image_url" as const, image_url: { url, detail: "low" as const } })),
         ],
         _debugMeta: { marker },
     };

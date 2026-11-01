@@ -78,6 +78,10 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
     ],
   },
   {
+    id:"offstage",label:"幕后讨论",description:"独立分析对话、手动附加资料与幕后模型选择",variant:"teal",critical:true,
+    sources:[{type:"kv",label:"幕后对话与附件",keys:["ai_phone_offstage_v1"]}],
+  },
+  {
     id: "voice_favorites",
     label: "语音收藏",
     description: "Chat 通话单句与语音消息的独立音频收藏；电话原收藏仍随电话数据备份",
@@ -122,6 +126,7 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
           "ai_phone_character_routines_v1",
           "ai_phone_sleep_cycles_v1",
           "ai_phone_call_first_speaker_v1",
+          "ai_phone_lock_v1",
           "ai_phone_qa_feedback_v1",
           "ai_phone_qa_github_v1",
           "ai_phone_media_maintenance_config_v1",

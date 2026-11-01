@@ -1,4 +1,5 @@
 export type DataModuleId =
+  | "offstage"
   | "voice_favorites"
   | "chat"
   | "settings"

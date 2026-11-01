@@ -1,4 +1,5 @@
 "use client";
+import { LivePhotoInput } from "./live-photo";
 import {callSafeWindowStart} from "@/lib/call-record-window";
 import {finishOpenCall} from "./use-call-end-record";
 import { loadManualCallGroups, saveManualCallGroup, removeManualCallGroup } from "@/lib/manual-call-groups";
@@ -588,7 +589,7 @@ type PendingMessageJump = {
 };
 
 const TRANSIENT_MESSAGE_PREFIX = "ui-transient-";
-type RichModalKind = "photo" | "text_photo" | "red_packet" | "transfer" | "location" | "transfer_target" | "voice_msg" | "gift" | "system_instruction";
+type RichModalKind = "live_photo" | "photo" | "text_photo" | "red_packet" | "transfer" | "location" | "transfer_target" | "voice_msg" | "gift" | "system_instruction";
 type ChatTextInputHandle = {
     appendText: (text: string, options?: { focus?: boolean }) => void;
     clear: () => void;
@@ -829,6 +830,7 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
     const plusMenuItems = [
         { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>, label: "照片墙", onClick: () => onOpenRichModal("photo") },
         { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="7" y1="8" x2="17" y2="8" /><line x1="7" y1="12" x2="14" y2="12" /><line x1="7" y1="16" x2="11" y2="16" /></svg>, label: "文字图片", onClick: () => onOpenRichModal("text_photo") },
+        { icon: <span style={{fontSize:22}}>◉</span>, label:"实况", onClick:()=>onOpenRichModal("live_photo") },
         { icon: <AlertCircle size={22} strokeWidth={1.5} color="var(--c-text)" />, label: "系统指令", onClick: () => onOpenRichModal("system_instruction") },
         { icon: <Clapperboard size={22} strokeWidth={1.5} color={theaterMode ? "var(--c-icon-active)" : "var(--c-text)"} />, label: "番外指令模式", active: theaterMode, onClick: onToggleTheaterMode },
         { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>, label: "视频通话", onClick: onStartVideoCall },
@@ -1300,6 +1302,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     void chatProfileRevision;
 
     // Rich media input modals
+    const [showLivePhoto, setShowLivePhoto] = useState(false);
     const [richModal, setRichModal] = useState<RichModalKind | null>(null);
     const [transferTarget, setTransferTarget] = useState<Character | null>(null);
     // Media detail modal (red packet / transfer detail view)
@@ -6977,7 +6980,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 	                onTogglePlusMenu={() => { setShowPlusMenu(!showPlusMenu); setShowEmojiPanel(false); setShowStickerPanel(false); }}
 	                onToggleTheaterMode={toggleTheaterMode}
 	                onCloseTheaterMode={closeTheaterMode}
-	                onOpenRichModal={(modal) => { setShowPlusMenu(false); setRichModal(modal); }}
+	                onOpenRichModal={(modal) => { setShowPlusMenu(false); if(modal === "live_photo")setShowLivePhoto(true);else setRichModal(modal); }}
                 onOpenCustomPlusAction={handleOpenCustomPlusAction}
                 onStartVideoCall={() => { cancelFollowUp(session.id); setShowPlusMenu(false); setCallAcceptedOnIsland(false); setCallInitiator("user"); setShowVideoCall(true); }}
                 onStartVoiceCall={() => { cancelFollowUp(session.id); setShowPlusMenu(false); setCallAcceptedOnIsland(false); setCallInitiator("user"); setShowVoiceCall(true); }}
@@ -7127,6 +7130,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     onClose={() => setRichModal(null)}
                 />
             )}
+            {showLivePhoto && <LivePhotoInput onClose={() => setShowLivePhoto(false)} onSend={live => {if(sendRichMessage("image",{label:`实况视频（${live.duration.toFixed(1)}秒），图片是按时间顺序排列的8帧，请按左到右、上到下查看。`,liveVideoId:live.videoId,liveCover:live.cover,liveDuration:live.duration,liveAudio:live.audio,liveMuted:!live.audio},"",live.sheet))setShowLivePhoto(false)}} />}
             {richModal === "photo" && (
                 <PhotoInputModal
                     onSend={(desc, imageDataUrls) => {

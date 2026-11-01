@@ -30,7 +30,8 @@ export type LLMToolCallPayload = { id: string; name: string; args: Record<string
 
 export type LLMContentPart =
     | { type: "text"; text: string }
-    | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+    | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } }
+    | { type: "input_audio"; input_audio: {data:string;format:"wav"|"mp3"} };
 
 export type LLMMessage = {
     role: LLMMessageRole;
@@ -150,6 +151,7 @@ type PromptBlock = {
     order: number;
     marker: string;
     fromHistory?: boolean;
+    liveAudio?: string;
     imageUrl?: string;      // vision: image URL/data URL attached to this prompt block
     reasoning?: string;
     openRouterReasoningDetails?: unknown[];
@@ -183,6 +185,7 @@ function formatPhotoDirective(msg: ChatMessage, prefix = ""): string {
         if (status === "declined") return `${prefix}[头像推荐:${platform}:你已拒绝这张头像]`;
         return `${prefix}[头像推荐:${platform}] 用户向你推荐这张图片作为你的${platform}头像。请根据人设自主决定：愿意采用就在本次回复末尾输出[接受头像推荐]；不采用则输出[拒绝头像推荐]。两个控制标记不会展示给用户。`;
     }
+    if(msg.mediaData?.liveVideoId)return `[实况视频:${msg.mediaData.liveDuration?.toFixed(1)}秒] ${msg.mediaData.label||""} 画面按时间顺序从左到右、从上到下排列。仅根据提供的画面和音频判断；没有音频输入则不要声称听到声音。`;
     const description = msg.mediaData?.label?.trim() || "图片";
     const mode = msg.mediaData?.useReferenceImage === true ? "使用参考图" : "不使用参考图";
     return `${prefix}[照片:${mode}:${description}]`;
@@ -575,6 +578,7 @@ function pushChronologicalShortTermBlocks(params: {
             marker: `History [${item.historyIndex}]`,
             fromHistory: true,
             imageUrl,
+            liveAudio:msg.mediaData?.liveAudio,
         });
 
         if (msg.isRetracted) {
@@ -1043,6 +1047,7 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
                 marker: `History [${distFromBottom}]`,
                 fromHistory: true,
                 imageUrl,
+            liveAudio:msg.mediaData?.liveAudio,
             });
 
             // Retracted: keep the original message above, then append a system notice
@@ -1094,7 +1099,8 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
             // Vision message: build multi-part content with image (never merged)
             const parts: LLMContentPart[] = [];
             if (processedText) parts.push({ type: "text", text: processedText });
-            parts.push({ type: "image_url", image_url: { url: b.imageUrl, detail: "low" } });
+            parts.push({ type: "image_url", image_url: { url: b.imageUrl, detail: /实况视频/.test(b.text)?"high":"low" } });
+            if(b.liveAudio)parts.push({type:"input_audio",input_audio:{data:b.liveAudio,format:"wav"}});
             finalPayload.push({
                 role: b.role,
                 content: parts,
@@ -1762,6 +1768,7 @@ function pushGroupChronologicalShortTermBlocks(params: {
             marker: `History [${item.historyIndex}]`,
             fromHistory: true,
             imageUrl,
+            liveAudio:msg.mediaData?.liveAudio,
         });
     });
 
@@ -2246,6 +2253,7 @@ export function assembleGroupPromptPayload(input: GroupAssemblerInput): LLMMessa
                 marker: `History [${distFromBottom}]`,
                 fromHistory: true,
                 imageUrl,
+            liveAudio:msg.mediaData?.liveAudio,
             });
         });
     }
@@ -2276,7 +2284,8 @@ export function assembleGroupPromptPayload(input: GroupAssemblerInput): LLMMessa
             // Vision message: build multi-part content with image (never merged)
             const parts: LLMContentPart[] = [];
             if (processedText) parts.push({ type: "text", text: processedText });
-            parts.push({ type: "image_url", image_url: { url: b.imageUrl, detail: "low" } });
+            parts.push({ type: "image_url", image_url: { url: b.imageUrl, detail: /实况视频/.test(b.text)?"high":"low" } });
+            if(b.liveAudio)parts.push({type:"input_audio",input_audio:{data:b.liveAudio,format:"wav"}});
             finalPayload.push({
                 role: b.role,
                 content: parts,

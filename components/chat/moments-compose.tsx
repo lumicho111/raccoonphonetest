@@ -89,7 +89,7 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
     const handleImageSelect = () => fileRef.current?.click();
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []).slice(0, 3 - photos.length);
+        const files = Array.from(e.target.files || []).slice(0, 9 - photos.length);
         e.target.value = "";
         if (!files.length) return;
         setUploading(true);
@@ -98,7 +98,7 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
                 const url = await saveMomentsImage(file);
                 const preview = URL.createObjectURL(file);
                 previewsRef.current.push(preview);
-                setPhotos(prev => prev.length < 3 ? [...prev, { url, preview }] : prev);
+                setPhotos(prev => prev.length < 9 ? [...prev, { url, preview }] : prev);
             }
         } catch (error) { console.error("[Moments] photo upload failed", error); }
         finally { setUploading(false); }
@@ -215,7 +215,7 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
                                 <button type="button" onClick={() => handleRemovePhoto(index)} className="ui-close-sm compose-photo-remove" aria-label="移除照片">×</button>
                             </div>
                         ))}
-                        {photos.length < 3 && <button type="button" onClick={handleImageSelect} disabled={uploading} className="compose-photo-block" aria-label="添加照片">
+                        {photos.length < 9 && <button type="button" onClick={handleImageSelect} disabled={uploading} className="compose-photo-block" aria-label="添加照片">
                             {uploading ? "上传中…" : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>}
                         </button>}
                     </div>

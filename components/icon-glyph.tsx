@@ -67,6 +67,7 @@ const MDI_PATHS: Record<IconId, string> = {
   interview_magazine: mdiMicrophone,
   mapmode: mdiMapMarker,
   qa: mdiHammerWrench,
+  offstage: mdiMessageProcessing,
   moments: mdiCamera,
   group_chat: mdiAccountGroup,
   theme: mdiPalette,

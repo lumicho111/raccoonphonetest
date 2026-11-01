@@ -67,6 +67,7 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
     const [editingComment, setEditingComment] = useState<MomentComment | null>(null);
     const [commentDraft, setCommentDraft] = useState("");
     const [deleteCommentTarget, setDeleteCommentTarget] = useState<MomentComment | null>(null);
+    const photoTouchStart=useRef<number|null>(null);
     const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
     const previewSrc = useMomentsPhotoUrl(previewPhoto || undefined);
     const userPhotos = post.authorType === "user" ? getPostPhotos(post) : [];
@@ -405,7 +406,7 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
             {(resolvedPhotoUrl || fallbackPhotoDescription) && (
             <div className="feed-post-media mb-3 w-full flex flex-col gap-2">
                 {userPhotos.length > 0 ? (
-                    <div className="moments-post-photo-row">
+                    <div className="moments-post-photo-row" style={{display:"grid",gridTemplateColumns:`repeat(${userPhotos.length===4?2:Math.min(3,userPhotos.length)},minmax(0,1fr))`,maxWidth:390}}>
                         {userPhotos.map((url, index) => <div className="moments-post-photo-tile" key={`${url}-${index}`}>
                             <button type="button" onClick={() => setPreviewPhoto(url)} aria-label={`查看第 ${index + 1} 张照片`}><MomentsPhotoImage url={url} /></button>
                             {onFeaturePhoto && <button type="button" className="moments-feature-button" onClick={() => onFeaturePhoto(post.id, url)}>展示到主页</button>}
@@ -445,9 +446,11 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
                 )}
             </div>
             )}
-            {previewSrc && typeof document !== "undefined" && document.querySelector(".moments-feed-page") && createPortal(<div className="moments-lightbox" role="dialog" aria-modal="true" onClick={() => setPreviewPhoto(null)}>
+            {previewSrc && typeof document !== "undefined" && document.querySelector(".moments-feed-page") && createPortal(<div className="moments-lightbox" role="dialog" aria-modal="true" onTouchStart={e=>{photoTouchStart.current=e.touches[0].clientX}} onTouchEnd={e=>{if(photoTouchStart.current===null)return;const delta=e.changedTouches[0].clientX-photoTouchStart.current;photoTouchStart.current=null;if(Math.abs(delta)>40){const i=userPhotos.indexOf(previewPhoto||'');setPreviewPhoto(userPhotos[Math.max(0,Math.min(userPhotos.length-1,i+(delta<0?1:-1)))])}}} onClick={() => setPreviewPhoto(null)}>
                 <button type="button" className="moments-lightbox-close" onClick={() => setPreviewPhoto(null)}>关闭</button>
+                <button className="moments-lightbox-prev" disabled={userPhotos.indexOf(previewPhoto||'')<=0} onClick={e=>{e.stopPropagation();setPreviewPhoto(userPhotos[userPhotos.indexOf(previewPhoto||'')-1])}}>‹</button>
                 <img src={previewSrc} alt="照片原图" onClick={e => e.stopPropagation()} />
+                <button className="moments-lightbox-next" disabled={userPhotos.indexOf(previewPhoto||'')>=userPhotos.length-1} onClick={e=>{e.stopPropagation();setPreviewPhoto(userPhotos[userPhotos.indexOf(previewPhoto||'')+1])}}>›</button><span className="moments-lightbox-bottom">{userPhotos.indexOf(previewPhoto||'')+1} / {userPhotos.length}</span>
             </div>, document.querySelector(".moments-feed-page")!)}
             {showFallbackPreview && fallbackPhotoDescription && (
                 <MediaPreviewOverlay

@@ -151,6 +151,7 @@ export type ApiConfig = {
     defaultModel: string;
     enableNativeTools?: boolean;
     enableImageRecognition: boolean;
+    enableAudioInput?: boolean;
     enableImageGeneration: boolean;
     preventEmptyGenerateRambling?: boolean;
 };

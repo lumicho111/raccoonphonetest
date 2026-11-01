@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight } from "lucide-react";
 
 import { AccountGate } from "@/components/auth/account-gate";
 import { CloudBackupScheduler } from "@/components/cloud-backup-scheduler";
 import { MediaMaintenanceScheduler } from "@/components/media-maintenance-scheduler";
 import { DesktopShell } from "./desktop-shell";
 import { OfflinePushRevampAnnouncement } from "./offline-push-revamp-announcement";
-import { SplashAnimation } from "./splash-animation";
+import { PhoneLockScreen } from "./phone-lock-screen";
 import { MusicProvider } from "@/lib/music-context";
 import { startContactRecommendationScheduler } from "@/lib/contact-recommendation";
 import { hydrateKvDb, isKvHydrated } from "@/lib/kv-db";
@@ -159,16 +158,7 @@ function SplashScreen({ ready = false, onEnter }: { ready?: boolean; onEnter?: (
         <div className="phone-case">
           <div className="phone-frame">
             <div className="phone-shell splash-phone-screen">
-              <SplashAnimation />
-              <button
-                type="button"
-                className={ready ? "splash-enter-button splash-enter-button-show" : "splash-enter-button"}
-                onClick={onEnter}
-                disabled={!ready}
-                aria-label="Enter"
-              >
-                <ArrowRight size={18} strokeWidth={1.8} />
-              </button>
+              <PhoneLockScreen ready={ready} onEnter={() => onEnter?.()} />
             </div>
           </div>
         </div>
@@ -312,8 +302,8 @@ export function MainApp() {
 
   return (
     <AccountGate>
-      {!splashDismissed ? (
-        <SplashScreen ready={hydrated} onEnter={() => setSplashDismissed(true)} />
+      {!hydrated ? (
+        <SplashScreen ready={false} />
       ) : (
         <main className="app-root">
           <MusicProvider>
