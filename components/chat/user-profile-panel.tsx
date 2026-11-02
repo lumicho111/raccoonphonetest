@@ -1,4 +1,5 @@
 "use client";
+import {isAndroidApp,nativeNotificationGranted,refreshNativeNotificationPermission} from "@/lib/android-notifications";
 import {RoutineSettings} from "./routine-settings";
 import { useChatUserAvatar } from "./use-chat-user-avatar";
 
@@ -137,6 +138,7 @@ function ProfileSettingsSliderItem({
 }
 
 function readBrowserNotificationPermissionHint(): string {
+    if(isAndroidApp())return "安卓系统通知："+(nativeNotificationGranted()?"已允许":"未允许")+"；进程结束后的远程提醒仍需推送服务。";
     if (typeof window === "undefined") return "当前浏览器权限：未知（服务端渲染）";
     if (!("Notification" in window)) return "当前浏览器权限：不支持 Notification API";
     const permission = Notification.permission;
@@ -148,6 +150,7 @@ function readBrowserNotificationPermissionHint(): string {
 }
 
 function isBrowserNotificationGranted(): boolean {
+    if(isAndroidApp())return nativeNotificationGranted();
     return typeof window !== "undefined"
         && "Notification" in window
         && Notification.permission === "granted";
@@ -186,6 +189,7 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
     useEffect(() => {
         setIdentity(resolveUserIdentity());
         const settings = loadChatAppSettings();
+        if(isAndroidApp())void refreshNativeNotificationPermission().then(granted=>{setNotifEnabled(settings.browserNotificationsEnabled===true&&granted);setNotifHint(readBrowserNotificationPermissionHint());});
         const browserGranted = isBrowserNotificationGranted();
         setNotifEnabled(settings.browserNotificationsEnabled === true && browserGranted);
         setEnterToSendEnabled(settings.enterToSendEnabled === true);
@@ -271,7 +275,7 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
         }
 
         setNotifChecking(true);
-        setNotifHint("正在检查浏览器通知权限...");
+        setNotifHint("正在检查通知权限...");
         try {
             const granted = await requestNotificationPermission();
             const permissionHint = readBrowserNotificationPermissionHint();
@@ -390,9 +394,6 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
                                 ) : (
                                     <User size={38} color="var(--c-icon)" />
                                 )}
-                                <span className="absolute right-0 bottom-0 w-6 h-6 rounded-full bg-black/65 text-white flex items-center justify-center border-2 border-white/80">
-                                    <Camera size={12} />
-                                </span>
                             </button>
                             <input
                                 ref={profileAvatarInputRef}
@@ -529,8 +530,8 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
                         <div className="flex items-center gap-3 py-3 w-full">
                             <Bell size={18} className="text-[var(--c-icon)] opacity-70" strokeWidth={1.25}/>
                             <div className="flex flex-col flex-1 text-left gap-0.5">
-                                <span className="ts-14 font-semibold text-[var(--c-text-title)]">浏览器后台通知</span>
-                                <span className="ts-11 text-[var(--c-text)] opacity-70">{notifHint || "允许网页在后台时弹出新消息横幅提醒"}</span>
+                                <span className="ts-14 font-semibold text-[var(--c-text-title)]">后台通知</span>
+                                <span className="ts-11 text-[var(--c-text)] opacity-70">{notifHint || "允许后台新消息显示系统通知"}</span>
                             </div>
                             <Toggle checked={notifEnabled} disabled={notifChecking} onChange={handleNotificationToggle} />
                         </div>

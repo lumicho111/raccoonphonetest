@@ -1581,16 +1581,7 @@ export function ChatSettingsPanel({
                             </div>
                         </div>
                         ) : null}
-                        <button className="menu-item" onClick={() => setShowScreenEffects(true)}>
-                            <ChatInfoIcon icon={Sparkles} color={BINDING_ACCENTS.preset} />
-                            <div className="menu-label-group">
-                                <span className="menu-label">全屏特效</span>
-                                <span className="menu-desc">消息包含触发词时播放表情雨/礼花，全局生效</span>
-                            </div>
-                            <div className="menu-right">
-                                <ChevronRight size={16} />
-                            </div>
-                        </button>
+
                     </>
                 </div>
 

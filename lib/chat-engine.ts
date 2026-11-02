@@ -1,3 +1,4 @@
+import {followUpIntentInstruction,extractFollowUpIntent} from "./follow-up-intent";
 import { CHARACTER_REMARK_LANGUAGE_INSTRUCTION } from "./social-language-instructions";
 import { loadChatOfflineSceneState } from "./chat-offline-storage";
 import { buildCharacterOutputLanguageInstruction } from "./character-language";
@@ -2123,6 +2124,7 @@ export async function buildChatPromptMessages(
             content: "本次自定义 APP AI 任务只输出严格 JSON。不要输出 Markdown 代码块、解释文字或聊天富媒体指令。",
         });
     }
+    if(!session.isGroup && (options?.appId??"chat")==="chat"&&!options?.callFormatInstruction){const instruction=followUpIntentInstruction();if(instruction)llmMessages.push({role:"system",content:instruction});}
     if((!options?.appId||options.appId==="chat")&&!options?.callFormatInstruction&&!options?.appTags?.some(tag=>["followup","idle_wake","timed_wake","user_timed_wake","busy_resume","voice","video"].includes(tag)))appendEmptyGenerateGuardMessage(llmMessages, config, historyForPrompt);
 
     return { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled };
@@ -2217,6 +2219,7 @@ export async function generateOfflineChatCompletion(
     } else {
         rawOutput = await sendLLMRequest(config, preset, llmMessages, regexes, meta, requestOptions);
     }
+    rawOutput=rawOutput.replace(/<followup\b[^>]*\/?\s*>/gi,"");
     // 剔除预设配置的文本片段（<思考结束> 等残留标签），不进入记录/提示词
     rawOutput = stripPresetTexts(rawOutput, preset);
     let parsed = parseOfflineResponse(rawOutput, summaryTag);
@@ -2376,6 +2379,7 @@ async function generateNativeChatCompletion(
         }
         // 剔除预设配置的文本片段（<思考结束> 等残留标签）
         displayContent = stripPresetTexts(displayContent, preset);
+        displayContent = extractFollowUpIntent(session.id,displayContent);
         displayContent = await translateGeneratedContent(displayContent, options?.appId || "chat", character.id, config, options?.signal);
 
         const { cleanText: afterActionStrip, actions } = parseActionTags(displayContent);
@@ -2824,6 +2828,7 @@ async function generateChatCompletionCore(
         }
         // 剔除预设配置的文本片段（<思考结束> 等残留标签），不进入消息/提示词
         filteredOutput = stripPresetTexts(filteredOutput, preset);
+        filteredOutput = extractFollowUpIntent(session.id,filteredOutput);
 
         // Parse actions (朋友圈 etc) — strip from display text but keep tool tags
         const { cleanText: afterActionStrip, actions } = parseActionTags(filteredOutput);

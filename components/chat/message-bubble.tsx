@@ -688,6 +688,7 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     defaultExpanded = false,
     htmlFrameVariant,
     inlineKktMeta,
+    originalLeading,
 }: {
     text: string;
     onActionSelect?: (text: string) => void;
@@ -697,7 +698,9 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     defaultExpanded?: boolean;
     htmlFrameVariant?: ChatHtmlFrameVariant;
     inlineKktMeta?: ReactNode;
+    originalLeading?: ReactNode;
 }) {
+    const toggleStarted = useRef(0);
     const bilingual = splitBilingualText(text);
     const [expanded, setExpanded] = useState(defaultExpanded);
     useEffect(() => {
@@ -713,34 +716,23 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     };
 
     if (!bilingual) {
-        return renderContent(text, className);
+        return originalLeading?<div style={{display:"flex",alignItems:"center",gap:6}}>{originalLeading}{renderContent(text,className)}</div>:renderContent(text,className);
     }
 
     return (
-        <div className={`chat-bilingual-block ${className ?? ""}`.trim()}>
+        <div className={`chat-bilingual-block ${className ?? ""}`.trim()} role="button" tabIndex={0} aria-expanded={expanded} aria-label="切换中文翻译" onPointerDown={()=>{toggleStarted.current=Date.now();}} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==="Enter"||e.key===" ")){e.preventDefault();setExpanded(v=>!v);}}} onClick={e=>{if(toggleStarted.current&&Date.now()-toggleStarted.current>500)return;const interactive=(e.target as HTMLElement).closest('a,button,input,textarea,select,[contenteditable="true"]');if(interactive&&e.currentTarget.contains(interactive)||window.getSelection()?.toString())return;e.stopPropagation();setExpanded(v=>!v);}}>
             {inlineKktMeta ? (
                 <div className="chat-kkt-original-row">
-                    <div className="chat-bilingual-section">
+                    <div className="chat-bilingual-section" style={originalLeading?{display:"flex",alignItems:"center",gap:6}:undefined}>{originalLeading}
                         {renderContent(bilingual.original, "chat-bilingual-content")}
                     </div>
                     {inlineKktMeta}
                 </div>
             ) : (
-                <div className="chat-bilingual-section">
+                <div className="chat-bilingual-section" style={originalLeading?{display:"flex",alignItems:"center",gap:6}:undefined}>{originalLeading}
                     {renderContent(bilingual.original, "chat-bilingual-content")}
                 </div>
             )}
-            <button
-                type="button"
-                className="chat-bilingual-toggle"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setExpanded(v => !v);
-                }}
-                aria-expanded={expanded}
-            >
-                {expanded ? "收起中文" : "中文"}
-            </button>
             {expanded && (
                 <>
                     <div className="chat-bilingual-divider" />

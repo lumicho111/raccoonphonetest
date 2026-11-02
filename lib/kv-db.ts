@@ -45,9 +45,9 @@ function migrateLegacyKey(lsKey: string): void {
     if (raw === null) return;
     if (_cache.get(lsKey) !== raw) {
         _cache.set(lsKey, raw);
-        kvDb.entries.put({ key: lsKey, value: raw }).catch(() => {});
+        kvDb.entries.put({ key: lsKey, value: raw }).then(()=>removeLegacyLocalStorageKeyIfValue(lsKey,raw)).catch(err=>reportStorageFailure(err));
     }
-    localStorage.removeItem(lsKey);
+    // Legacy bytes are removed only after successful IndexedDB commit.
 }
 
 function migrateLegacyPrefix(prefix: string): void {
@@ -121,6 +121,9 @@ export function hydrateKvDb(): Promise<void> {
     _hydratePromise = (async () => {
         // Load existing IDB data into cache
         const all = await kvDb.entries.toArray();
+        _cache.clear();
+        await saveKvRecoveryCheckpoint(all).catch(reportStorageFailure);
+
         for (const { key, value } of all) {
             if (!_cache.has(key)) _cache.set(key, value);
         }
@@ -190,11 +193,17 @@ export function kvGet(key: string): string | null {
 
 // ── Write: update cache + fire-and-forget to IDB ──
 export function kvSet(key: string, value: string): void {
+    if(_hydrateError)throw new Error('本地数据尚未成功读取，已阻止覆盖保存，请重试启动。');
+    if(!_hydrated){console.warn("[KvDB] blocked pre-hydration write",key);return;}
+    dirtyWrites.set(key,value);
+
     _cache.set(key, value);
     if (isManagedLegacyKey(key)) writeFallbackLocalStorage(key, value);
     kvDb.entries.put({ key, value }).then(() => {
+        if(dirtyWrites.get(key)===value)dirtyWrites.delete(key);
         if (isManagedLegacyKey(key)) removeLegacyLocalStorageKeyIfValue(key, value);
     }).catch(err => {
+        reportStorageFailure(err);
         writeFallbackLocalStorage(key, value);
         if (!isAbortLikeError(err)) {
             console.warn("[KvDB] put failed:", key, err);
@@ -203,6 +212,8 @@ export function kvSet(key: string, value: string): void {
 }
 
 export async function kvSetAsync(key: string, value: string): Promise<void> {
+    if(!_hydrated)throw new Error("本地数据读取尚未完成，不能保存");
+    if(_hydrateError)throw new Error("数据读取失败，禁止覆盖保存");
     _cache.set(key, value);
     if (isManagedLegacyKey(key)) writeFallbackLocalStorage(key, value);
     try {
@@ -213,12 +224,14 @@ export async function kvSetAsync(key: string, value: string): Promise<void> {
         if (!isAbortLikeError(err)) {
             console.warn("[KvDB] put failed:", key, err);
         }
+        reportStorageFailure(err);
         throw err;
     }
 }
 
 // ── Delete ──
 export function kvRemove(key: string): void {
+    if(!_hydrated)throw new Error("本地数据读取尚未完成，不能删除");
     _cache.delete(key);
     if (isManagedLegacyKey(key)) removeLegacyLocalStorageKey(key);
     kvDb.entries.delete(key).catch(err =>
@@ -236,4 +249,14 @@ export function kvKeysWithPrefix(prefix: string): string[] {
 
 export function kvEntries(): Array<{ key: string; value: string }> {
     return Array.from(_cache.entries()).map(([key, value]) => ({ key, value }));
+}
+
+const dirtyWrites=new Map<string,string>();
+export function reportStorageFailure(error:unknown){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("local-storage-failure",{detail:{message:"本地保存失败，请保持应用打开，重试保存或导出备份。"}}));console.warn("[Storage] write failed",error);}
+export async function flushKvWrites(){for(const [key,value] of dirtyWrites){await kvDb.entries.put({key,value});if(dirtyWrites.get(key)===value)dirtyWrites.delete(key);}}
+/** Retain two KV checkpoints before version changes, never silently restore or clear live data. Media databases remain untouched. */
+async function saveKvRecoveryCheckpoint(entries:Array<{key:string;value:string}>){
+ if(!entries.length||typeof window==="undefined")return;
+ const version="float-1.0.1";const db=new Dexie("AiPhoneRecoveryDB");db.version(1).stores({snapshots:"id,createdAt"});
+ try{const table=db.table("snapshots");if(await table.get(version))return;await table.put({id:version,createdAt:Date.now(),entries});const rows=await table.orderBy("createdAt").reverse().toArray();for(const old of rows.slice(2))await table.delete(old.id);}finally{db.close();}
 }

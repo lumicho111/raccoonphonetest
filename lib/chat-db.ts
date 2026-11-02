@@ -1,3 +1,4 @@
+import {reportStorageFailure} from "./kv-db";
 // lib/chat-db.ts
 // IndexedDB persistence layer for chat data using Dexie.js.
 // Provides async persistence behind the synchronous in-memory cache in chat-storage.ts.
@@ -182,11 +183,12 @@ function safeParse<T>(raw: string | null): T[] {
 // ── Async persistence helpers (fire-and-forget) ──
 
 export function dbPutMessage(msg: ChatMessage): void {
-    chatDb.messages.put(msg).catch(err => console.warn("[ChatDB] put message failed:", err));
+    pendingMessages.set(msg.id,msg);
+    chatDb.messages.put(msg).then(()=>{if(pendingMessages.get(msg.id)===msg)pendingMessages.delete(msg.id);}).catch(err => { console.warn("[ChatDB] put message failed:",err);reportStorageFailure(err); });
 }
 
 export function dbPutMessages(msgs: ChatMessage[]): void {
-    chatDb.messages.bulkPut(msgs).catch(err => console.warn("[ChatDB] bulkPut messages failed:", err));
+    chatDb.messages.bulkPut(msgs).catch(err => { console.warn("[ChatDB] bulkPut messages failed:",err);reportStorageFailure(err); });
 }
 
 // 可等待、错误上抛、分块提交的批量写入。导入聊天记录这类大批量落库必须
@@ -201,48 +203,54 @@ export async function dbBulkPutMessages(msgs: ChatMessage[]): Promise<void> {
 }
 
 export function dbDeleteMessage(id: string): void {
-    chatDb.messages.delete(id).catch(err => console.warn("[ChatDB] delete message failed:", err));
+    pendingMessages.delete(id);
+    chatDb.messages.delete(id).catch(err => { console.warn("[ChatDB] delete message failed:",err);reportStorageFailure(err); });
 }
 
 export function dbDeleteMessagesBySession(sessionId: string): void {
+    for(const [id,m] of pendingMessages)if(m.sessionId===sessionId)pendingMessages.delete(id);
     chatDb.messages.where("sessionId").equals(sessionId).delete()
-        .catch(err => console.warn("[ChatDB] delete session messages failed:", err));
+        .catch(err => { console.warn("[ChatDB] delete session messages failed:",err);reportStorageFailure(err); });
 }
 
 export function dbDeleteMessagesByIds(ids: string[]): void {
-    chatDb.messages.bulkDelete(ids).catch(err => console.warn("[ChatDB] bulkDelete messages failed:", err));
+    for(const id of ids)pendingMessages.delete(id);
+    chatDb.messages.bulkDelete(ids).catch(err => { console.warn("[ChatDB] bulkDelete messages failed:",err);reportStorageFailure(err); });
 }
 
 export function dbPutSession(session: ChatSession): void {
-    chatDb.sessions.put(session).catch(err => console.warn("[ChatDB] put session failed:", err));
+    chatDb.sessions.put(session).catch(err => { console.warn("[ChatDB] put session failed:",err);reportStorageFailure(err); });
 }
 
 export function dbPutSessions(sessions: ChatSession[]): void {
-    chatDb.sessions.bulkPut(sessions).catch(err => console.warn("[ChatDB] bulkPut sessions failed:", err));
+    chatDb.sessions.bulkPut(sessions).catch(err => { console.warn("[ChatDB] bulkPut sessions failed:",err);reportStorageFailure(err); });
 }
 
 export function dbReplaceSessions(sessions: ChatSession[]): void {
     chatDb.transaction("rw", chatDb.sessions, async () => {
         await chatDb.sessions.clear();
         await chatDb.sessions.bulkPut(sessions);
-    }).catch(err => console.warn("[ChatDB] replace sessions failed:", err));
+    }).catch(err => { console.warn("[ChatDB] replace sessions failed:",err);reportStorageFailure(err); });
 }
 
 export function dbDeleteSession(id: string): void {
-    chatDb.sessions.delete(id).catch(err => console.warn("[ChatDB] delete session failed:", err));
+    chatDb.sessions.delete(id).catch(err => { console.warn("[ChatDB] delete session failed:",err);reportStorageFailure(err); });
 }
 
 export function dbPutContacts(contacts: ChatContact[]): void {
-    chatDb.contacts.bulkPut(contacts).catch(err => console.warn("[ChatDB] bulkPut contacts failed:", err));
+    chatDb.contacts.bulkPut(contacts).catch(err => { console.warn("[ChatDB] bulkPut contacts failed:",err);reportStorageFailure(err); });
 }
 
 export function dbClearContacts(): void {
-    chatDb.contacts.clear().catch(err => console.warn("[ChatDB] clear contacts failed:", err));
+    chatDb.contacts.clear().catch(err => { console.warn("[ChatDB] clear contacts failed:",err);reportStorageFailure(err); });
 }
 
 export function dbReplaceContacts(contacts: ChatContact[]): void {
     chatDb.transaction("rw", chatDb.contacts, async () => {
         await chatDb.contacts.clear();
         await chatDb.contacts.bulkPut(contacts);
-    }).catch(err => console.warn("[ChatDB] replaceContacts failed:", err));
+    }).catch(err => { console.warn("[ChatDB] replaceContacts failed:",err);reportStorageFailure(err); });
 }
+
+const pendingMessages=new Map<string,ChatMessage>();
+export async function flushPendingChatMessages(){for(const [id,message] of pendingMessages){await chatDb.messages.put(message);if(pendingMessages.get(id)===message)pendingMessages.delete(id);}}

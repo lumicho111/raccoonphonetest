@@ -1,3 +1,4 @@
+import {StorageHealth} from "@/components/storage-health";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
@@ -42,7 +43,7 @@ export default function RootLayout({
       <body>
         <PWAManifestInjector />
         <PWARegistrar />
-        <CSSImportEnhancer />
+        <StorageHealth/><CSSImportEnhancer />
         <ChatPluginBootstrap />
         <ChatReasoningVisibilityController />
         {children}

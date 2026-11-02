@@ -77,7 +77,7 @@ export function EmojiPanel({ onSelect, onEffectSend }: EmojiPanelProps) {
         return BUILTIN_SCREEN_EFFECTS.filter(effect => settings[effect.type].enabled);
     });
     const effectCategoryIndex = EMOJI_CATEGORIES.length;
-    const showEffectTab = enabledEffects.length > 0;
+    const showEffectTab = false;
 
     return (
         <div className="h-[220px] flex flex-col">

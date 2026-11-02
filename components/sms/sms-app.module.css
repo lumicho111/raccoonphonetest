@@ -141,8 +141,8 @@
  mask:url("/sms/tail-shared-mask.png") center / 100% 100% no-repeat;
  -webkit-mask:url("/sms/tail-shared-mask.png") center / 100% 100% no-repeat;
 }
-.mine.tail .bubble::after{right:-7px;left:auto;background:var(--sms-user);transform:none}
-.theirs.tail .bubble::after{left:-7px;right:auto;background:var(--sms-other);transform:scaleX(-1)}
+.mine.tail .bubble::after{right:-4px;left:auto;background:var(--sms-user);transform:none}
+.theirs.tail .bubble::after{left:-4px;right:auto;background:var(--sms-other);transform:scaleX(-1)}
 /* Fixed center column keeps the name below the avatar at all header widths. */
 .app .chatHeader{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:start;gap:8px;min-height:0;padding:calc(var(--page-header-safe-top,48px) + 2px) 14px 7px;background:#f6f6f7}
 .app .chatHeader .person{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:7px;min-width:0;max-width:100%;width:100%;margin:0;padding:0}

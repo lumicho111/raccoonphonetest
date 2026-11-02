@@ -1544,6 +1544,7 @@ export default function MapView({ world, save, onSaveUpdate, onBack }: Props) {
         <MapTextStream
           messages={streamMessages}
           avatarMap={avatarMap}
+          voiceCharacterMap={Object.fromEntries(save.agents.flatMap(a=>{const c=characters.find(c=>c.id===a.characterId);return c?[[c.name,c.id]]:[];}))}
           fontFamily={customFontFamily}
           fontScale={worldTheme.fontScale}
           lineHeightScale={worldTheme.lineHeightScale}

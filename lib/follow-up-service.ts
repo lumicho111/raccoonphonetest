@@ -1,3 +1,4 @@
+import {takeFollowUpIntent} from "./follow-up-intent";
 import {getCharacterSleep} from "./character-routine";
 import {ensureIdleDue,deferIdleCheck} from "./idle-reconnect-storage";
 /**
@@ -188,8 +189,9 @@ export function scheduleFollowUp(sessionId: string, count: number, stateValues?:
 
     const session=loadChatSessions().find(s=>s.id===sessionId);
     if(!session || session.isGroup || config.enabled===false || count>=(config.maxConsecutive??3)) {clearFollowUpSchedule(sessionId);cancelFollowUpBailout(sessionId);return;}
-    const lo=Math.min(config.anxietyMinDelay,config.anxietyMaxDelay),hi=Math.max(config.anxietyMinDelay,config.anxietyMaxDelay);
-    const delaySec=Math.round((lo+Math.random()*(hi-lo))*(1+count*.5));
+    const intended=takeFollowUpIntent(sessionId);
+    if(intended===undefined){clearFollowUpSchedule(sessionId);cancelFollowUpBailout(sessionId);return;}
+    const delaySec=Math.round(intended);
     const fireAt=Date.now()+delaySec*1000;
     saveFollowUpSchedule({ sessionId, fireAt, count, delaySec });
     // 离线推送兜底：把本轮追问的完整请求快照预约到服务端，App 被杀时由服务端接管

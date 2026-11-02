@@ -321,10 +321,7 @@ export function InterviewMagazineApp({ onClose }: Props) {
   const activeCharacter = activeCharacters[0] ?? null;
   const maxCharacterTurns = getMaxCharacterTurns(Math.max(1, selectedCharacterIds.length));
 
-  const bgImageUrl = activeIssue?.guestSnapshots?.[0]?.characterSnapshot?.avatar
-    || activeIssue?.characterSnapshot?.avatar
-    || activeCharacter?.avatar
-    || (activeIssue?.characterIds?.length === 0 || selectedCharacterIds.length === 0 ? null : characters[0]?.avatar);
+  const bgImageUrl = "/interview/presence-bedroom.png";
 
   const resetDraft = () => {
     setTheme("");

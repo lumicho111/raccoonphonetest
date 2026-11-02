@@ -1,3 +1,4 @@
+import {isAndroidApp,nativeNotificationGranted,requestNativeNotifications,showNativeMessage} from "./android-notifications";
 // lib/browser-notification.ts
 // Browser Notification API wrapper for background alerts.
 
@@ -8,6 +9,7 @@ let _notifCounter = 0;
 /** Check if notifications are enabled in app settings. */
 export function isNotificationEnabled(): boolean {
     if (typeof window === "undefined") return false;
+    if(isAndroidApp())return loadChatAppSettings().browserNotificationsEnabled===true&&nativeNotificationGranted();
     if (!("Notification" in window)) return false;
     const settings = loadChatAppSettings();
     return settings.browserNotificationsEnabled === true && Notification.permission === "granted";
@@ -15,6 +17,7 @@ export function isNotificationEnabled(): boolean {
 
 /** Request notification permission from the browser. Returns true if granted. */
 export async function requestNotificationPermission(): Promise<boolean> {
+    if(isAndroidApp())return requestNativeNotifications();
     if (typeof window === "undefined" || !("Notification" in window)) return false;
     if (Notification.permission === "granted") return true;
     if (Notification.permission === "denied") return false;
@@ -72,6 +75,7 @@ export function sendBrowserNotification(
     if (!isNotificationEnabled()) return;
     if (!document.hidden) return;
 
+    if(isAndroidApp()){void showNativeMessage(title,options?.body,options?.url).catch(console.warn);return;}
     const payload: NotificationOptions = {
         body: options?.body,
         icon: options?.icon || "/icon-192.png",

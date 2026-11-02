@@ -11,9 +11,18 @@
     "check:sdk": "node scripts/check-custom-app-sdk-consistency.mjs",
     "check:push": "node scripts/check-personal-push-dist.mjs",
     "push:build-dist": "node scripts/build-personal-push-dist.mjs",
-    "build:glass-icons": "node scripts/build-glass-icons.mjs"
+    "build:glass-icons": "node scripts/build-glass-icons.mjs",
+    "android:web": "vite build --config vite.mobile.config.mjs",
+    "android:sync": "cap sync android",
+    "android:apk": "node scripts/build-android.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "6.2.1",
+    "@capacitor/app": "6.0.3",
+    "@capacitor/core": "6.2.1",
+    "@capacitor/filesystem": "6.0.4",
+    "@capacitor/local-notifications": "6.1.3",
+    "@capacitor/share": "6.0.3",
     "@gltf-transform/functions": "^4.4.1",
     "@heroicons/react": "^2.2.0",
     "@mdi/js": "^7.4.47",
@@ -46,6 +55,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@capacitor/cli": "6.2.1",
     "@gltf-transform/core": "^4.3.0",
     "@gltf-transform/extensions": "^4.3.0",
     "@tailwindcss/postcss": "^4.2.1",
@@ -55,9 +65,12 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "4.7.0",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.1.0",
+    "fake-indexeddb": "6.2.5",
     "tailwindcss": "^4.2.1",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "6.4.1"
   }
 }

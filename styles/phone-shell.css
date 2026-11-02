@@ -1547,3 +1547,5 @@
 /* Widget pages use a slightly tighter, uniform row gap without reserving a label line. */
 .icon-grid:has(.widget-wrap) { --slot-gap-y:max(0px,calc(var(--home-row-gap-y) - 3px)); }
 .icon-grid .widget-1x4 { height:var(--slot-icon-height); }
+
+.phone-status-bar{position:absolute}.phone-status-bar>.status-island{position:absolute;left:50%;transform:translateX(-50%);top:0;margin:0}

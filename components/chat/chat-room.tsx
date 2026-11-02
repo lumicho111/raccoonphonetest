@@ -1392,60 +1392,6 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    // 全屏特效：命中触发词的新消息播放表情雨/礼花（微信同款）
-    const [activeScreenEffect, setActiveScreenEffect] = useState<ActiveScreenEffect | null>(null);
-    const screenFxSeenRef = useRef<Set<string>>(new Set());
-    const screenFxMountedAtRef = useRef(Date.now());
-
-    useEffect(() => {
-        const seen = screenFxSeenRef.current;
-        let fired = activeScreenEffect !== null;
-        for (const msg of messages) {
-            if (seen.has(msg.id)) continue;
-            seen.add(msg.id);
-            if (msg.role !== "user" && msg.role !== "assistant") continue;
-            // 只对本次打开聊天室之后产生的消息生效，历史加载/翻页不触发
-            if (new Date(msg.createdAt).getTime() < screenFxMountedAtRef.current) continue;
-            // 骰子气泡：气泡自己翻滚定格，这里同步播全屏骰子（点数一致）
-            if (msg.mediaType === "dice") {
-                if (fired) continue;
-                const face = Math.min(6, Math.max(1, Number(msg.mediaData?.diceFace) || 1));
-                setActiveScreenEffect({ runId: msg.id, effect: "dice", emojis: "", diceFace: face });
-                fired = true;
-                continue;
-            }
-            if (msg.mediaType || !msg.content) continue;
-            const hit = matchChatScreenEffectRule(msg.content);
-            if (!hit) continue;
-            if (hit.effect === "dice") {
-                // 单独一条骰子图标（角色发的）：原地转成骰子气泡（内容保持图标），
-                // 点数由系统旁白公布，避免结果挂在角色消息上被模仿
-                const face = rollChatDiceFace();
-                const patch = {
-                    mediaType: "dice" as const,
-                    mediaData: { ...msg.mediaData, diceFace: face },
-                };
-                updateChatMessage(msg.id, patch);
-                setMessages(prev => prev.map(m => (m.id === msg.id ? { ...m, ...patch } : m)));
-                const diceAside = pushChatMessage({
-                    sessionId: session.id,
-                    role: "system",
-                    content: formatChatDiceResultMessage(face),
-                });
-                setMessages(prev => [...prev, diceAside]);
-                if (!fired) {
-                    setActiveScreenEffect({ runId: msg.id, effect: "dice", emojis: "", diceFace: face });
-                    fired = true;
-                }
-                continue;
-            }
-            if (fired) continue;
-            setActiveScreenEffect({ runId: msg.id, ...hit });
-            fired = true;
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [messages]);
-
     useEffect(() => {
         if (!effectiveBackgroundImage) {
             setBgImageResolved(null);
@@ -6035,7 +5981,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             )}
 
             {/* 全屏特效层（表情雨/礼花），不拦截任何触摸操作 */}
-            <ChatScreenEffectOverlay active={activeScreenEffect} onDone={() => setActiveScreenEffect(null)} />
+            {/* Fullscreen emoji effects retired; chat text and stickers remain. */}
             {/* Header */}
             <header className="page-header chat-room-main-pane" data-ui="header">
                 <div className="page-header-safe-area" />

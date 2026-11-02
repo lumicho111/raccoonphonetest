@@ -1,4 +1,6 @@
 "use client";
+import {isAndroidApp} from "@/lib/android-runtime";
+import {AndroidSettings} from "./settings/android-settings";
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, createContext, type CSSProperties, type ReactNode } from "react";
 import { Activity, Check, ChevronRight, Clock, Database, FileText, Fingerprint, Globe, HardDrive, Image, Info, KeyRound, Laptop, Layers, Link2, Loader2, LogOut, MessageSquare, Mic, SlidersHorizontal, UserCircle, Wrench, X, CloudUpload } from "lucide-react";
@@ -42,6 +44,7 @@ type SettingsPageProps = {
 };
 
 type SubPage =
+    | "android"
     | "aiBehavior"
     | "main"
     | "api"
@@ -300,6 +303,7 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
 
     const renderSubPage = () => {
         switch (currentPage) {
+            case "android": return <AndroidSettings onNotice={onNotice}/>;
             case "aiBehavior": return <AiBehaviorSettings />;
             case "api":
                 return <ApiSettings />;
@@ -429,6 +433,7 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
                                 <FeaturedCard item={agentComputerFeaturedItem} />
                             </div>
                         </div>
+                        {isAndroidApp()&&<FeaturedCard item={{id:"android",icon:Info,label:"安卓应用",desc:"版本、网站服务与覆盖更新",iconColor:BINDING_ACCENTS.api,onClick:()=>setCurrentPage("android")}}/>}
                         <div className="settings-realtime-section">
                             <h3 className="settings-menu-section-title">Runtime</h3>
                             <div className="app-card card-featured settings-toggle-card">

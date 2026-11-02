@@ -1,4 +1,6 @@
 "use client";
+import { AdventureVoice } from "./adventure-voice";
+import { splitBilingualText } from "@/lib/bilingual-text";
 import { useRef, useEffect } from "react";
 import type { StreamMessage } from "@/lib/map-types";
 import { BilingualTextBlock } from "@/components/chat/message-bubble";
@@ -24,6 +26,7 @@ export const ADVENTURE_THEMES = [
 type Props = {
   messages: StreamMessage[];
   avatarMap?: Record<string, string>;
+  voiceCharacterMap?: Record<string,string>;
   fontFamily?: string;
   fontScale?: number;        // multiplier, default 1
   lineHeightScale?: number;  // multiplier, default 1
@@ -37,6 +40,7 @@ type Props = {
 export default function MapTextStream({
   messages,
   avatarMap,
+  voiceCharacterMap,
   fontFamily,
   fontScale = 1,
   lineHeightScale = 1,
@@ -74,6 +78,7 @@ export default function MapTextStream({
           key={msg.id}
           msg={msg}
           avatarMap={avatarMap}
+          voiceCharacterMap={voiceCharacterMap}
           fontSize={baseFontSize}
           lineHeight={baseLineHeight}
           bilingualTranslationEnabled={bilingualTranslationEnabled}
@@ -128,6 +133,7 @@ function SpeakerAvatar({ src, fallback, size = 20 }: { src?: string; fallback?: 
 function MessageItem({
   msg,
   avatarMap,
+  voiceCharacterMap,
   fontSize,
   lineHeight,
   bilingualTranslationEnabled,
@@ -135,6 +141,7 @@ function MessageItem({
 }: {
   msg: StreamMessage;
   avatarMap?: Record<string, string>;
+  voiceCharacterMap?: Record<string,string>;
   fontSize: number;
   lineHeight: number;
   bilingualTranslationEnabled: boolean;
@@ -231,9 +238,10 @@ function MessageItem({
                 text={msg.text}
                 mode="plain"
                 defaultExpanded={defaultTranslationExpanded}
+                originalLeading={msg.speaker&&voiceCharacterMap?.[msg.speaker]?<AdventureVoice characterId={voiceCharacterMap[msg.speaker]} text={msg.text}/>:undefined}
               />
             ) : (
-              msg.text
+              <span style={{display:"inline-flex",alignItems:"center",gap:6}}>{msg.speaker&&voiceCharacterMap?.[msg.speaker]&&<AdventureVoice characterId={voiceCharacterMap[msg.speaker]} text={msg.text}/>}<span>{msg.text}</span></span>
             )}
           </div>
         </div>
