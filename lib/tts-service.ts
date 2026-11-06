@@ -1,3 +1,4 @@
+import { fetchAndroidTts, usesAndroidTtsTransport } from "./android-tts";
 import { loadChatAppSettings } from "./chat-storage";
 // lib/tts-service.ts — 语音合成服务
 
@@ -68,11 +69,12 @@ export async function synthesizeSpeech(
 // toggled the mic. Abort after a ceiling so the caller can recover.
 const TTS_TIMEOUT_MS = 120_000;
 
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TTS_TIMEOUT_MS): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TTS_TIMEOUT_MS, androidDirect = false): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        return await fetch(url, { ...init, signal: controller.signal });
+        const request = { ...init, signal: controller.signal };
+        return await (androidDirect ? fetchAndroidTts(url, request) : fetch(url, request));
     } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
             throw new Error(`语音合成超时（超过 ${Math.round(timeoutMs / 1000)} 秒无响应）`);
@@ -175,9 +177,10 @@ async function synthesizeFishAudio(text: string, config: VoiceApiConfig): Promis
     // directly from the browser can fail at the CORS/preflight layer before Fish
     // returns an HTTP status at all (surfacing only as `Failed to fetch`). Route the
     // official endpoint through our same-origin Next API proxy so browser CORS never
-    // enters the path. A custom Base URL is still called directly, which keeps support
+    // enters the path. Android uses its native HTTP transport directly, without this proxy.
+    // A custom Base URL is still called directly, which keeps support
     // for user-owned reverse proxies that explicitly enable browser CORS.
-    const response = isOfficialFishApi
+    const response = isOfficialFishApi && !usesAndroidTtsTransport()
         ? await fetchWithTimeout("/api/voice/fish-tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -200,8 +203,8 @@ async function synthesizeFishAudio(text: string, config: VoiceApiConfig): Promis
                 format: "mp3",
                 ...(voiceId ? { reference_id: voiceId } : {}),
             }),
-        }).catch((error: unknown) => {
-            if (error instanceof TypeError) {
+        }, TTS_TIMEOUT_MS, usesAndroidTtsTransport()).catch((error: unknown) => {
+            if (error instanceof TypeError && !usesAndroidTtsTransport()) {
                 throw new Error("Fish Audio 自定义 Base URL 无法从浏览器访问（可能被 CORS 或网络策略拦截）；请使用默认官方 Base URL，或使用已开启 CORS 的自有反代。");
             }
             throw error;
@@ -233,7 +236,7 @@ async function synthesizeElevenLabs(text: string, config: VoiceApiConfig): Promi
 
     const baseUrl = (config.baseUrl?.trim() || "https://api.elevenlabs.io/v1").replace(/\/+$/, "");
     const model = config.model?.trim() || "eleven_multilingual_v2";
-    const response = /^https:\/\/api\.elevenlabs\.io\/v1$/i.test(baseUrl)
+    const response = /^https:\/\/api\.elevenlabs\.io\/v1$/i.test(baseUrl) && !usesAndroidTtsTransport()
         ? await fetchWithTimeout("/api/voice/elevenlabs-tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -243,8 +246,8 @@ async function synthesizeElevenLabs(text: string, config: VoiceApiConfig): Promi
             method: "POST",
             headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
             body: JSON.stringify({ text, model_id: model }),
-        }).catch((error: unknown) => {
-            if (error instanceof TypeError) {
+        }, TTS_TIMEOUT_MS, usesAndroidTtsTransport()).catch((error: unknown) => {
+            if (error instanceof TypeError && !usesAndroidTtsTransport()) {
                 throw new Error("ElevenLabs 自定义 Base URL 无法从浏览器访问；请使用默认官方地址，或使用已开启 CORS 的自有反代。");
             }
             throw error;
@@ -344,6 +347,7 @@ export function setTtsVolume(volume: number): void {
 // 上下文永久 resume，页面从第一次点击起就一直持有系统音频会话；叠加通话退出
 // 后识别泄漏，整页音频会被钉在"通话模式"（语音条/试听音量巨大且音量键失灵）。
 let _callAudioSessionActive = false;
+export function isCallAudioSessionActive(){return _callAudioSessionActive;}
 
 /** 通话界面挂载时置 true、卸载/挂断时置 false（false 时立即挂起空闲的上下文）。 */
 export function setCallAudioSessionActive(active: boolean): void {

@@ -299,7 +299,7 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                     <div className="kkt-section-heading"><span>更新的个人资料</span><button type="button" className="kkt-section-toggle" onClick={() => toggleSection("updates")} aria-label={collapsedSections.updates ? "展开更新的个人资料" : "收起更新的个人资料"} aria-expanded={!collapsedSections.updates} aria-controls="kkt-profile-updates"><ChevronUp size={16} strokeWidth={1.8}/></button></div>
                     <div id="kkt-profile-updates" className="kkt-updates-list" hidden={collapsedSections.updates}>{profileUpdates.map(c => {
                         const avatar = resolveChatCharacterAvatar(c.char);
-                        return <div key={c.characterId} className="kkt-update-preview">
+                        return <div key={c.characterId} data-reverse-contact-id={c.characterId} className="kkt-update-preview">
                             <span className="kkt-update-avatar">{avatar ? <img src={avatar} alt="" /> : <ChatFallbackAvatar />}</span>
                             <span>{resolveChatCharacterDisplayName(c.char)}</span>
                         </div>;
@@ -360,6 +360,7 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                                     return (
                                         <div
                                             key={c.id}
+                                            data-reverse-contact-id={c.characterId}
                                             onClick={() => {
                                                 const sess = createOrGetSession(char.id);
                                                 onSelectSession(sess);

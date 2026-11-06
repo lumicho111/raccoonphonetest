@@ -188,7 +188,7 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
             : currentPage === "moderation"
                 ? "管理中心"
                 : SETTINGS_MENU.find(m => m.id === currentPage)?.label || "设置";
-    const title = subpageTitle || defaultTitle;
+    const title = subpageTitle || (currentPage === "android" ? "关于与更新" : defaultTitle);
 
     const setSubpageRightAction = useCallback((page: string, action: ReactNode | null) => {
         setSubpageRightActions(prev => {
@@ -433,7 +433,7 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
                                 <FeaturedCard item={agentComputerFeaturedItem} />
                             </div>
                         </div>
-                        {isAndroidApp()&&<FeaturedCard item={{id:"android",icon:Info,label:"安卓应用",desc:"版本、网站服务与覆盖更新",iconColor:BINDING_ACCENTS.api,onClick:()=>setCurrentPage("android")}}/>}
+                        {isAndroidApp()&&<FeaturedCard item={{id:"android",icon:Info,label:"关于与更新",desc:"版本、导入更新包与网站服务",iconColor:BINDING_ACCENTS.api,onClick:()=>setCurrentPage("android")}}/>}
                         <div className="settings-realtime-section">
                             <h3 className="settings-menu-section-title">Runtime</h3>
                             <div className="app-card card-featured settings-toggle-card">

@@ -1,6 +1,7 @@
 import type { CustomAppIconId } from "@/lib/custom-app-types";
 
 export type IconId =
+  | "browser"
   | "chat"
   | "photos"
   | "weverse"
@@ -71,7 +72,7 @@ export const PAGE_2_DEFAULT: IconId[] = [
   "photos",
   "weverse",
   "ytb",
-  "lysn"
+  "lysn", "browser"
 ];
 
 // 第三页默认图标：右半边 2×2 排布（左半边留给日历组件），位置见 createDefaultDesktopIconLayout
@@ -80,6 +81,7 @@ export const PAGE_3_DEFAULT: IconId[] = ["qa", "resource_hub", "sms", "twitter",
 export const DOCK_DEFAULT: IconId[] = ["settings", "theme", "resources", "characters"];
 
 export const ICONS: Record<IconId, IconMeta> = {
+  browser:{id:"browser",label:"浏览器",tone:"#348ce7",placeholder:false},
   offstage: {id:"offstage",label:"幕后",tone:"#343434",placeholder:false},
   chat: { id: "chat", label: "\u804a\u5929", tone: "var(--c-icon-green)", placeholder: false },
   photos: { id: "photos", label: "照片", tone: "var(--c-icon-rose)", placeholder: false },
@@ -91,7 +93,7 @@ export const ICONS: Record<IconId, IconMeta> = {
   twitter: { id: "twitter", label: "X", tone: "#1d9bf0", placeholder: false },
   theqoo: { id: "theqoo", label: "Theqoo", tone: "#315777", placeholder: false },
   question_box: { id: "question_box", label: "提问箱", tone: "#d9c8fa", placeholder: false },
-  diary: { id: "diary", label: "手记", tone: "var(--c-icon-violet)", placeholder: false },
+  diary: { id: "diary", label: "iCity", tone: "var(--c-icon-violet)", placeholder: false },
   music: { id: "music", label: "\u97F3\u4E50", tone: "var(--c-icon-coral)", placeholder: false },
   reading: { id: "reading", label: "\u9605\u8BFB", tone: "var(--c-icon-amber)", placeholder: false },
   story: { id: "story", label: "\u5267\u60C5", tone: "var(--c-icon-story, #8b6f52)", placeholder: false },

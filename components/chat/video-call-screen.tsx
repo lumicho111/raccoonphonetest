@@ -1,4 +1,5 @@
 "use client";
+import {DraggableMediaWindow} from "@/components/ui/draggable-media-window";
 import {characterSpeaksFirst} from "@/lib/call-first-speaker";
 import { VoiceFavoriteDialog } from "./voice-favorite-dialog";
 import { useCallEndRecord } from "./use-call-end-record";
@@ -703,17 +704,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
 
     if (minimized) {
         return (
-            <button
-                type="button"
-                className="call-mini-window"
-                style={{ backgroundImage: `url(${bgImageResolved || callIdentity.avatar || ""})` }}
-                onClick={onRestore}
-                aria-label={`返回与${callIdentity.name}的视频通话`}
-                title="点击返回通话"
-            >
-                <span className="call-mini-window-overlay" />
-                <span className="call-mini-window-name">{callIdentity.name}</span>
-            </button>
+            <DraggableMediaWindow label={`返回与${callIdentity.name}的视频通话`} onOpen={onRestore} style={{backgroundImage:`url(${bgImageResolved || callIdentity.avatar || ""})`}}><span className="call-mini-window-overlay"/><span className="call-mini-window-name">{callIdentity.name}</span></DraggableMediaWindow>
         );
     }
 

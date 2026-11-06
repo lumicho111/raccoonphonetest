@@ -1,4 +1,6 @@
 "use client";
+import {reversePageIntent} from "@/lib/reverse-phone-state";
+import {useAppBack} from "@/lib/back-navigation";
 import { CHAT_APPEARANCE_OPEN, loadChatNightMode, saveChatNightMode } from "@/lib/chat-appearance";
 import "@/styles/chat-night.css";
 
@@ -30,9 +32,14 @@ export type PhoneChatAppProps = {
 };
 
 export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSessionId, onSessionChange, sharePayload, onShareDone }: PhoneChatAppProps) {
+    const appRoot=useRef<HTMLDivElement>(null);
+    useAppBack(()=>{if(activeSession){setActiveSession(null);setActiveTab("messages");}else if(appearanceOpen)setAppearanceOpen(false);else onClose();},()=>!!appRoot.current?.getClientRects().length,15);
+    useEffect(()=>{const fn=(event:Event)=>{const d=(event as CustomEvent).detail||{};if(d.app!=='chat'||!appRoot.current?.getClientRects().length)return;if(d.view==='thread'&&d.sessionId){const session=loadChatSessions().find(s=>s.id===d.sessionId);if(session){setActiveSession(session);setActiveTab('messages');}}else{setActiveSession(null);setActiveTab(d.view==='feeds'?'feeds':d.view==='contacts'?'contacts':'messages');}};window.addEventListener('rabbit-reverse-page',fn);if(reversePageIntent())fn(new CustomEvent('rabbit-reverse-page',{detail:reversePageIntent()}));return()=>window.removeEventListener('rabbit-reverse-page',fn);},[]);
+    useEffect(()=>{const share=()=>{if(!appRoot.current?.getClientRects().length)return;setActiveSession(null);setActiveTab('feeds');};window.addEventListener('chat-screenshot-to-moments',share);return()=>window.removeEventListener('chat-screenshot-to-moments',share);},[]);
     const [activeTab, setActiveTab] = useState<TabKey>("contacts");
     const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
     const [activeMascot, setActiveMascot] = useState(false);
+    useEffect(()=>{if(!initialSessionId)return;const s=loadChatSessions().find(s=>s.id===initialSessionId);if(s){setActiveSession(s);setActiveTab("messages");}},[initialSessionId]);
     // Chat app-level custom CSS (affects all chat pages, lower priority than per-session CSS)
     const [chatAppCSS, setChatAppCSS] = useState(() =>
         typeof window !== "undefined" ? kvGet("chat-app-custom-css") || "" : ""
@@ -263,7 +270,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     if (!dbReady) return null;
 
     return (
-        <div
+        <div ref={appRoot}
             data-chat-theme={nightMode ? "dark" : "light"}
             className="chat-app absolute inset-0 flex flex-col overflow-hidden z-10"
             {...(activeSession || activeMascot ? { "data-room-active": "" } : {})}

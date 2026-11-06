@@ -1,4 +1,5 @@
 "use client";
+import {DraggableMediaWindow} from "@/components/ui/draggable-media-window";
 import {characterSpeaksFirst} from "@/lib/call-first-speaker";
 import { VoiceFavoriteDialog } from "./voice-favorite-dialog";
 import { useCallEndRecord } from "./use-call-end-record";
@@ -102,20 +103,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
         window.dispatchEvent(new CustomEvent("chat-call-state", { detail: { active: callState !== "ENDED", sessionId: session.id, type: "voice", phase: callState === "CONNECTING" ? "ringing" : "connected" } }));
 
     }, [callState, session.id]);
-    useEffect(() => { minimizedRef.current = minimized; }, [minimized]);
-
-    // 缩小为悬浮窗：冻结通话——停止监听、打断在播放的语音
-    useEffect(() => {
-        if (!minimized) return;
-        audioTokenRef.current++;
-        setPlayingSubtitleId(null);
-        setInputVisible(false);
-        if (stateRef.current === "AI_SPEAKING" || stateRef.current === "USER_SPEAKING") setCallState("IDLE");
-        if (sttRef.current) { sttRef.current.abort(); sttRef.current = null; }
-        setInterimText("");
-        if (audioAbortRef.current) { audioAbortRef.current(); audioAbortRef.current = null; }
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
-    }, [minimized]);
+    useEffect(() => { minimizedRef.current = false; }, [minimized]);
 
     // 来电等待接听：循环振动（开关在聊天主页，iOS 网页不支持自动无效果）
     // + 来电/致电铃声与挂断音（角色专属提示音优先，其余在"全局聊天信息 → 提示音"）
@@ -316,7 +304,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
 
     const queueUserText = useCallback((userText: string) => {
         const text = userText.trim();
-        if (!text || !inputOpenRef.current || !["IDLE", "USER_SPEAKING"].includes(stateRef.current) || minimizedRef.current) return;
+        if (!text || !inputOpenRef.current || !["IDLE", "USER_SPEAKING"].includes(stateRef.current)) return;
         setInputVisible(false);
         firstSpeakerDone.current=true;
         const userMsg = pushChatMessage({ sessionId: session.id, role: "user", content: text });
@@ -363,7 +351,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
     }, [session, processAIResponse, subtitles, setCallState, setInputVisible, callIdentity.name, callDuration, onEnd]);
 
     useEffect(()=>{
-        if(callState!=="IDLE" || firstSpeakerDone.current || minimized)return;
+        if(callState!=="IDLE" || firstSpeakerDone.current  )return;
         if(firstSpeakerChoice.current===null)firstSpeakerChoice.current=characterSpeaksFirst(session.contactId);
         const timer=setTimeout(()=>{if(stateRef.current!=="IDLE")return;firstSpeakerDone.current=true;if(firstSpeakerChoice.current)void runConversationTurn();},0);
         return ()=>clearTimeout(timer);
@@ -371,7 +359,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
 
     const playSubtitle = useCallback(async (subtitle: SubtitleEntry) => {
         if (playingSubtitleId === subtitle.id) { audioTokenRef.current++; audioAbortRef.current?.(); setPlayingSubtitleId(null); if ((stateRef.current as string) !== "ENDED") setCallState("IDLE"); return; }
-        if (stateRef.current !== "IDLE" || minimizedRef.current) return;
+        if (stateRef.current !== "IDLE") return;
         const voiceConfig = subtitle.role === "user" ? resolveUserVoiceConfig() : resolveVoiceConfig(session.contactId);
         if (!voiceConfig) { setReplyError(subtitle.role === "user" ? "请先在全局聊天信息中选择用户语音配置" : "请先给角色绑定语音配置"); return; }
         const token = ++audioTokenRef.current;
@@ -380,7 +368,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
         try {
             let blob = subtitleAudioCacheRef.current.get(subtitle.id);
             if (!blob) blob = await synthesizeSpeech(originalCallSpeech(subtitle.text), voiceConfig) || undefined;
-            if (token !== audioTokenRef.current || (stateRef.current as string) === "ENDED" || minimizedRef.current) return;
+            if (token !== audioTokenRef.current || (stateRef.current as string) === "ENDED") return;
             if (!blob) throw new Error("语音合成未返回音频");
             subtitleAudioCacheRef.current.set(subtitle.id, blob);
             let started = false;
@@ -461,17 +449,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
 
     if (minimized) {
         return (
-            <button
-                type="button"
-                className="call-mini-window"
-                style={{ backgroundImage: `url(${bgImageResolved || callIdentity.avatar || ""})` }}
-                onClick={onRestore}
-                aria-label={`返回与${callIdentity.name}的语音通话`}
-                title="点击返回通话"
-            >
-                <span className="call-mini-window-overlay" />
-                <span className="call-mini-window-name">{callIdentity.name}</span>
-            </button>
+            <DraggableMediaWindow label={`返回与${callIdentity.name}的语音通话`} onOpen={onRestore} style={{backgroundImage:`url(${bgImageResolved || callIdentity.avatar || ""})`}}><span className="call-mini-window-overlay"/><span className="call-mini-window-name">{callIdentity.name}</span></DraggableMediaWindow>
         );
     }
 

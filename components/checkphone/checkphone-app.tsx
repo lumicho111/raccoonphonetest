@@ -1,9 +1,13 @@
 "use client";
+import {PhoneAccessDialog,PhonePasswordManager,PhoneVisitHistory} from "./checkphone-access-dialog";
+import {finishPhoneAccess,markPhoneApp,currentPhoneVisit} from "@/lib/checkphone-access";
+import {settlePhoneVisit} from "@/lib/checkphone-settle";
 import { loadCheckPhoneAppSelection, saveCheckPhoneAppSelection } from "@/lib/checkphone-app-selection";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AtSign,
+  KeyRound,
   BookOpenText,
   Camera,
   Compass,
@@ -293,6 +297,10 @@ function getAppIconClass(appId: CheckPhoneAppId, isDock = false) {
 
 export function CheckPhoneApp({ onClose }: CheckPhoneAppProps) {
   const [characters, setCharacters] = useState<Character[]>([]);
+  useEffect(()=>()=>{const visit=finishPhoneAccess();if(visit)void settlePhoneVisit(visit).catch(console.error);},[]);
+  const [accessTarget,setAccessTarget]=useState<string|null>(null);
+  const [passwordManager,setPasswordManager]=useState(false);
+  const [settleError,setSettleError]=useState("");
   const [activeCharId, setActiveCharId] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, ManifestState>>({});
   const [manifestsCacheMap, setManifestsCacheMap] = useState<Record<string, CheckPhoneManifest>>({});
@@ -479,6 +487,7 @@ export function CheckPhoneApp({ onClose }: CheckPhoneAppProps) {
   }
 
   function openApp(appId: CheckPhoneAppId) {
+    markPhoneApp(CHECKPHONE_APP_SPECS[appId].label);
     if (activeCharId) {
       updateUnreadApps(activeCharId, (current) => current.filter((id) => id !== appId));
     }
@@ -650,6 +659,7 @@ export function CheckPhoneApp({ onClose }: CheckPhoneAppProps) {
 
   const handleBack = () => {
     if (activeCharId) {
+      const visit=finishPhoneAccess(); if(visit)void settlePhoneVisit(visit).catch(e=>setSettleError("后续处理失败："+String(e)));
       setActiveCharId(null);
       setSelectedAppId(null);
     } else {
@@ -1177,7 +1187,7 @@ export function CheckPhoneApp({ onClose }: CheckPhoneAppProps) {
       onBack={handleBack}
       className="cp-page-override cp-roster-page"
       rightAction={
-        <div style={{ display: "flex", gap: 10 }}><button type="button" className="cp-history-btn" aria-label="桌面应用管理" onClick={() => { setAppsManagerOpen(true); setAppsCharacterId(""); }}><LayoutGrid size={18} strokeWidth={1.8}/></button><button
+        <div style={{ display: "flex", gap: 10 }}><button aria-label="生成手机密码" className="cp-history-btn" onClick={()=>setPasswordManager(true)}><KeyRound size={18} strokeWidth={1.8}/></button><button type="button" className="cp-history-btn" aria-label="桌面应用管理" onClick={() => { setAppsManagerOpen(true); setAppsCharacterId(""); }}><LayoutGrid size={18} strokeWidth={1.8}/></button><button
           type="button"
           className="cp-history-btn"
           aria-label="查手机记录"
@@ -1187,6 +1197,9 @@ export function CheckPhoneApp({ onClose }: CheckPhoneAppProps) {
         </button></div>
       }
     >
+      {accessTarget&&<PhoneAccessDialog owner={accessTarget} onClose={()=>setAccessTarget(null)} onEnter={()=>{setActiveCharId(accessTarget);setAccessTarget(null);}}/>}
+      {passwordManager&&<PhonePasswordManager onClose={()=>setPasswordManager(false)}/>}
+      {settleError&&<p role="alert">{settleError}</p>}
       <div className="cp-app-wrapper">
         <div className="cp-roster-view">
           {/* Tactical forensic header console */}
@@ -1213,11 +1226,11 @@ export function CheckPhoneApp({ onClose }: CheckPhoneAppProps) {
                 <div
                   key={character.id}
                   className="cp-roster-card"
-                  onClick={() => setActiveCharId(character.id)}
+                  onClick={() => setAccessTarget(character.id)}
                   onKeyDown={(event) => {
                     if (event.key !== "Enter" && event.key !== " ") return;
                     event.preventDefault();
-                    setActiveCharId(character.id);
+                    setAccessTarget(character.id);
                   }}
                   role="button"
                   tabIndex={0}
@@ -1300,7 +1313,7 @@ export function CheckPhoneApp({ onClose }: CheckPhoneAppProps) {
                   <X size={16} strokeWidth={2} />
                 </button>
               </div>
-              <div className="cp-history-body">
+              <div className="cp-history-body"><PhoneVisitHistory/>
                 {historyGroups.length === 0 && (
                   <div className="cp-history-empty">NO ACCESS RECORDS</div>
                 )}

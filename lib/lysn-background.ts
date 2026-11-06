@@ -1,3 +1,5 @@
+import {notifyLysn} from "./lysn-notification";
+import {lysnCalendarContext} from "./lysn-calendar-context";
 import { loadCharacters } from "./character-storage";
 import { generateLysn } from "./lysn-engine";
 import { prepareLysnMessages } from "./lysn-message";
@@ -21,7 +23,7 @@ export async function maybeGenerateLysnBackgroundMessage(): Promise<void> {
   const observedMessages: Array<{ characterId: string; text: string }> = [];
   for (const characterId of state.subscribedIds) {
     const room = state.rooms[characterId];
-    if (!room?.openerShown) continue;
+    if (!room?.openerShown || !lysnCalendarContext(characterId).canRead) continue;
     const lastArtistAt = state.messages.filter(m => m.characterId === characterId && m.sender === "artist" && !m.opener).at(-1)?.createdAt || 0;
     const unread = state.messages.filter(m => m.characterId === characterId && m.sender === "fan" && !m.seenAt && m.createdAt > lastArtistAt);
     if (!unread.length) {
@@ -47,34 +49,30 @@ export async function maybeGenerateLysnBackgroundMessage(): Promise<void> {
   const now = Date.now();
   const id = scheduleState.subscribedIds.find(characterId => {
     const room = scheduleState.rooms[characterId];
-    if (!room?.openerShown) return false;
+    if (!room?.openerShown || !lysnCalendarContext(characterId).canSend) return false;
     const activity = room.activity || "normal";
-    const interval = ({ quiet: 12, normal: 4, frequent: 1 }[activity]) * 3600000;
+    const interval = ({ quiet: 36, normal: 6, frequent: 1 }[activity]) * 3600000 * (lysnCalendarContext(characterId).level===2?1.5:1);
     const firstWait = ({ quiet: 4 * 3600000, normal: FIRST_MESSAGE_WAIT_MS, frequent: 5 * 60000 }[activity]);
     const latest = scheduleState.messages.filter(m => m.characterId === characterId && m.sender === "artist" && !m.opener).at(-1)?.createdAt || 0;
     const joined = scheduleState.subscribedAt[characterId] || now;
-    return now - Math.max(latest, scheduleState.lastAutoAt[characterId] || 0, joined) >= (latest ? interval : firstWait);
+    if(!room.nextArrivalAt){room.nextArrivalAt=Math.max(latest,scheduleState.lastAutoAt[characterId]||0,joined)+(latest?interval:firstWait)*(.65+Math.random()*.9);saveLysn(scheduleState);}
+    return now>=room.nextArrivalAt;
   });
   if (!id || !loadCharacters().some(c => c.id === id)) return;
   running = true;
-  scheduleState.lastAutoAt[id] = now; saveLysn(scheduleState);
+  scheduleState.lastAutoAt[id] = now; scheduleState.rooms[id].nextArrivalAt=undefined; saveLysn(scheduleState);
   try {
     const result = await generateLysn(id, scheduleState.messages.filter(m => m.characterId === id), "new");
     if (!result.length) return;
     const rows = await prepareLysnMessages(id, result);
     if (!rows.length) return;
-    if (!loadLysn().subscribedIds.includes(id)) return;
-    const newlyObserved = loadLysn().messages.filter(m => m.characterId === id && m.sender === "fan" && m.kind === "text" && !m.seenAt);
+    if (!loadLysn().subscribedIds.includes(id) || loadLysn().subscribedAt[id]!==scheduleState.subscribedAt[id] || !lysnCalendarContext(id).canSend) return;
+    const newlyObserved = loadLysn().messages.filter(m => m.characterId === id && m.sender === "fan" && m.kind === "text" && !m.seenAt && result.some(row=>row.quote?.original===m.original));
     appendLysn(id, rows);
     newlyObserved.forEach(message => noteLysnFanMessage(id, message.original));
     if (result[0]?.profileUpdate) await applyLysnProfileAction(id, JSON.stringify(result[0].profileUpdate));
     const latest = loadLysn();
-    if (latest.settings.notificationsEnabled && !latest.rooms[id]?.muted) {
-      const character = loadCharacters().find(c => c.id === id);
-      const name = latest.rooms[id]?.chatName || latest.profiles[id]?.name || character?.name || "艺人";
-      sendBrowserNotification(`${name} · Lysn`, { body: result[0].original.slice(0, 90), url: `/#lysn=${encodeURIComponent(id)}` });
-      window.dispatchEvent(new CustomEvent("lysn-message-notice", { detail: { characterId: id, title: `${name} · Lysn`, body: result[0].original } }));
-    }
+    notifyLysn(id);
   } catch {
     const latest = loadLysn();
     latest.lastAutoAt[id] = Date.now() - FIRST_MESSAGE_WAIT_MS + RETRY_WAIT_MS;

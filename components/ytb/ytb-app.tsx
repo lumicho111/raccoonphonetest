@@ -10,7 +10,7 @@ import { generateYtb, generateYtbMessages, generateYtbRound } from "@/lib/ytb-en
 import { deleteYtbChannel, emptyYtbState, saveYtbRecording, discardYtbRecording, deleteYtbRecording, loadYtbState, makeYtbChannel, saveYtbState, YTB_UPDATED, YTB_STRANGER_AVATAR, ytbId, type YtbChannel, type YtbDeal, type YtbMessage, type YtbState, type YtbStream } from "@/lib/ytb-storage";
 import { expireYtbStreams, finishYtbStream, withdrawYtbIncome, ytbAvailability } from "@/lib/ytb-runtime";
 import { exchangeWalletAmount, loadWalletState, walletCurrency } from "@/lib/wallet-storage";
-import { playAudioBlobViaMediaElement, resolveUserVoiceConfig, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
+import {isCallAudioSessionActive, playAudioBlobViaMediaElement, resolveUserVoiceConfig, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
 import { initialYtbNavigation, navigateYtb, backYtb, replaceYtb, type YtbScreen as Screen } from "@/lib/ytb-navigation";
 import { ytbCanVisit, ytbKnowEachOther, ytbEnterStream, ytbRecognizes, ytbReadMessages } from "@/lib/ytb-policy";
 import { ytbMemorySources } from "@/lib/ytb-memory";
@@ -19,13 +19,13 @@ import { YtbConversation } from "./ytb-conversation";
 import { YtbLiveRoom } from "./ytb-live-room";
 import s from "./ytb-app.module.css";
 
-type Props={onClose:()=>void;onNotice?:(message:string)=>void};
+type Props={visible?:boolean;onClose:()=>void;onNotice?:(message:string)=>void};
 type Modal={type:"create"|"choose"|"refresh"}|{type:"exit"|"summary"|"calls"|"ad"|"bell"|"replay"|"share"|"delete";id:string}|{type:"groupEdit";id:string}|{type:"replayEdit";id:string};
 const compact=(n:number)=>n>=10000?`${(n/10000).toFixed(1)}万`:Math.max(0,n).toLocaleString();
 const Avatar=({url,name,onClick}:{url:string;name:string;onClick?:()=>void})=>onClick?<button className={s.avatar} onClick={onClick}>{url?<img src={url} alt=""/>:name.slice(0,1)}</button>:<span className={s.avatar}>{url?<img src={url} alt=""/>:name.slice(0,1)}</span>;
 const initialStudio={title:"",titleTranslated:"",theme:"",cover:"",linkedDealId:""};
 async function upload(file:File):Promise<string>{return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const c=document.createElement("canvas"),scale=Math.min(1,1000/Math.max(img.width,img.height));c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext("2d")?.drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL("image/webp",.82));};img.src=String(r.result);};r.readAsDataURL(file);});}
-export function YtbApp({onClose,onNotice}:Props){
+export function YtbApp({visible=true,onClose,onNotice}:Props){
  const [state,setState]=useState(emptyYtbState),ref=useRef(state);
  const [ready,setReady]=useState(false),[navigation,setNavigation]=useState(initialYtbNavigation),[modal,setModal]=useState<Modal|null>(null);
  const {tab,screen,messageTab,channelTab}=navigation.current;
@@ -55,6 +55,11 @@ export function YtbApp({onClose,onNotice}:Props){
  const current=screen&&"id"in screen?state.channels.find(c=>c.id===screen.id):undefined;
  const stream=screen?.type==="stream"?state.streams.find(l=>l.id===screen.id):undefined;
  const host=stream?state.channels.find(c=>c.id===stream.channelId):undefined;
+ const backgroundAdvanceAt=useRef(0);
+ useEffect(()=>{if(!visible&&stream?.status==='live')commit(p=>({...p,backgroundId:stream.id}));else if(visible&&stream&&ref.current.backgroundId===stream.id)commit(p=>({...p,backgroundId:null}));},[visible,stream?.id]);
+ useEffect(()=>{const fn=(event:Event)=>{if((event as CustomEvent).detail?.active)audio.current?.abort();};window.addEventListener('chat-call-state',fn);return()=>window.removeEventListener('chat-call-state',fn);},[]);
+ useEffect(()=>{const timer=window.setInterval(()=>{const now=Date.now(),live=ref.current.streams.find(l=>l.id===ref.current.backgroundId&&l.status==='live'),ch=ref.current.channels.find(c=>c.id===live?.channelId);if(!live||!ch||ch.ownerType==='user'||busyRef.current||now<backgroundAdvanceAt.current||Math.max(live.startedAt,...live.lines.map(l=>l.at))>now)return;backgroundAdvanceAt.current=now+60000;void run(()=>advance(live.id));},5000);return()=>window.clearInterval(timer);},[]);
+
  const thread=screen?.type==="thread"?state.threads.find(t=>t.id===screen.id):undefined;
  const group=screen?.type==="group"?state.groups.find(g=>g.id===screen.id):undefined;
  const peer=thread?state.channels.find(c=>c.id===thread.peerChannelId):group?state.channels.find(c=>c.id===group.channelId):undefined;
@@ -138,7 +143,7 @@ export function YtbApp({onClose,onNotice}:Props){
  }
 
  async function refreshMessages(){for(const l of ref.current.streams)for(const id of l.pendingShares||[]){const ch=ref.current.channels.find(c=>c.id===id);if(ch&&ytbAvailability(ch).free)await shareReplay(l.id,ch);}await refreshDms();}
- async function speak(text:string,ch?:YtbChannel){unlockAudioPlayback();await run(async()=>{const config=ch?.ownerType==="user"?resolveUserVoiceConfig():ch?.ownerType==="character"?resolveVoiceConfig(ch.ownerId,"ytb"):null;if(!config)throw new Error("请先为这个账号配置语音。");audio.current?.abort();const blob=await synthesizeSpeech(text,config);if(blob)audio.current=playAudioBlobViaMediaElement(blob);});}
+ async function speak(text:string,ch?:YtbChannel){if(isCallAudioSessionActive()){notice("通话进行中，直播暂时静音");return;}unlockAudioPlayback();await run(async()=>{const config=ch?.ownerType==="user"?resolveUserVoiceConfig():ch?.ownerType==="character"?resolveVoiceConfig(ch.ownerId,"ytb"):null;if(!config)throw new Error("请先为这个账号配置语音。");audio.current?.abort();const blob=await synthesizeSpeech(text,config);if(blob)audio.current=playAudioBlobViaMediaElement(blob);});}
  function callChannel(live:YtbStream,ch:YtbChannel){const host=ref.current.channels.find(c=>c.id===live.channelId);if(ch.ownerType==="character"&&host&&!ytbCanVisit(host,ch)){notice("对方与你尚无关系线，或尚不知道这个账号的身份。");return;}if(!ytbAvailability(ch).free){notice("对方现在有日程，暂时无法接通。");return;}if(live.calls.some(c=>c.status==="connected")){notice("请先结束当前连线。");return;}updateStream(live.id,l=>({...ytbEnterStream(l,ch,ref.current),calls:[...l.calls,{id:ytbId(),channelId:ch.id,name:ch.name,avatar:ch.avatar,at:Date.now(),status:"connected"}]}));setModal(null);notice("已接通，发送语言后点飞机推进通话。");}
  const [callTab,setCallTab]=useState("incoming");
  function end(id:string){commit(p=>finishYtbStream(p,id));setModal({type:"summary",id});}

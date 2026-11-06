@@ -1,3 +1,4 @@
+import {isReverseActive} from "./reverse-phone-state";
 // lib/reading-storage.ts — Dexie IndexedDB persistence for Reading feature.
 
 import Dexie from "dexie";
@@ -172,6 +173,7 @@ export async function loadProgress(bookId: string): Promise<ReadingProgress | nu
 }
 
 export async function saveProgress(progress: ReadingProgress): Promise<void> {
+    if(isReverseActive())return;
     await db.progress.put(progress);
     _progressCache.set(progress.bookId, progress);
 }

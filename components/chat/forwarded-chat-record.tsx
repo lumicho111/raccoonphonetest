@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, MessagesSquare, X } from "lucide-react";
 import type { ChatMessage } from "@/lib/chat-storage";
+import {splitBilingualText} from "@/lib/bilingual-text";
+import {loadChatSessions} from "@/lib/chat-storage";
+import {loadChatNightMode} from "@/lib/chat-appearance";
+import {useAppBack} from "@/lib/back-navigation";
 import { forwardedMessageText, type ForwardedChatEntry } from "@/lib/chat-forward";
 import { getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
 import { isMediaStoreRef, loadMediaObjectUrl } from "@/lib/media-cache-storage";
@@ -26,7 +30,8 @@ export function ForwardAvatar({ image, name }: {image?:string|null;name:string})
   const url=useAsset(image);
   return <span className="chat-forward-avatar">{url?<img src={url} alt=""/>:name.slice(0,1)}</span>;
 }
-function SnapshotEntry({entry}:{entry:ForwardedChatEntry}) {
+function SnapshotEntry({entry,defaultExpanded}:{entry:ForwardedChatEntry;defaultExpanded:boolean}) {
+  const [expanded,setExpanded]=useState(defaultExpanded);const pair=splitBilingualText(entry.message.content);
   const message=entry.message;
   const source=message.mediaType==="sticker" ? message.mediaData?.stickerUrl||message.mediaUrl : message.mediaUrl;
   const url=useAsset(source);
@@ -35,14 +40,15 @@ function SnapshotEntry({entry}:{entry:ForwardedChatEntry}) {
   return <article className="chat-forward-entry">
     <ForwardAvatar image={entry.avatar} name={entry.name}/>
     <div><header><strong>{entry.name}</strong><time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</time></header>
-      {media}<p>{forwardedMessageText(message)}</p>
+      {media}<div className="chat-forward-text" onClick={()=>pair&&setExpanded(x=>!x)} role={pair?"button":undefined} tabIndex={pair?0:undefined} onKeyDown={e=>{if(pair&&(e.key==="Enter"||e.key===" ")){e.preventDefault();setExpanded(x=>!x);}}}>{pair?<><p>{pair.original}</p>{expanded&&<p className="chat-forward-translation">{pair.translated}</p>}</>:<p>{forwardedMessageText(message)}</p>}</div>
     </div>
   </article>;
 }
 export function ForwardedChatBubble({msg}:{msg:ChatMessage}) {
   const record=msg.mediaData?.forwardRecord;
   const [open,setOpen]=useState(false);
-  const [dark,setDark]=useState(false);
+  const [dark,setDark]=useState(loadChatNightMode);
+  useAppBack(()=>setOpen(false),()=>open,60);
   const button=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
     if(!open)return;
@@ -58,8 +64,8 @@ export function ForwardedChatBubble({msg}:{msg:ChatMessage}) {
     </button>
     {open&&createPortal(<div className="chat-forward-mask" data-theme={dark?"dark":"light"} onClick={event=>{event.stopPropagation();if(event.target===event.currentTarget){setOpen(false);button.current?.focus();}}}>
       <section className="chat-forward-dialog" role="dialog" aria-modal="true" aria-label={record.title}>
-        <header className="chat-forward-heading"><div><strong>{record.title}</strong><small>转发时的记录快照 · {record.entries.length} 条</small></div><button autoFocus type="button" onClick={()=>{setOpen(false);button.current?.focus();}} aria-label="关闭聊天记录"><X size={22}/></button></header>
-        <div className="chat-forward-scroll">{record.entries.map((entry,index)=><SnapshotEntry key={`${entry.message.id}:${index}`} entry={entry}/>)}</div>
+        <header className="chat-forward-heading"><div><strong>{record.title}</strong><small>聊天记录 · {record.entries.length} 条</small></div><button autoFocus type="button" onClick={()=>{setOpen(false);button.current?.focus();}} aria-label="关闭聊天记录"><X size={22}/></button></header>
+        <div className="chat-forward-scroll">{record.entries.map((entry,index)=><SnapshotEntry key={`${entry.message.id}:${index}`} entry={entry} defaultExpanded={loadChatSessions().find(s=>s.id===msg.sessionId)?.collapseBilingualTranslation===false}/>)}</div>
       </section>
     </div>,document.body)}
   </>;

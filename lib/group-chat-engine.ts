@@ -1,3 +1,5 @@
+import { offlineSpeechInstruction } from "./offline-dialogue";
+import { loadChatOfflineSceneState } from "./chat-offline-storage";
 import { activeOfflineContext } from "./chat-offline-context";
 import { LANGUAGE_EXCHANGE_RULES, buildCharacterOutputLanguageInstruction } from "./character-language";
 import { buildCallKnowledge, groupCallInstruction, type ActiveGroupCall } from "./call-participation";
@@ -1207,6 +1209,10 @@ export async function generateGroupOfflineChatCompletion(
             disableTools: true,
         },
     );
+    const sceneMode = Boolean(loadChatOfflineSceneState(session.id));
+    const sceneCharacters = loadCharacters().filter(c => session.participantIds?.includes(c.id));
+    llmMessages.push({role: "system", content: offlineSpeechInstruction(sceneCharacters.map(c => ({id:c.id,name:c.name})), session.bilingualTranslationEnabled !== false)});
+    if (sceneMode) llmMessages.push({role: "system", content: "本会话采用按场归档：本轮只输出 <content> 包裹的连续群像线下正文，不要输出 summary 或任何事件摘要。整场结束后经用户审阅另行总结。不能替用户言行，保留去中心化、自然参与和各角色信息边界。"});
     const summaryTag = preset?.story_summary_tag?.trim() || "summary";
     const thinkingTag = preset?.thinking_tag?.trim() || "thinking";
     const offlineTagEnabled = preset?.offline_thinking_enabled === true;
@@ -1254,7 +1260,7 @@ export async function generateGroupOfflineChatCompletion(
     // 要求模型补一段摘要，避免「静默结束」导致该轮线下记录没有摘要、进不了短期记忆事件流。
     // 不重发完整 llmMessages：长对话下 token/延迟成本高，且摘要本来就只针对本轮关键事件。
     // 会话里关了「摘要自动补提」就不再多发这一次请求：漏了就漏了，只调一次 API
-    const MAX_SUMMARY_RETRY = session.offlineSummaryRetry === false ? 0 : 2;
+    const MAX_SUMMARY_RETRY = sceneMode || session.offlineSummaryRetry === false ? 0 : 2;
     const lastUserMessage = [...llmMessages].reverse().find(m => m.role === "user");
     for (let attempt = 0; attempt < MAX_SUMMARY_RETRY; attempt += 1) {
         if (parsed.summary.trim()) break;

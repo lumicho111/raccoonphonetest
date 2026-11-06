@@ -1410,6 +1410,7 @@ function buildMomentUiSnapshot(
 }
 
 async function resolveMomentPhotosForVision(post: MomentPost): Promise<string[]> {
+    if(post.media?.sheet)return [post.media.sheet];
     const urls=(post.photoUrls?.length?post.photoUrls:post.photoUrl?[post.photoUrl]:[]).slice(0,9);
     const results=await Promise.all(urls.map(async url=>{try{return url.startsWith("asset://")?await getChatImageFromIndexedDB(url.slice(8)):url}catch{return null}}));
     return results.filter((url):url is string=>Boolean(url));
@@ -1428,9 +1429,8 @@ async function buildMomentSnapshotMessage(
     },
 ): Promise<LLMMessage> {
     const snapshot = buildMomentUiSnapshot(post, characterId, { ...options, publicOnly: options?.publicOnly || /npc/i.test(marker) });
-    const text = options?.prefixLines?.length
-        ? [...options.prefixLines, snapshot].join("\n")
-        : snapshot;
+    const mediaHint=post.media ? `\n附件为${post.media.kind}，${post.media.duration.toFixed(1)}秒。附图为从左到右、从上到下的时间顺序抽帧，不推测未提供的声音。` : "";
+    const text = (options?.prefixLines?.length ? [...options.prefixLines, snapshot].join("\n") : snapshot)+mediaHint;
     const imageUrls = apiConfig?.enableImageRecognition
         ? await resolveMomentPhotosForVision(post)
         : [];

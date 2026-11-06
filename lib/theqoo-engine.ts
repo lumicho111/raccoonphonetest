@@ -80,7 +80,7 @@ function scheduleContext(settings: TheqooSourceSettings): string {
     if(seen.has(key))return;seen.add(key);
     dated.push({date,text:`${date} ${owner}：${title.slice(0,80)}${suffix.slice(0,260)}`});
   };
-  if (settings.includeCalendar || settings.includeWeverseSchedule) {
+  if (settings.includeCalendar) {
     const owners: ["user" | "character", string, string][] = [
       ["user", "self", "U"],
       ...loadCharacters().slice(0, 12).map(char => ["character" as const, char.id, char.name] as ["character", string, string]),
@@ -95,7 +95,7 @@ function scheduleContext(settings: TheqooSourceSettings): string {
       }
     }
   }
-  if(settings.includeCalendar || settings.includeWeverseSchedule) for(const char of loadCharacters().filter(c=>settings.includeCalendar || loadWeverseState().communities.some(w=>w.memberCharacterIds.includes(c.id))).slice(0,12)) lines.unshift(...calendarPublicClues(char.id,now));
+  if(settings.includeCalendar) for(const char of loadCharacters().filter(c=>settings.includeCalendar).slice(0,12)) lines.unshift(...calendarPublicClues(char.id,now));
   const nearest = dated.sort((a,b)=>Math.abs(Date.parse(a.date)-now)-Math.abs(Date.parse(b.date)-now)).slice(0,18).map(row=>row.text);
   return [...new Set([...lines.slice(0,2).map(line=>line.slice(0,200)),...nearest])].slice(0,18).map(line=>line.slice(0,340)).join("；").slice(0,2200);
 }

@@ -8326,3 +8326,22 @@
 .moments-post-photo-row:has(>:nth-child(4)) .moments-post-photo-tile>button:first-child{aspect-ratio:1}.moments-post-photo-row .moments-post-photo-tile{max-width:none}
 
 .phone-shell .chat-message-notice-bar{background:#f5f5f7!important;color:#202124!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}.phone-shell .chat-message-notice-name{color:#141416!important}.phone-shell .chat-message-notice-body{color:#424247!important;opacity:1!important}.phone-shell .chat-message-notice-action{background:#e3e7ed!important;color:#263c54!important}
+
+/* Reviewed group-scene audience, using the same settings controls. */
+.chat-offline-scenes-sheet .offline-participants{border:1px solid var(--c-input-border,#9995);border-radius:12px;padding:12px;display:grid;gap:10px;font:inherit}
+.chat-offline-scenes-sheet .offline-participants legend{font-size:calc(12px * var(--app-text-scale,1));line-height:1.5;padding:0 4px}
+.chat-offline-scenes-sheet .offline-participants label{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;margin:0;font:inherit}
+.chat-offline-scenes-sheet .offline-participants input{width:18px;height:18px;margin:0;padding:0;flex:none;accent-color:var(--offline-gold,#a98c5a)}
+/* Slide right to reveal actions; vertical list scrolling stays native. */
+.chat-app .chat-swipe-row{position:relative;margin:0 -14px;overflow:hidden;isolation:isolate;border-radius:12px}
+.chat-app .kkt-list-page .chat-swipe-content>.minimal-list-item{margin:0;padding:10px 14px}
+.chat-swipe-content{position:relative;touch-action:pan-y;will-change:transform;background:transparent}
+.chat-swipe-actions{position:absolute;inset:0 auto 0 0;width:160px;display:flex;align-items:stretch;background:var(--c-input,#eee)}
+.chat-swipe-actions button{width:80px;border:0;padding:8px 3px;background:var(--c-input,#eee);color:var(--c-text,#222);font:inherit;font-size:calc(12px*var(--app-text-scale,1));cursor:pointer}
+.chat-swipe-actions button:first-child{background:var(--c-text-title,#333);color:var(--c-page-body-bg,#fff)}
+.chat-swipe-row[data-open=false] .chat-swipe-actions{visibility:hidden}
+@media(prefers-reduced-motion:reduce){.chat-swipe-content{transition:none!important}}
+
+.chat-system-instruction-card:has([data-offstage="1"]) {background:var(--c-input,#f0f0f2);border-color:var(--c-border,#ddd);color:var(--c-text,#555)}
+
+.floating-call-status {position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:10990;border:0;border-radius:22px;padding:10px 16px;background:#222;color:white;font:inherit;font-size:12px;white-space:nowrap}.call-mini-window {background-size:cover;background-position:center}.call-mini-window-overlay {backdrop-filter:blur(1px)}

@@ -19,7 +19,7 @@ export function calendarPublicClues(characterId:string,now=Date.now(),random= Ma
   const localStamp=Date.parse(local+":00Z");
   const candidates=loadOwnerCalendarPlans("character",characterId).flatMap(p=>p.items).filter(i=>{
    const stamp=Date.parse(`${i.date}T${i.startTime}:00Z`);
-   return i.visibility!=="public"&&i.kind!=="milestone"&&stamp<=localStamp&&stamp>=localStamp-3*86400000&&!state.checked.includes(`${characterId}:${i.id}`)&&!sensitive.test(`${i.title} ${i.location} ${i.encounterScene||""}`)&&(Boolean(i.encounterScene?.trim())||/机场|车站|场馆|商场|咖啡|街道|公园|书店|餐厅|便利店/.test(i.location));
+   return i.visibility!=="public"&&i.kind!=="milestone"&&stamp<=localStamp&&stamp>=localStamp-3*86400000&&!state.checked.includes(`${characterId}:${i.id}`)&&!sensitive.test(`${i.title} ${i.location} ${i.encounterScene||""}`)&&(Boolean(i.encounterScene?.trim())||/机场|车站|场馆|商场|咖啡|街道|公园|书店|餐厅|便利店|片场|摄影棚|杂志社|录音棚/.test(i.location));
   });
   // A single opportunity is sampled per irregular time window; the outcome is saved across platforms.
   if(candidates.length){
@@ -28,7 +28,7 @@ export function calendarPublicClues(characterId:string,now=Date.now(),random= Ma
    if(random()<0.16){
     const scene=(item.encounterScene||"在公共场所短暂停留后离开").replace(/[\r\n]+/g," ").trim().slice(0,90);
     const offset=localStamp-Date.parse(`${item.date}T${item.startTime}:00Z`);
-    state.clues.push({id,characterId,at:now-offset,text:`${item.date} 有路人在公共场所疑似看到${character.name}：${scene}`});
+    state.clues.push({id,characterId,at:now-offset,text:/片场|摄影棚|杂志社|录音棚/.test(item.location) ? `${item.date} 有工作接触者公开提到与${character.name}有过短暂工作接触；仅可聊亲眼见过的礼貌、态度和专业表现，不知道项目名称、精确地点、时间及内部安排。` : `${item.date} 有路人在公共场所疑似看到${character.name}：${scene}`});
    }
   }
   state.clues=state.clues.filter(c=>c.at>=now-14*86400000).slice(-80);state.checked=state.checked.slice(-500);

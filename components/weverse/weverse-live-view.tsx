@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BadgeCheck, ChevronRight, Heart, LoaderCircle, Play, Send, Square, Volume2, X } from "lucide-react";
 import type { WeverseLive } from "@/lib/weverse-storage";
-import { playAudioBlobViaMediaElement, resolveUserVoiceConfig, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
+import {isCallAudioSessionActive, playAudioBlobViaMediaElement, resolveUserVoiceConfig, resolveVoiceConfig, synthesizeSpeech, unlockAudioPlayback } from "@/lib/tts-service";
 import styles from "./weverse-app.module.css";
 
 type Props = {
@@ -71,6 +71,7 @@ export function WeverseLiveView({ isUserHost,onHostSend, live, speakerNames, spe
   const commentBoxRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
+  useEffect(()=>{const fn=(event:Event)=>{if((event as CustomEvent).detail?.active){voiceRequestIdRef.current++;voicePlaybackRef.current?.abort();voicePlaybackRef.current=null;setPlayingVoiceSegmentId(null);}};window.addEventListener('chat-call-state',fn);return()=>window.removeEventListener('chat-call-state',fn);},[]);
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 300);
     return () => window.clearInterval(timer);
@@ -156,6 +157,7 @@ export function WeverseLiveView({ isUserHost,onHostSend, live, speakerNames, spe
       return;
     }
 
+    if(isCallAudioSessionActive()){setVoiceNotice("通话进行中，直播暂时静音");return;}
     unlockAudioPlayback();
     stopVoice();
     const requestId = ++voiceRequestIdRef.current;

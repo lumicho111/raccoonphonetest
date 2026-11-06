@@ -52,6 +52,7 @@ function constructNotification(title: string, payload: NotificationOptions): voi
             window.focus();
             const target = (payload.data as { url?: string } | undefined)?.url;
             if (target?.startsWith("/#lysn=")) window.location.hash = target.slice(1);
+            else if(target)window.dispatchEvent(new CustomEvent("rabbit-notification-open",{detail:target}));
             notification.close();
         };
     } catch {
@@ -70,9 +71,9 @@ function constructNotification(title: string, payload: NotificationOptions): voi
  */
 export function sendBrowserNotification(
     title: string,
-    options?: { body?: string; icon?: string; url?: string },
+    options?: { body?: string; icon?: string; url?: string; independent?: boolean },
 ): void {
-    if (!isNotificationEnabled()) return;
+    if (!(options?.independent && isAndroidApp() ? nativeNotificationGranted() : isNotificationEnabled())) return;
     if (!document.hidden) return;
 
     if(isAndroidApp()){void showNativeMessage(title,options?.body,options?.url).catch(console.warn);return;}

@@ -5,6 +5,9 @@ import { Clock, Folder, ChevronRight, X } from "lucide-react";
 import type { ChatSession } from "@/lib/chat-storage";
 import { ensureChatOfflineScene, loadChatOfflineSceneState, loadChatOfflineTurns, updateChatOfflineScene, deleteChatOfflineArchive, OFFLINE_SCENE_UPDATED, type ChatOfflineArchive } from "@/lib/chat-offline-storage";
 import { saveChatOfflineScene, summarizeChatOfflineScene, editChatOfflineArchive, offlineStoryLabel, validateOfflineStoryTime, type OfflineSceneDraft } from "@/lib/chat-offline-scene-memory";
+import { loadCharacters } from "@/lib/character-storage";
+import { offlineSpeakerMap } from "@/lib/offline-speakers";
+import { parseOfflineDialogue } from "@/lib/offline-dialogue";
 import { OfflineDialogueText } from "./offline-dialogue-text";
 export const OFFLINE_SCENE_ACTION = "chat-offline-scene-action";
 export function requestOfflineSceneAction(element: HTMLElement, action: "archive" | "history" | "clock") {
@@ -27,6 +30,9 @@ export function OfflineSceneControls({ session, turnCount, generating, getContai
     const [draft, setDraft] = useState<OfflineSceneDraft | null>(null);
     const [summary, setSummary] = useState(""); const [title, setTitle] = useState("");
     const [start, setStart] = useState(""); const [end, setEnd] = useState("");
+    const [participants, setParticipants] = useState<string[]>([]);
+    const roster = loadCharacters().filter(c=>session.participantIds?.includes(c.id));
+    const speakers = offlineSpeakerMap(session);
     const [status, setStatus] = useState<"active" | "paused">("active");
     const [busy, setBusy] = useState(false); const [error, setError] = useState("");
     const [archives, setArchives] = useState<ChatOfflineArchive[]>([]);
@@ -73,6 +79,8 @@ export function OfflineSceneControls({ session, turnCount, generating, getContai
         if (getContainer()?.querySelector<HTMLTextAreaElement>(".chat-input-textarea")?.value.trim()) { setError("请先发送或清空输入框里的文字。"); return; }
         const scene = ensureChatOfflineScene(session.id, session.contactId);
         setDraft({ scene, fingerprint: JSON.stringify(loadChatOfflineTurns(session.id)), summary: "" });
+        const spoken = new Set(loadChatOfflineTurns(session.id).flatMap(t=>parseOfflineDialogue(t.assistantContent).filter(p=>p.kind==='dialogue').map(p=>p.kind==='dialogue'?speakers[p.speaker]:'')).filter(Boolean));
+        setParticipants(roster.filter(c=>spoken.has(c.id)).map(c=>c.id));
         setTitle(scene.title || ""); setSummary(""); setError(""); setView("summary"); onBusyChange(true);
     }
     async function save() {
@@ -80,11 +88,11 @@ export function OfflineSceneControls({ session, turnCount, generating, getContai
         saving.current = true; locked.current = true; setBusy(true); setError("");
         try {
             if (view === "edit" && selected) {
-                await editChatOfflineArchive(session, selected, title, summary, start, end || undefined);
+                await editChatOfflineArchive(session, selected, title, summary, start, end || undefined, participants);
                 const updated = loadChatOfflineSceneState(session.id)?.archives.find(a => a.id === selected.id);
                 setSelected(updated || null); refresh(); setView("archives"); onBusyChange(false);
             } else if (draft) {
-                await saveChatOfflineScene(session, draft, title, summary, start, end || undefined);
+                await saveChatOfflineScene(session, draft, title, summary, start, end || undefined, participants);
                 if (!alive.current) return;
                 setView(null); onBusyChange(false); onArchived();
             }
@@ -99,7 +107,7 @@ export function OfflineSceneControls({ session, turnCount, generating, getContai
     }
     function editArchive() {
         if (!selected) return;
-        setTitle(selected.title); setSummary(selected.summary); setStart(localTime(selected.storyStartedAt || selected.startedAt)); setEnd(selected.storyEndedAt ? localTime(selected.storyEndedAt) : ""); setView("edit"); onBusyChange(true);
+        setParticipants(selected.participantIds || []); setTitle(selected.title); setSummary(selected.summary); setStart(localTime(selected.storyStartedAt || selected.startedAt)); setEnd(selected.storyEndedAt ? localTime(selected.storyEndedAt) : ""); setView("edit"); onBusyChange(true);
     }
     if (!view) return null;
     const compact = view !== "archives";
@@ -109,7 +117,7 @@ export function OfflineSceneControls({ session, turnCount, generating, getContai
             <header><strong>{view === "confirm" ? "结束本次线下？" : view === "clock" ? "本场时间与状态" : view === "archives" ? selected?.title || "往期归档" : "归档详情"}</strong><button type="button" disabled={saving.current} aria-label={selected && view === "archives" ? "返回列表" : "关闭"} onClick={selected && view === "archives" ? () => setSelected(null) : close}>{selected && view === "archives" ? "返回" : <X size={18} />}</button></header>
             {view === "confirm" ? <><p>结束后整理整场总结，审阅保存后进入短期记忆并归档。</p>{error ? <p role="alert" className="chat-offline-scenes-error">{error}</p> : null}<footer><button onClick={close}>取消</button><button disabled={!turnCount || !!error} onClick={beginSummary}>结束</button></footer></> : view === "clock" ? <>{timeFields}<div className="offline-state-choices"><button aria-pressed={status === "active"} onClick={() => setStatus("active")}>进行中</button><button aria-pressed={status === "paused"} onClick={() => setStatus("paused")}>暂停 · 待续写</button></div><p>暂停保留本场进度，不将角色锁定在现场。故事时间可手动调整。</p>{error ? <p role="alert" className="chat-offline-scenes-error">{error}</p> : null}<footer><button onClick={close}>取消</button><button onClick={saveClock}>保存</button></footer></> : view === "summary" || view === "edit" ? <>
                 <label>标题<input aria-label="归档标题" value={title} disabled={busy} placeholder="给这次见面起个名字" onChange={e => setTitle(e.target.value)} /></label>
-                {timeFields}<label>线下总结<textarea aria-label="整场摘要" value={summary} disabled={busy} onChange={e => setSummary(e.target.value)} placeholder={busy ? "正在整理整场经历…" : "直接手写本场总结，也可以点击“生成总结”"} /></label>
+                {timeFields}{session.isGroup ? <fieldset className="offline-participants"><legend>本场实际参与者（请核对，只有勾选者接收场次总结）</legend>{roster.map(c=><label key={c.id}><input type="checkbox" checked={participants.includes(c.id)} disabled={busy} onChange={e=>setParticipants(ids=>e.target.checked?[...ids,c.id]:ids.filter(id=>id!==c.id))}/>{c.name}</label>)}</fieldset> : null}<label>线下总结<textarea aria-label="整场摘要" value={summary} disabled={busy} onChange={e => setSummary(e.target.value)} placeholder={busy ? "正在整理整场经历…" : "直接手写本场总结，也可以点击“生成总结”"} /></label>
                 {error ? <p role="alert" className="chat-offline-scenes-error">{error}</p> : null}<footer>{view === "summary" ? <button disabled={busy} onClick={() => void generate()}>{summary.trim() ? "重新生成总结" : "生成总结"}</button> : <button disabled={busy} onClick={() => { setView("archives"); onBusyChange(false); }}>取消</button>}<button disabled={busy || !summary.trim() || !title.trim() || !start} onClick={() => void save()}>{busy ? "处理中…" : "保存"}</button></footer>
             </> : selected ? <>
                 <p>{offlineStoryLabel(selected.storyStartedAt || selected.startedAt, selected.storyEndedAt)}</p><div className="offline-archive-summary"><h3>线下总结</h3><div className="chat-offline-archive-text">{selected.summary}</div><button type="button" onClick={editArchive}>{selected.memoryTarget === "short_term" ? "编辑归档与短期总结" : "编辑归档与长期记忆"}</button></div><button type="button" className="offline-archive-delete" onClick={() => {
@@ -117,7 +125,7 @@ export function OfflineSceneControls({ session, turnCount, generating, getContai
                     try { deleteChatOfflineArchive(session.id, selected.id); setSelected(null); setError(""); refresh(); }
                     catch(e) { setError(e instanceof Error ? e.message : "删除失败，请重试。"); }
                 }}>删除归档</button>{error ? <p role="alert" className="chat-offline-scenes-error">{error}</p> : null}<h3>原文</h3>
-                {selected.turns.map(turn => <article className="chat-offline-archive-turn" key={turn.id}>{turn.userContent ? <><small>{userName}</small><OfflineDialogueText text={turn.userContent} role="user" characterId={session.contactId} /></> : null}<small>{characterName}</small><OfflineDialogueText text={turn.assistantContent} role="assistant" characterId={session.contactId} /></article>)}
+                {selected.turns.map(turn => <article className="chat-offline-archive-turn" key={turn.id}>{turn.userContent ? <><small>{userName}</small><OfflineDialogueText text={turn.userContent} role="user" characterId={session.contactId} speakers={speakers} defaultExpanded={session.collapseBilingualTranslation === false} /></> : null}<small>{characterName}</small><OfflineDialogueText text={turn.assistantContent} role="assistant" characterId={session.contactId} speakers={speakers} defaultExpanded={session.collapseBilingualTranslation === false} /></article>)}
             </> : <>{archives.length ? <div className="offline-archive-list">{[...archives].sort((a,b) => (b.storyStartedAt || b.startedAt).localeCompare(a.storyStartedAt || a.startedAt)).map(a => <button type="button" className="chat-offline-archive-row" key={a.id} onClick={() => setSelected(a)}><Folder size={20} /><span><strong>{a.title}</strong><small>{offlineStoryLabel(a.storyStartedAt || a.startedAt, a.storyEndedAt)}</small></span><ChevronRight size={16} /></button>)}</div> : <p>还没有归档的见面。</p>}</>}
         </section>
     </div>;

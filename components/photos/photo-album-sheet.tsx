@@ -10,34 +10,34 @@ type Props = {
   albums: PhotoAlbum[];
   photoIds: string[];
   onClose: () => void;
+  mode?: "create" | "manage";
+  onCreated?: (id: string) => void;
 };
 
-export function PhotoAlbumSheet({ characterId, albums, photoIds, onClose }: Props) {
+export function PhotoAlbumSheet({ characterId, albums, photoIds, onClose, mode = "manage", onCreated }: Props) {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const ownAlbums = albums.filter(album => album.characterId === characterId);
   const submit = () => {
     if (!name.trim()) return;
     if (editingId) renamePhotoAlbum(editingId, name);
-    else createPhotoAlbum(characterId, name, photoIds);
+    else { const album=createPhotoAlbum(characterId, name, photoIds); if(album && mode === "create") { onCreated?.(album.id); onClose(); return; } }
     setEditingId(null);
     setName("");
   };
-  return <div className="photos-sheet-backdrop">
-    <section className="photos-sheet photos-organize-sheet" role="dialog" aria-modal="true" aria-label="整理相册">
+  return <div className="photos-sheet-backdrop" onClick={onClose}>
+    <section className="photos-sheet photos-organize-sheet" role="dialog" aria-modal="true" aria-label="整理相册" onClick={event=>event.stopPropagation()}>
       <header className="photos-sheet-header">
         <button type="button" onClick={onClose} aria-label="关闭"><X size={19} /></button>
-        <div><strong>{photoIds.length ? "加入相册" : "管理相册"}</strong><span>{photoIds.length ? `已选 ${photoIds.length} 张 · 可加入多个相册` : "自建分类 · 一套照片也可以建一个相册"}</span></div>
-        <button type="button" onClick={onClose}>完成</button>
+        <div><strong>{mode === "create" ? "新建相册" : photoIds.length ? "加入相册" : "管理相册"}</strong></div>
+        {mode !== "create" ? <button type="button" onClick={onClose}>完成</button> : <span aria-hidden="true" style={{width:36}}/>}
       </header>
       <div className="photos-sheet-scroll">
-        <form className="photos-album-create" onSubmit={event => { event.preventDefault(); submit(); }}>
-          <label className="photos-edit-row"><span>{editingId ? "相册重命名" : "新相册名称"}</span><input autoFocus maxLength={80} value={name} onChange={event => setName(event.target.value)} placeholder="例如：前置自拍 / 练习室套图" /></label>
-          {!editingId ? <div className="photos-name-suggestions">{["前置自拍", "对镜自拍", "他拍", "群体照", "随手拍", "套图"].map(value => <button type="button" key={value} onClick={() => setName(value)}>{value}</button>)}</div> : null}
-          <div className="photos-organize-actions"><button type="submit" disabled={!name.trim()}>{editingId ? "保存名称" : photoIds.length ? "创建并加入照片" : "创建相册"}</button>{editingId ? <button type="button" onClick={() => { setEditingId(null); setName(""); }}>取消改名</button> : null}</div>
-        </form>
-        <p className="photos-note">同一张照片可放进多个相册，不重复保存图片。删除相册或移出照片都会保留原图和使用记录。</p>
-        {ownAlbums.map(album => {
+        {(mode === "create" || editingId) && <form className="photos-album-create" onSubmit={event => { event.preventDefault(); submit(); }}>
+          <label className="photos-edit-row"><span>{editingId ? "相册重命名" : "新相册名称"}</span><input autoFocus maxLength={80} value={name} onChange={event => setName(event.target.value)} placeholder="相册名称" /></label>
+          <div className="photos-organize-actions"><button type="submit" disabled={!name.trim()}>保存</button>{editingId ? <button type="button" onClick={() => { setEditingId(null); setName(""); }}>取消改名</button> : null}</div>
+        </form>}
+        {mode !== "create" && ownAlbums.map(album => {
           const selected = photoIds.length > 0 && photoIds.every(id => album.photoIds.includes(id));
           const partial = !selected && photoIds.some(id => album.photoIds.includes(id));
           return <div className="photos-subalbum-row" key={album.id}>

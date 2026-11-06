@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode, Ref } from "react";
+import {useRef, type ReactNode, type Ref} from "react";
+import {useAppBack} from "@/lib/back-navigation";
 import { ChevronLeft } from "lucide-react";
 
 type PageShellProps = {
@@ -16,8 +17,10 @@ type PageShellProps = {
 };
 
 export function PageShell({ title = "", onBack, leftAction, rightAction, children, footer, className, bodyRef, clearHeader = false }: PageShellProps) {
+  const root=useRef<HTMLDivElement>(null);
+  useAppBack(()=>onBack?.(),()=>!!onBack&&!!root.current?.getClientRects().length,20);
   return (
-    <div className={`page-shell ${className ?? ""}`}>
+    <div ref={root} className={`page-shell ${className ?? ""}`}>
       <header
         className={clearHeader ? "moments-clear-header" : "page-header"}
         data-ui={clearHeader ? "moments-header" : "header"}

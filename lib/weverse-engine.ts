@@ -1,4 +1,6 @@
+// Public audiences must receive only published dialogue/visible scenes; never host-private calendar or memories.
 import { loadSchedulePrompts } from "./schedule-prompt-settings";
+import { publicCalendarContext } from "./calendar-public-context";
 import { schedulePublicContentSuffix } from "./schedule-public-content";
 import { weverseLiveAvailability } from "./weverse-live-availability";
 import { worldlineContextForApp } from "./worldline-storage";
@@ -148,7 +150,7 @@ async function resolveCharacterGeneration(characterId: string, community: Wevers
   ]);
 
   const now = options?.now ?? new Date();
-  const scheduleSummary = historical ? "" : loadOwnerCalendarPlans("character", character.id).flatMap(p=>p.items).filter(i=>isPublicCalendarItem(i)).map(i=>`${i.date} ${i.startTime} ${i.title}${schedulePublicContentSuffix(i,now.getTime(),character.timeZone)}`).slice(0,24).join("\n");
+  const scheduleSummary = historical ? "" : loadOwnerCalendarPlans("character", character.id).flatMap(p=>p.items).map(i=>`${i.visibility === "public" ? "公开" : "私人，仅本人可知"} ${i.date} ${i.startTime} ${i.title}${schedulePublicContentSuffix(i,now.getTime(),character.timeZone)}`).slice(0,24).join("\n");
   const messages = assemblePromptPayload({
     character,
     history: [],
@@ -243,7 +245,7 @@ function communityTimeContext(community: WeverseCommunity, now = new Date()): st
   const chars = loadCharacters().filter((item) => community.memberCharacterIds.includes(item.id));
   const zone = getSystemTimeZone();
   const time = chars.length ? buildGroupTimeContext(chars.map((item) => ({ name: item.name, timeZone: item.timeZone })), now).timeContext : `当前社区参考时间：${formatZonedChineseDateTime(now, zone)} ${zone}，${getZonedWeekday(now, zone)}`;
-  const schedules = loadWeverseState().schedules.filter(item => item.communityId === community.id && item.visibility === "public" && item.startsAt >= now.getTime()-7*86400000 && item.startsAt <= now.getTime()+35*86400000).sort((a,b)=>a.startsAt-b.startsAt).slice(0,24).map(item=>`${new Date(item.startsAt).toISOString()} ${item.title}${schedulePublicContentSuffix(item,now.getTime())}`);
+  const schedules = publicCalendarContext(now.getTime());
   return [time,schedules.length ? `可参考的公开日程（未来只谈安排，已解锁内容可供讨论）：\n${schedules.join("\n")}` : ""].filter(Boolean).join("\n");
 }
 
@@ -331,7 +333,7 @@ export async function generateWeverseOfficialPost(
 export async function generateWeverseOfficialNotice(
   community: WeverseCommunity,
   contextPosts: WeversePost[],
-  options?: { now?: Date; historical?: boolean },
+  options?: { now?: Date; historical?: boolean; opening?: boolean },
 ): Promise<GeneratedWeverseNotice> {
   const resolved = await resolveCommunityApi(community);
   const now = options?.now ?? new Date();
@@ -341,6 +343,7 @@ export async function generateWeverseOfficialNotice(
       content: [
         `你正在运营 Weverse 的「${community.name}」官方公告（Notice）系统。`,
         `Official Account：${community.official.displayName}`,
+        options?.opening?"本社区尚无公告，优先写社区开通欢迎粉丝或使用规则公告，日期靠近开通时间。":"按已有公开事项选择公告内容，可以是粉丝送信地址说明、活动出席、病休、约束私生行为、取消活动、回归等；无事实依据不编重大变故，不为凑数宣布工作。",
         "Notice 不是普通社交动态。它用于正式说明公开事项，必须有清晰标题和完整信息，语气正式、克制、事实优先。",
         "不要写成社交媒体碎碎念，不要用‘大家今天也辛苦啦’之类互动口吻；不要添加评论区邀请。",
         "可以是公开活动说明、运营通知、公开日程提醒、规则/参与方式、纪念日说明等；不要凭空捏造严重事件或高风险事实。",
@@ -436,7 +439,7 @@ export async function generateWeverseFanBatch(
         "不要把整批粉丝都写成同一时间段的口吻。除非目标帖子/评论明确涉及睡觉或深夜，否则不要集体说晚安、早点睡、快去睡等。",
         options?.historical ? "这是历史回填：请写成目标日期当时的公开粉丝内容，不要引用未来事件。" : "",
         "粉丝昵称要像真实网络昵称，可用韩文、拉丁字母、少量日文/中文；不要全部叫匿名粉丝。",
-        "内容要有轻重差异：有人认真，有人只留一句，有人聊造型/舞台/吃饭/天气，也可以粉丝之间互相接话。不要模板化复制。",
+        "内容要有轻重差异和不同立场：粉丝自己的生活、追星记录、问答求助、接梗、具体舞台细节、不同审美、温和批评与运营抱怨都可以。不要整批夸奖、期待、催回归，也不要机械凑齐类型或凭空编重大丑闻。评论围绕主帖和已有讨论，自然重复少量梗但不复读模板。",
         "不要编造严重绯闻、违法事件或重大官方消息，不要替艺人本人宣布未发生的官方事项。",
         `近期社区内容：\n${recentCommunityContext(contextPosts, community)}`,
         targetPost ? `本轮主要给这条帖子增加互动：\n${targetPost.id} | ${targetPost.authorType}: ${targetPost.originalBody || targetPost.body}` : "",
@@ -728,6 +731,12 @@ function liveTranscriptContext(live: WeverseLive, community: WeverseCommunity): 
   return [segments.length ? `最近直播内容：\n${segments.join("\n")}` : "", comments.length ? `最近弹幕：\n${comments.join("\n")}` : ""].filter(Boolean).join("\n\n");
 }
 
+async function publicLiveComments(community:WeverseCommunity, visible:string, count:number){
+ const cfg=await resolveCommunityApi(community);
+ const raw=await sendLLMRequest(cfg.apiConfig,cfg.preset,[{role:'system',content:'你只生成普通观众的直播评论。只知道已经播出的言语、可见画面和公开日历，不知道主播私下行程、心理、地点和未公开项目。不补造信息；可以不知道、问问题或根据可见线索不确定地猜测。只输出JSON {"comments":[{"displayName":"网名","original":"评论","translated":"中文翻译"}]}。'},{role:'user',content:communityTimeContext(community)+'\n已播出的片段：'+visible+'\n生成最多'+count+'条评论。'}],cfg.regexes,undefined,{appId:'weverse',skipOutputRegex:true});
+ return normalizeLiveComments(extractJsonObject(raw)?.comments).slice(0,count);
+}
+
 function liveFormatRules(opening = false, liveType: "visual" | "voice" | "auto" = "visual"): string[] {
   return [
     "这是 Weverse 的成员私人 LIVE，不是私聊，也不是正式节目主持。角色可以随意聊天、吃饭、推荐歌、等人进来、发呆、准备工作或睡前陪粉丝一会儿。",
@@ -793,7 +802,7 @@ export async function generateWeverseLiveOpening(
   const liveType: "visual" | "voice" = requestedLiveType === "auto" ? (parsed?.liveType === "voice" ? "voice" : "visual") : requestedLiveType;
   const allowed = new Set([characterId]);
   const segments = normalizeLiveSegments(parsed?.segments, allowed, characterId).filter((segment) => liveType === "visual" || segment.kind === "speech");
-  const comments = normalizeLiveComments(parsed?.comments).slice(0, 14);
+  const comments = await publicLiveComments(community, segments.map(s=>s.original).join("\n"),14).catch(()=>[]);
   const title = String(parsed?.title ?? "").trim() || `${resolved.character.name} LIVE`;
   if (!segments.length) throw new ChatEngineError("这次没有生成有效 LIVE 开场，请重试。");
   return { liveType, title, segments, comments, artistComments: [], viewerJoins: [], viewerLeaves: [], participantJoins: [], participantLeaves: [], shouldEnd: false };
@@ -868,7 +877,7 @@ export async function generateWeverseLiveContinuation(
   const viewerLeaves = normalizeCharacterIds(parsed?.viewerLeaves, viewerPoolForComments, { max: 2 });
 
   const segments = normalizeLiveSegments(parsed?.segments, activeForSegments, primaryHost).filter((segment) => live.liveType === "visual" || segment.kind === "speech");
-  const comments = normalizeLiveComments(parsed?.comments).slice(0, 12);
+  const comments = await publicLiveComments(community, live.segments.map(s=>s.original).slice(-24).join("\n"),12).catch(()=>[]);
   const artistComments = normalizeLiveArtistComments(parsed?.artistComments, validCommunityIds, activeForSegments)
     .filter((item) => !viewerLeaves.includes(item.characterId))
     .slice(0, 3);

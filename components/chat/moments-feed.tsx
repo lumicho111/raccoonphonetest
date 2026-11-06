@@ -1,4 +1,5 @@
 "use client";
+import {takeMomentScreenshot} from "@/lib/chat-screenshot";
 import { useChatUserAvatar } from "./use-chat-user-avatar";
 
 import { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react";
@@ -51,6 +52,8 @@ type MomentsFeedProps = {
 export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     const [posts, setPosts] = useState<MomentPost[]>([]);
     const [showCompose, setShowCompose] = useState(false);
+    const [sharedPhoto,setSharedPhoto]=useState<Blob|null>(null);
+    useEffect(()=>{const open=()=>{if(!scrollRef.current?.getClientRects().length)return;const blob=takeMomentScreenshot();if(blob){setSharedPhoto(blob);setShowCompose(true);}};open();window.addEventListener('chat-screenshot-to-moments',open);return()=>window.removeEventListener('chat-screenshot-to-moments',open);},[]);
     const openMyLife = () => setShowCompose(true);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     // 后台生图失败：弹一次弹窗提示，关掉即消失（同时多条失败只提示第一条）
@@ -371,6 +374,7 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     };
 
     const handlePublished = () => {
+        setSharedPhoto(null);
         setShowCompose(false);
         refreshPosts();
         window.dispatchEvent(new CustomEvent("moments-updated"));
@@ -430,7 +434,8 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
             bodyRef={scrollRef}
             footer={showCompose ? (
                 <MomentsCompose
-                    onClose={() => setShowCompose(false)}
+                    initialPhoto={sharedPhoto}
+                    onClose={() => {setShowCompose(false);setSharedPhoto(null);}}
                     onPublished={handlePublished}
                 />
             ) : activeComposer ? (

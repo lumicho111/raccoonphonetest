@@ -42,6 +42,7 @@ type IconGlyphProps = {
 };
 
 const MDI_PATHS: Record<IconId, string> = {
+  browser:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-3 7 8-4-4 8-8 4 4-8Zm3 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z",
   settings: mdiCogOutline,
   chat: mdiMessageProcessing,
   photos: mdiFlower,

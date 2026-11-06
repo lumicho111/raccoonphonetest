@@ -1,3 +1,4 @@
+import {unwrapMotionPhoto} from './motion-photo';
 import { saveChatImageToIndexedDB } from './chat-asset-storage';
 export const LIVE_MAX_SECONDS = 8;
 export const LIVE_MAX_BYTES = 30 * 1024 * 1024;
@@ -49,6 +50,7 @@ finally {
     void ac?.close();
 } }
 export async function prepareLivePhoto(file: File, mute: boolean): Promise<LivePhoto> {
+    file = await unwrapMotionPhoto(file);
     if (file.size > LIVE_MAX_BYTES)
         throw Error('视频超过30MB，请压缩后再选');
     const url = URL.createObjectURL(file), video = document.createElement('video');

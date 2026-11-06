@@ -7,8 +7,8 @@ import { BilingualTextBlock, isStandaloneHtmlPreviewContent } from "./message-bu
 
 let stopCurrentOfflineSpeech: (() => void) | null = null;
 
-function Speech({ original, translated, role, characterId }: { original: string; translated: string; role: "user" | "assistant"; characterId: string }) {
-    const [expanded, setExpanded] = useState(false);
+function Speech({ original, translated, role, characterId, defaultExpanded = false }: { defaultExpanded?: boolean; original: string; translated: string; role: "user" | "assistant"; characterId: string }) {
+    const [expanded, setExpanded] = useState(defaultExpanded);
     const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
     const [error, setError] = useState("");
     const audio = useRef<{ abort: () => void } | null>(null);
@@ -42,17 +42,20 @@ function Speech({ original, translated, role, characterId }: { original: string;
     return <span className="offline-speech">
         <span className="offline-speech-line">
             <button type="button" className="offline-speech-play" data-playback={state} aria-pressed={state === "playing"} aria-label={state === "idle" ? "播放原文对白" : "停止播放"} onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); void play(); }}>{state === "loading" ? <Loader2 size={15} className="animate-spin" /> : <Volume2 size={16} className={state === "playing" ? "offline-speech-playing" : undefined} />}</button>
-            <button type="button" className="offline-speech-original" aria-expanded={translated ? expanded : undefined} aria-label={translated ? "展开或收起翻译" : "原文对白"} onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); if (translated) setExpanded(!expanded); }}>「{original}」</button>
+            <button type="button" className="offline-speech-original" aria-expanded={translated ? expanded : undefined} aria-label={translated ? "展开或收起翻译" : "原文对白"} onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); if (translated) setExpanded(!expanded); }}>{original}</button>
         </span>
         {translated && expanded ? <button type="button" className="offline-speech-translation" aria-label="收起翻译" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setExpanded(false); }}>{translated}</button> : null}
         {error ? <span role="alert" className="chat-offline-scenes-error">{error}</span> : null}
     </span>;
 }
-export function OfflineDialogueText({ text, role, characterId }: { text: string; role: "user" | "assistant"; characterId: string }) {
+export function OfflineDialogueText({ text, role, characterId, speakers, defaultExpanded = false }: { text: string; role: "user" | "assistant"; characterId: string; speakers?: Record<string,string>; defaultExpanded?: boolean }) {
     const parts = useMemo(() => parseOfflineDialogue(text), [text]);
-    if (isStandaloneHtmlPreviewContent(text)) return <BilingualTextBlock text={text} mode="markdown" defaultExpanded={false} htmlFrameVariant="offline" />;
+    if (!parts.some(part => part.kind === "dialogue") && isStandaloneHtmlPreviewContent(text)) return <BilingualTextBlock text={text} mode="markdown" defaultExpanded={defaultExpanded} htmlFrameVariant="offline" />;
     return <div className="offline-prose">{parts.map((part, index) => {
-        if (part.kind === "dialogue") return <Speech key={`${index}:${part.original}`} {...part} role={role} characterId={characterId} />;
+        if (part.kind === "dialogue") {
+            const id = role === 'user' ? (part.speaker === 'user' ? characterId : undefined) : speakers?.[part.speaker];
+            return id !== undefined ? <Speech key={`${index}:${part.original}`} {...part} defaultExpanded={defaultExpanded} role={role} characterId={id} /> : <span key={index} className="offline-narration">{part.original}{part.translated ? ` | ${part.translated}` : ''}</span>;
+        }
         // Blocks supply their own paragraph spacing. Source newlines at the
         // speech boundary must not become additional empty rendered lines.
         // Preserve intentional line breaks inside each narration block.

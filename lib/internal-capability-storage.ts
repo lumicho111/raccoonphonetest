@@ -8,7 +8,6 @@ const INTERNAL_CAPABILITIES_KEY = "ai_phone_internal_capabilities_v1";
 registerKvMigration(INTERNAL_CAPABILITIES_KEY);
 
 export const MEMORY_WRITE_CAPABILITY_ID = "memory_write";
-export const NOTE_WALL_CAPABILITY_ID = "note_wall_service";
 export const MUSIC_CONTROL_CAPABILITY_ID = "music_control";
 export const CALENDAR_MANAGEMENT_CAPABILITY_ID = "calendar_management";
 export const SEND_FILE_CAPABILITY_ID = "send_file";
@@ -115,61 +114,6 @@ const TIMED_WAKE_USAGE_GUIDE = [
     "",
     "示例：",
     '[执行动作:稍后主动联系({"delayMinutes":15,"intent":"过15分钟看看对方回了没，如果还合适就轻轻找一句"})]',
-].join("\n");
-
-const NOTE_WALL_USAGE_GUIDE = [
-    "以下是你获取指令的返回结果：",
-    "服务：便签墙",
-    "用途：公共社区便签墙相关服务。",
-    "",
-    "执行时必须使用下面的具体动作名，不要输出“便签墙”本身。",
-    "",
-    "活人感要求：",
-    "- 发送便签时像顺手贴下的生活碎片：口语、具体、去精致，可吐槽、疑问、玩笑、碎碎念；不要作文腔、总结腔、AI味。",
-    "- 发送便签评论时短一点，接住便签里的具体点自然回应；可以调侃、追问、附和、轻怼，别客服腔、别一味夸。",
-    "- 禁止讲大道理、爹味说教、强行升华；禁止“引用原文+这句太真实了”这类套话。",
-    "",
-    "动作：查看便签列表",
-    "描述：查看公共便签墙上的便签列表。",
-    "参数：",
-    "  - limit (number): 返回数量，1-30，默认 20",
-    "  - sort (string): 排序方式，latest=最新，hot=互动最多，all=全部，默认 latest",
-    "示例：",
-    '[执行动作:查看便签列表({"limit":20,"sort":"latest"})]',
-    "",
-    "动作：查看便签详情及评论",
-    "描述：查看某张便签的完整正文和评论。",
-    "参数：",
-    "  - noteId (string): 便签列表或上下文中提供的 noteId",
-    "  - commentLimit (number): 返回评论数量，1-30，默认 20",
-    "示例：",
-    '[执行动作:查看便签详情及评论({"noteId":"便签noteId","commentLimit":20})]',
-    "",
-    "动作：发送便签",
-    "描述：以当前角色身份在公共便签墙上发送一张便签。",
-    "参数：",
-    "  - authorName (string): 右下角落款名，由你自己决定",
-    "  - summary (string): 便签标题；便签卡片上方加粗显示的短标题，建议 4-18 字，不要复述 body 的第一句",
-    "  - body (string): 点开后的完整正文；口语、具体、有生活细节；不要重复 summary，也不要以 summary 原文开头再扩写，可用 \\n 分成 2-4 段",
-    "  - size (string): small|medium|large，默认 medium",
-    "  - paper (string): plain|cream|pink|blue|kraft，默认 plain",
-    "  - tape (string): none(透明胶)|masking|stripe|flower，默认 none",
-    "  - font (string): default|huangyou|shangshangqian|huiwen，默认 default",
-    "  - isAnonymous (boolean): 是否匿名。即使匿名，也要填写 authorName，前台会显示匿名",
-    "示例：",
-    '[执行动作:发送便签({"authorName":"落款名","summary":"逃课念头","body":"今天只想把书包留在门口，假装铃声没有响过。\\n如果有人问我去哪了，就说我去晒太阳了。","paper":"cream","tape":"masking","font":"huiwen","isAnonymous":false})]',
-    "",
-    "动作：发送便签评论",
-    "描述：以当前角色身份回复某张便签。",
-    "参数：",
-    "  - noteId (string): 要回复的便签 noteId",
-    "  - authorName (string): 评论显示的落款名，由你自己决定",
-    "  - body (string): 评论内容，20-160字更自然；短、口语、接住具体点，别客服腔或总结腔",
-    "  - isAnonymous (boolean): 是否匿名。即使匿名，也要填写 authorName",
-    "示例：",
-    '[执行动作:发送便签评论({"noteId":"便签noteId","authorName":"落款名","body":"看到这里时突然很想接一句：这张便签我会记得。","isAnonymous":false})]',
-    "",
-    "查看类动作会返回结果，你可以基于结果继续决定是否发送便签或便签评论。发送类动作会直接执行，执行时只输出执行动作指令，不要附加闲聊内容。",
 ].join("\n");
 
 const MUSIC_CONTROL_USAGE_GUIDE = [
@@ -312,97 +256,6 @@ const CALENDAR_MANAGEMENT_USAGE_GUIDE = [
     "- 添加、修改、取消会直接执行。执行时只输出执行动作指令，不要附加闲聊内容。",
 ].join("\n");
 
-const NOTE_WALL_LIST_PARAMETER_SCHEMA = JSON.stringify({
-    type: "object",
-    properties: {
-        limit: {
-            type: "number",
-            description: "返回数量，1-30，默认 20",
-        },
-        sort: {
-            type: "string",
-            description: "排序方式：latest=最新，hot=互动最多，all=全部，默认 latest",
-        },
-    },
-});
-
-const NOTE_WALL_DETAIL_PARAMETER_SCHEMA = JSON.stringify({
-    type: "object",
-    properties: {
-        noteId: {
-            type: "string",
-            description: "便签列表或上下文中提供的 noteId",
-        },
-        commentLimit: {
-            type: "number",
-            description: "返回评论数量，1-30，默认 20",
-        },
-    },
-    required: ["noteId"],
-});
-
-const NOTE_WALL_NOTE_PARAMETER_SCHEMA = JSON.stringify({
-    type: "object",
-    properties: {
-        authorName: {
-            type: "string",
-            description: "右下角落款名，由你自己决定",
-        },
-        summary: {
-            type: "string",
-            description: "便签标题；便签卡片上方加粗显示的短标题，建议 4-18 字，不要复述 body 的第一句",
-        },
-        body: {
-            type: "string",
-            description: "点开后的完整正文；口语、具体、有生活细节；不要重复 summary，也不要以 summary 原文开头再扩写，可用 \\n 分成 2-4 段",
-        },
-        size: {
-            type: "string",
-            description: "small|medium|large，默认 medium",
-        },
-        paper: {
-            type: "string",
-            description: "plain|cream|pink|blue|kraft，默认 plain",
-        },
-        tape: {
-            type: "string",
-            description: "none(透明胶)|masking|stripe|flower，默认 none",
-        },
-        font: {
-            type: "string",
-            description: "default|huangyou|shangshangqian|huiwen，默认 default",
-        },
-        isAnonymous: {
-            type: "boolean",
-            description: "是否匿名。即使匿名，也要填写 authorName，前台会显示匿名",
-        },
-    },
-    required: ["summary", "body"],
-});
-
-const NOTE_WALL_COMMENT_PARAMETER_SCHEMA = JSON.stringify({
-    type: "object",
-    properties: {
-        noteId: {
-            type: "string",
-            description: "要回复的便签 noteId",
-        },
-        authorName: {
-            type: "string",
-            description: "评论显示的落款名，由你自己决定",
-        },
-        body: {
-            type: "string",
-            description: "评论内容，20-160字更自然；短、口语、接住具体点，别客服腔或总结腔",
-        },
-        isAnonymous: {
-            type: "boolean",
-            description: "是否匿名。即使匿名，也要填写 authorName",
-        },
-    },
-    required: ["noteId", "body"],
-});
-
 const MUSIC_EMPTY_PARAMETER_SCHEMA = JSON.stringify({
     type: "object",
     properties: {},
@@ -508,29 +361,6 @@ const CALENDAR_DELETE_PARAMETER_SCHEMA = JSON.stringify({
         keyword: { type: "string", description: "事项关键词；没有 itemId 时必填" },
     },
 });
-
-const NOTE_WALL_SUBTOOLS: InternalToolDefinition[] = [
-    {
-        name: "查看便签列表",
-        description: "查看公共便签墙上的便签列表。",
-        parameterSchema: NOTE_WALL_LIST_PARAMETER_SCHEMA,
-    },
-    {
-        name: "查看便签详情及评论",
-        description: "查看某张便签的完整正文和评论。",
-        parameterSchema: NOTE_WALL_DETAIL_PARAMETER_SCHEMA,
-    },
-    {
-        name: "发送便签",
-        description: "以当前角色身份在公共便签墙上发送一张便签。",
-        parameterSchema: NOTE_WALL_NOTE_PARAMETER_SCHEMA,
-    },
-    {
-        name: "发送便签评论",
-        description: "以当前角色身份回复某张便签。",
-        parameterSchema: NOTE_WALL_COMMENT_PARAMETER_SCHEMA,
-    },
-];
 
 const MUSIC_CONTROL_SUBTOOLS: InternalToolDefinition[] = [
     { name: "开始一起听", description: "与用户用现有 Music 播放器一起听歌。", parameterSchema: MUSIC_EMPTY_PARAMETER_SCHEMA },
@@ -1216,15 +1046,6 @@ const BUILTIN_INTERNAL_CAPABILITIES: InternalCapabilityConfig[] = [
         updatedAt: 0,
     },
     {
-        id: NOTE_WALL_CAPABILITY_ID,
-        name: "便签墙",
-        description: "公共社区便签墙相关服务。",
-        enabled: false,
-        mode: "auto",
-        createdAt: 0,
-        updatedAt: 0,
-    },
-    {
         id: MUSIC_CONTROL_CAPABILITY_ID,
         name: "网易云音乐",
         description: "控制{{user}}小手机里的音乐播放，查看{{user}}小手机里的音乐库、网易云歌单和播放列表。",
@@ -1290,13 +1111,13 @@ const BUILTIN_INTERNAL_CAPABILITIES: InternalCapabilityConfig[] = [
 ];
 
 export function loadInternalCapabilities(): InternalCapabilityConfig[] {
-    if (typeof window === "undefined") return BUILTIN_INTERNAL_CAPABILITIES.filter(item=>item.id!==REALITY_BRIDGE_CAPABILITY_ID).map(item => ({ ...item }));
+    if (typeof window === "undefined") return BUILTIN_INTERNAL_CAPABILITIES.filter(item=>item.id!==REALITY_BRIDGE_CAPABILITY_ID && item.id!=="note_wall_service").map(item => ({ ...item }));
     try {
         const raw = kvGet(INTERNAL_CAPABILITIES_KEY);
         const items: InternalCapabilityConfig[] = raw ? JSON.parse(raw) : [];
-        return ensureBuiltinInternalCapabilities(items).filter(item=>item.id!==REALITY_BRIDGE_CAPABILITY_ID);
+        return ensureBuiltinInternalCapabilities(items).filter(item=>item.id!==REALITY_BRIDGE_CAPABILITY_ID && item.id!=="note_wall_service");
     } catch {
-        return ensureBuiltinInternalCapabilities([]).filter(item=>item.id!==REALITY_BRIDGE_CAPABILITY_ID);
+        return ensureBuiltinInternalCapabilities([]).filter(item=>item.id!==REALITY_BRIDGE_CAPABILITY_ID && item.id!=="note_wall_service");
     }
 }
 
@@ -1327,14 +1148,6 @@ export function getInternalCapabilityToolDefinition(capability: InternalCapabili
             description: capability.description,
             parameterSchema: MEMORY_WRITE_PARAMETER_SCHEMA,
             usageGuide: MEMORY_WRITE_USAGE_GUIDE,
-        };
-    }
-    if (capability.id === NOTE_WALL_CAPABILITY_ID) {
-        return {
-            name: capability.name,
-            description: capability.description,
-            parameterSchema: "{}",
-            usageGuide: NOTE_WALL_USAGE_GUIDE,
         };
     }
     if (capability.id === MUSIC_CONTROL_CAPABILITY_ID) {
@@ -1477,9 +1290,6 @@ export function getInternalCapabilitySubToolDefinition(
     capability: InternalCapabilityConfig,
     name: string,
 ): InternalToolDefinition | null {
-    if (capability.id === NOTE_WALL_CAPABILITY_ID) {
-        return NOTE_WALL_SUBTOOLS.find(tool => tool.name === name) ?? null;
-    }
     if (capability.id === MUSIC_CONTROL_CAPABILITY_ID) {
         return MUSIC_CONTROL_SUBTOOLS.find(tool => tool.name === name) ?? null;
     }
@@ -1501,9 +1311,6 @@ export function getInternalCapabilitySubToolDefinition(
 export function getInternalCapabilitySubToolDefinitions(
     capability: InternalCapabilityConfig,
 ): InternalToolDefinition[] {
-    if (capability.id === NOTE_WALL_CAPABILITY_ID) {
-        return NOTE_WALL_SUBTOOLS;
-    }
     if (capability.id === MUSIC_CONTROL_CAPABILITY_ID) {
         return MUSIC_CONTROL_SUBTOOLS;
     }

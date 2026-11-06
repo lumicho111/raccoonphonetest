@@ -1,3 +1,4 @@
+import type { SocialMedia } from './social-media';
 import { loadCharacters } from "./character-storage";
 import { socialRelated } from "./social-identity";
 import { resolveUserIdentity } from "./settings-storage";
@@ -40,6 +41,7 @@ export type TwitterAction = { id: string; actorId: string; targetPostId: string;
 export type TwitterPendingReply = { id: string; commentId: string; targetPostId: string; createdAt: number; attempts: number };
 export type TwitterEngagement = { likes: number; reposts: number; views: number; comments: number };
 export type TwitterPost = {
+  media?: SocialMedia;
   id: string;
   identitySnapshot?: Record<string, boolean>;
   authorId: string; // "user" or character id

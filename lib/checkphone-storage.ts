@@ -1,3 +1,6 @@
+import {reconciliationMemory} from './phone-reconcile';
+import {reverseMemory} from "./reverse-phone-state";
+import {phonePlayMemory,visitMemory} from "./checkphone-play";
 import Dexie from "dexie";
 import { CHECKPHONE_APP_SPECS, type CheckPhoneAppId, type CheckPhoneManifest, type CheckPhoneSnapshot } from "./checkphone-config";
 import { kvGet, kvRemove, kvSet, registerDynamicPrefix } from "./kv-db";
@@ -225,7 +228,7 @@ export async function savePhoneSnapshot<AppPayload = unknown>(snapshot: CheckPho
   } catch (error) {
     console.warn("[CheckPhoneStorage] save snapshot error:", error);
   }
-  recordCheckPhoneSnapshotEvent(snapshot as CheckPhoneSnapshot);
+  // Viewing/generating a snapshot no longer leaks a silent visit into memory.
 }
 
 export async function clearPhoneSnapshot(characterId: string, appId: CheckPhoneAppId): Promise<void> {
@@ -260,7 +263,7 @@ export function loadCheckPhoneProjectionEntries(
   characterId: string,
   options?: { afterTimestamp?: string },
 ): CheckPhoneProjectionEntry[] {
-  const entries = loadProjectionEventsByKey(projectionStorageKey(characterId));
+  const entries = [...loadProjectionEventsByKey(projectionStorageKey(characterId)), ...visitMemory(characterId), ...phonePlayMemory(characterId),...reverseMemory(characterId),...reconciliationMemory(characterId)];
   if (!options?.afterTimestamp) return entries;
   return entries.filter(entry => entry.timestamp > options.afterTimestamp!);
 }

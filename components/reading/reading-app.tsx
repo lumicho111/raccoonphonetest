@@ -1,8 +1,11 @@
 "use client";
+import {useAppBack} from "@/lib/back-navigation";
+import {reversePageIntent} from "@/lib/reverse-phone-state";
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { hydrateReadingStorage } from "@/lib/reading-storage";
 import { ReadingShelf } from "./reading-shelf";
+import {loadBooks} from "@/lib/reading-storage";
 import { ReadingViewer } from "./reading-viewer";
 import type { Book } from "@/lib/reading-types";
 import {
@@ -21,7 +24,9 @@ type Props = { onClose: () => void };
 
 export default function ReadingApp({ onClose }: Props) {
     const [ready, setReady] = useState(false);
+    useEffect(()=>{const fn=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.app==='reading')setActiveBook(d.bookId?loadBooks().find(b=>b.id===d.bookId)||null:null);};window.addEventListener('rabbit-reverse-page',fn);if(reversePageIntent())fn(new CustomEvent('rabbit-reverse-page',{detail:reversePageIntent()}));return()=>window.removeEventListener('rabbit-reverse-page',fn);},[]);
     const [activeBook, setActiveBook] = useState<Book | null>(null);
+    useAppBack(()=>activeBook?setActiveBook(null):onClose(),()=>!!document.querySelector('[data-active-app="reading"]'),18);
     const [appearance, setAppearance] = useState<ReadingAppearance>(DEFAULT_READING_APPEARANCE);
     const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
     const [customFontFamily, setCustomFontFamily] = useState<string | undefined>(undefined);

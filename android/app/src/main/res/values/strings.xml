@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">float</string>
-    <string name="title_activity_main">float</string>
+    <string name="app_name">兔版float</string>
+    <string name="title_activity_main">兔版float</string>
     <string name="package_name">app.ii.phone</string>
     <string name="custom_url_scheme">app.ii.phone</string>
 </resources>

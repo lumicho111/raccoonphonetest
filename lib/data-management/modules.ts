@@ -383,6 +383,7 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
           "ai_phone_interview_magazine_host_prompt_v1",
           "ai_phone_interview_magazine_memory_prompt_v1",
           "checkphone-settings",
+          "rabbit_phone_reconcile_v1", "rabbit_reverse_phone_v1", "rabbit_hidden_chats_v1", "rabbit_phone_access_v1", "rabbit_phone_visits_v1", "rabbit_phone_play_v1",
           "ai_phone_game_state_v1",
           "ai_phone_game_hall_drafts_v1",
           "ai_phone_black_market_state_v1",

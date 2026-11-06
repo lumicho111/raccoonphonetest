@@ -1,5 +1,6 @@
 "use client";
 import { LivePhotoBubble } from "./live-photo";
+import {ReversePhoneRecord} from "./reverse-phone-overlay";
 import { ForwardedChatBubble } from "./forwarded-chat-record";
 import { chatContactDisplayName, chatPokeDisplayName } from "@/lib/communication-display-name";
 
@@ -102,7 +103,7 @@ function PluginKindBubble({ msg, kind }: { msg: ChatMessage; kind: string }) {
  * Falls back to ReactMarkdown for plain text messages.
  */
 export const MessageBubble = memo(function MessageBubble({ msg, photoGroup, onUpdate, charName, userName, quoteCharacterName, quoteUserName, isGroup = false, onSystemMessage, groupSize, onShowDetail, characterId, onMusicPlay, onActionSelect, onMeetingInviteAction, displayContent, defaultTranslationExpanded = false, inlineKktMeta }: MessageBubbleProps) {
-    if (msg.mediaData?.liveVideoId) return <LivePhotoBubble msg={msg} />;
+    if (msg.mediaData?.liveVideoId || msg.mediaData?.socialMedia) return <LivePhotoBubble msg={msg} />;
     if (photoGroup && photoGroup.length > 1) return <ChatPhotoDeck messages={photoGroup} onUpdate={onUpdate} characterId={characterId} />;
     switch (msg.mediaType) {
         case "chat_record":
@@ -118,6 +119,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, photoGroup, onUp
         case "payment_request":
             return <PaymentRequestBubble msg={msg} charName={charName} userName={userName} onShowDetail={onShowDetail} />;
         case "app_card":
+            if(msg.mediaData?.appName==="reverse_phone")return <ReversePhoneRecord id={msg.mediaData.label||""}/>;
             return <AppCardBubble msg={msg} characterId={characterId} characterName={msg.senderName || charName} />;
         case "image":
             return <ImageBubble msg={msg} onUpdate={onUpdate} characterId={characterId} />;
@@ -899,7 +901,7 @@ function AppCardBubble({ msg, characterId, characterName }: { msg: ChatMessage; 
     } as React.CSSProperties;
     const openApp = () => {
         if (cardOpenDisabled) return;
-        if (d?.theqooSnapshot) { setSnapshotOpen(true); return; }
+        if (d?.theqooSnapshot || d?.cityDiarySnapshot) { setSnapshotOpen(true); return; }
         if (!d?.appId || typeof window === "undefined") return;
         window.dispatchEvent(new CustomEvent("open-app", {
             detail: {
@@ -1000,6 +1002,7 @@ function AppCardBubble({ msg, characterId, characterName }: { msg: ChatMessage; 
                 </div>
             ) : null}
         </div>
+        {snapshotOpen && d?.cityDiarySnapshot && <div className="icity-share-backdrop" role="presentation" onClick={()=>setSnapshotOpen(false)}><section role="dialog" aria-modal="true" aria-label="分享的iCity日记" className="icity-share-dialog" onClick={e=>e.stopPropagation()}><header><span>iCity · @{d.cityDiarySnapshot.handle}</span><button type="button" aria-label="关闭分享日记" onClick={()=>setSnapshotOpen(false)}>×</button></header><h3>{d.cityDiarySnapshot.title}</h3><p>{d.cityDiarySnapshot.text}</p>{d.cityDiarySnapshot.photos?.map((photo,i)=>photo.startsWith('text://')?<p key={i}>{decodeURIComponent(photo.slice(7))}</p>:<CitySharePhoto key={i} reference={photo}/>)}</section></div>}
         {snapshotOpen && d?.theqooSnapshot && <TheqooSnapshotWindow snapshot={d.theqooSnapshot} onClose={() => setSnapshotOpen(false)} />}
         </>
     );
@@ -2632,3 +2635,5 @@ function VoiceMessageBubble({ msg, characterId, onUpdate, defaultTranslationExpa
         </div>
     );
 }
+
+function CitySharePhoto({reference}:{reference:string}){const [url,setUrl]=useState(reference.startsWith('asset://')?'':reference);useEffect(()=>{let live=true;if(reference.startsWith('asset://'))void import('@/lib/chat-asset-storage').then(m=>m.getChatImageFromIndexedDB(reference.slice(8))).then(v=>{if(live)setUrl(v||'');});return()=>{live=false;};},[reference]);return url?<img src={url} alt="分享日记的配图"/>:null;}

@@ -17,20 +17,20 @@ function parse(raw: string): Record<string, unknown> {
   if (start < 0 || end <= start) throw new Error("生成格式无效，请重试。");
   return JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
 }
-async function ask(prompt: string, characterId?: string) {
+async function ask(prompt: string, characterId?: string, publicOnly = false) {
   const slot = resolveBinding(loadBindingConfig(), characterId, "question_box");
   const configs = loadApiConfigs();
   const api = configs.find(row => row.id === slot.apiConfigId) || configs.find(row => row.apiKey?.trim());
   if (!api?.apiKey?.trim()) throw new Error("请先配置小手机文字 API。");
   const preset = loadPresets().find(row => row.id === slot.presetId) || null;
   const world = loadWorldBooks().filter(row => slot.worldBookIds?.includes(row.id)).map(row => `${row.name}：${row.entries.filter(entry => !entry.disable).map(entry => entry.content).join("；")}`).join("\n").slice(0, 4000);
-  const shortTerm = characterId ? prepareShortTermContext(characterId, "question_box", { tokenBudgetOverride: 1800 }) : null;
-  const memoryConfig = characterId ? loadMemoryConfig() : null;
+  const shortTerm = characterId && !publicOnly ? prepareShortTermContext(characterId, "question_box", { tokenBudgetOverride: 1800 }) : null;
+  const memoryConfig = characterId && !publicOnly ? loadMemoryConfig() : null;
   const [longTerm, core] = characterId && memoryConfig ? await Promise.all([
     retrieveMemoriesForPrompt(characterId, shortTerm?.wbActivationContext || prompt, memoryConfig).catch(() => []),
     retrieveCoreMemoriesForPrompt(characterId, memoryConfig).catch(() => []),
   ]) : [[], []];
-  const linkedSources = characterId ? roleSocialContext(characterId, loadBoxState().socialSourcesByCharacter[characterId]) : "";
+  const linkedSources = characterId ? roleSocialContext(characterId, loadBoxState().socialSourcesByCharacter[characterId], publicOnly ? "public" : "self") : "";
   const context = [
     ...(shortTerm?.recentBlocks || []).filter(block => block.content).map(block => block.content),
     core.length ? formatCoreMemories(core) : "",
@@ -39,7 +39,7 @@ async function ask(prompt: string, characterId?: string) {
   const character = loadCharacters().find(c => c.id === characterId);
   const boundary = character ? fixedRelationshipInstruction(character, "用户", undefined, "question_box") : "";
   const output = await sendLLMRequest(api, preset, [
-    { role: "system", content: `${prompt}\n${boundary}\n相关世界书：${world || "无"}。${linkedSources ? `\n角色本人关联的日程与 WVS：${linkedSources}。日历仅供本人理解，匿名提问者不能据此得知隐私；公开回答不得泄漏私人安排。` : ""}${context ? `\n角色近期经历及记忆（仅供理解角色，不能用来识破匿名发问者）：\n${context}` : ""}\n只输出 JSON，不能输出 Markdown。` },
+    { role: "system", content: `${prompt}\n${boundary}\n相关世界书：${world || "无"}。${linkedSources ? `\n角色本人日历：${linkedSources}。日历仅供本人理解，匿名提问者不能据此得知隐私；本人可自行决定是否分享自己的安排；未说出的部分不能成为提问者知识。` : ""}${context ? `\n角色近期经历及记忆（仅供理解角色，不能用来识破匿名发问者）：\n${context}` : ""}\n只输出 JSON，不能输出 Markdown。` },
     { role: "user", content: "生成这次内容。" },
   ], [], undefined, { appId: "question_box", appTags: ["question_box", "questions"], skipOutputRegex: true });
   return parse(output);
@@ -69,15 +69,14 @@ export async function generateBoxQuestions(session: BoxSession, count: number, e
     ? available.sort(() => Math.random() - .5).slice(0, available.length ? 1 + Math.floor(Math.random() * Math.min(3, available.length)) : 0)
     : available.filter(row => session.participantIds?.includes(row.id)) : [];
   const roster = candidates.map(row => {
-    const recent = prepareShortTermContext(row.id, "question_box", { tokenBudgetOverride: 300 }).recentBlocks
-      .filter(block => block.content).map(block => block.content).join(" ").slice(-850);
+    const recent = ""; // Stranger question generation never receives private chat history.
     const linked = roleSocialContext(row.id, loadBoxState().socialSourcesByCharacter[row.id]);
     return `${row.id}=${row.name}：${row.persona.slice(0, 450)}${recent ? `。最近的经历和聊天：${recent}` : ""}${linked ? `。本人关联日程与 WVS：${linked}。私人日历只供本人参考，不能让别的发问者知情` : ""}`;
   }).join("\n");
   const previous = session.questions.slice(-14).map(row => row.text).join("；");
   const topic = session.topic ? `本期主题「${session.topic}」，问题应围绕主题但角度多样。` : "没有指定主题，问题题材自然多样。";
   const recipient = session.ownerId === "user" ? `U（${user?.name || "用户"}）。身份介绍：${[user?.bio, user?.customSettings].filter(Boolean).join("；").slice(0, 650)}。候选角色（允许部分角色提问，也允许陌生人提问）：${roster || "本期没有参与的角色，只能由陌生人提问"}。` : `${owner?.name || "角色"}。人设：${owner?.persona.slice(0, 1800) || "无"}。只能由虚构陌生人提问，不能代 U 发问。`;
-  const result = await ask(`你在为一期开着的提问箱新增恰好 ${count} 个问题。收件人：${recipient}${topic}已有问题避免重复：${previous || "无"}。全部问题正文必须写自然中文，不得写韩语或日语。不要每题都围绕恋爱或私人关系；尊重人物的公开与私密边界。每位候选角色只能依据自己的人设和经历提问，不得借用其他候选角色独有的聊天或秘密。发问人全部匿名，绝不在前端露出姓名。${excludeUser ? "这一批不能出现 U 的问题。" : ""}只输出 {"questions":[{"text":"中文问题","senderId":"若 U 的收件箱且确有角色发问，填写上面候选角色的准确 ID；陌生人填空字符串"}]}。`, session.ownerId === "user" ? undefined : session.ownerId);
+  const result = await ask(`你在为一期开着的提问箱新增恰好 ${count} 个问题。收件人：${recipient}${topic}已有问题避免重复：${previous || "无"}。全部问题正文必须写自然中文，不得写韩语或日语。问题可围绕近期事件、世界背景、人设、已公开行程、作品、公开事项、传闻和普通生活，也允许质疑、尖锐、玩笑和不讨好的问题，避免统一夸赞或每题恋爱。传闻保留不确定性，不能当事实；匿名提问者不知道未公开行程和私人秘密。尊重公开与私密边界。每位候选角色只能依据自己的人设和经历提问，不得借用其他候选角色独有的聊天或秘密。发问人全部匿名，绝不在前端露出姓名。${excludeUser ? "这一批不能出现 U 的问题。" : ""}只输出 {"questions":[{"text":"中文问题","senderId":"若 U 的收件箱且确有角色发问，填写上面候选角色的准确 ID；陌生人填空字符串"}]}。`, session.ownerId === "user" ? undefined : session.ownerId, true);
   const rows = Array.isArray(result.questions) ? result.questions : [];
   const valid = rows.slice(0, count).flatMap(value => {
     if (!value || typeof value !== "object") return [];
@@ -97,7 +96,7 @@ export async function generateBoxAnswers(session: BoxSession): Promise<Array<{ i
   const pending = [...session.questions.filter(question => !question.answer)].sort(() => Math.random() - .5).slice(0, 15);
   if (!pending.length) return [];
   const list = pending.map(question => ({ id: question.id, text: question.text, askedAt: new Date(question.createdAt).toISOString() }));
-  const result = await ask(`你是角色 ${char.name}，正在查看自己提问箱里还没回答的匿名问题。人设：${char.persona.slice(0, 4200)}。现在可以结合近期聊天和经历决定回答哪些问题；可能一题、多题或一题都不答。不要仅为完成任务而强行回答，也不要无理由永久拖延。如果此前不知怎么回答，近期经历可能让你有了想法。发问者全部匿名；后台 senderId 不可见，也不能当作识别依据。你可以根据问题措辞和自己已知的经历不确定地猜测是谁，但不能声称知道发问者身份。问题列表：${JSON.stringify(list)}。只给出想回答的列表，每项准确填写原问题 id。回答要符合人设；original 用日常语言，如非中文 translated 给准确自然的简体中文译文，中文则相同。只输出 {"answers":[{"id":"问题id","original":"回答原话","translated":"中文译文"}]}，不回答可输出空数组。`, char.id);
+  const result = await ask(`你是角色 ${char.name}，正在查看自己提问箱里还没回答的匿名问题。人设：${char.persona.slice(0, 4200)}。现在可以结合近期聊天和经历决定回答哪些问题；可能一题、多题或一题都不答。允许认真答、接梗、回避、敷衍或不回；不要为了完成任务而强行回答，不要求所有问题最终获答。如果此前不知怎么回答，近期经历可能让你有了想法。发问者全部匿名；后台 senderId 不可见，也不能当作识别依据。你可以根据问题措辞和自己已知的经历不确定地猜测是谁，但不能声称知道发问者身份。问题列表：${JSON.stringify(list)}。只给出想回答的列表，每项准确填写原问题 id。回答要符合人设；original 用日常语言，如非中文 translated 给准确自然的简体中文译文，中文则相同。只输出 {"answers":[{"id":"问题id","original":"回答原话","translated":"中文译文"}]}，不回答可输出空数组。`, char.id);
   const rows = Array.isArray(result.answers) ? result.answers : [];
   const seen = new Set<string>();
   return rows.flatMap(item => {

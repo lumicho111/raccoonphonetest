@@ -1,0 +1,1183 @@
+{
+  "version": "1.0.5",
+  "nativeBuild": 7,
+  "basis": "Full original 1.0.0 APK source, cumulative through 1.0.2 offline fixes",
+  "files": {
+    ".github/workflows/android-shell.yml": {
+      "sha256": "1215f29b403cceb3440ad7291a28d61d95fcbfe519417f15657e074c9aaf204d",
+      "base_sha256": null
+    },
+    "ANDROID_BUILD.md": {
+      "sha256": "99e5bc4149f592b595c9f4b12c6c42f4a548a1cd1eecd04c964f8373f0407d98",
+      "base_sha256": "37aedc2f739ee1c8f7e0b7234aba113883f8a658309201428074788f45b6955b"
+    },
+    "android-shell/README.md": {
+      "sha256": "3070aaf1f552d1149c3aad95a95e5d6e9dde62d02aad6511e4ba1fbbaecc134e",
+      "base_sha256": null
+    },
+    "android-shell/app/build.gradle": {
+      "sha256": "3df6ff1d72a9e81d6b21b95f72cd6e68efe436e0d6d7281739b6f460345c0365",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/AndroidManifest.xml": {
+      "sha256": "4ed39601e01016e9e6f65206093cd1bd2a1c9ba31c74cf0b5875b3ed81610401",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/java/app/floatphone/shell/BootReceiver.kt": {
+      "sha256": "451edac942e3f50639f52189a59d30d7794af2d899f63e8263f8c4b8591edd43",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/java/app/floatphone/shell/CallActionReceiver.kt": {
+      "sha256": "b8fba5ebe4b98a2524bdd3b0e95624131352bce1ce62565d49b64e56e9931d81",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/java/app/floatphone/shell/CallAlert.kt": {
+      "sha256": "e2639b45b6f5a8a7ef840f6a00a84263e56998d7fc7081d988b6528f451d2044",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/java/app/floatphone/shell/IncomingCallActivity.kt": {
+      "sha256": "ed479477d2063d4c3c45fa8e61badac3a2da4243473befb16f1406a9983a9331",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/java/app/floatphone/shell/MainActivity.kt": {
+      "sha256": "f1ce9fab0dcceadd695d4a4cc135007466b4387cdb2be61c8b91a3e3c754a1d5",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/java/app/floatphone/shell/PushService.kt": {
+      "sha256": "61854eea6a7198b2f1341e2f572cec4efd1ab28a9d621e437e99d503161b7c3f",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/res/drawable/appicon.png": {
+      "sha256": "9def30be9ad446a9bbbc5db01c82f31f736fcb77023cdb695bae602150e74bb7",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/res/drawable/ic_stat.xml": {
+      "sha256": "67fae8fade8a8fdcf36d0728494093b1681bb55960b37e7eca9eaa6472b995de",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/res/values/strings.xml": {
+      "sha256": "f8b0bbb9f482b4d5fd172b6b3e3569428f0a79e9f2eb8689a78b08ff766dfcf5",
+      "base_sha256": null
+    },
+    "android-shell/app/src/main/res/values/themes.xml": {
+      "sha256": "83ed2e8f3b15f6b5099a25d49bb73d019b155fa54d0236748dd262e7a121a003",
+      "base_sha256": null
+    },
+    "android-shell/build.gradle": {
+      "sha256": "43f605388294ca10e199db43b0a50c1b48ef5bfaebb2ebb808997aa35bd2bdf8",
+      "base_sha256": null
+    },
+    "android-shell/gradle.properties": {
+      "sha256": "d712f4f30e5e73d2d9e1beb89a2f585eb6661c239f02d3f70fbe02bc9988095b",
+      "base_sha256": null
+    },
+    "android-shell/settings.gradle": {
+      "sha256": "5397dfef24057c92ec22ead0a4bec4a4c65dc1ce569cd100e22de9dc15488abe",
+      "base_sha256": null
+    },
+    "android/app/capacitor.build.gradle": {
+      "sha256": "3793caccde242e188b5cf3e89a89345e47bd35822842b502596beda87b6343cf",
+      "base_sha256": "33c2b8779211be342b1b7b880f6db9dae6e03eeda068969a4bb7f18057751ec2"
+    },
+    "android/app/src/main/java/app/ii/phone/FloatUpdatesPlugin.java": {
+      "sha256": "4322c9b54e1384dadb5831c64321fd06b42ce12bf07cc83a8c382460c560d211",
+      "base_sha256": null
+    },
+    "android/app/src/main/java/app/ii/phone/MainActivity.java": {
+      "sha256": "1c6c231f70df4ef5ba4a29f4b1b6a2a7b41bd461ac500285c5efcd77ced14438",
+      "base_sha256": "b452b028f5431bea6720323dc0bc3590d9bc3386938352e4d34138c102f1512b"
+    },
+    "android/app/src/main/java/app/ii/phone/update/GitHubUpdates.java": {
+      "sha256": "bac68634ceac10e4d5d44e79276d87e02dfb2d70e02829a88bd42247e920a151",
+      "base_sha256": null
+    },
+    "android/app/src/main/java/app/ii/phone/update/ResourcePackage.java": {
+      "sha256": "4e8c93aad73513ddf3ff1a91a01a755a63e080c5150ecab70b728b83cac5c225",
+      "base_sha256": null
+    },
+    "android/app/src/main/java/app/ii/phone/update/ResourceStore.java": {
+      "sha256": "436171f36f753b1c3339d75df5c361a803532a1f013f54dd823641b16a94c11f",
+      "base_sha256": null
+    },
+    "android/app/src/main/res/values/strings.xml": {
+      "sha256": "5702df81a742462decdfbfe33bc4bae61dcaee8f723743dc04eb8c880782f70b",
+      "base_sha256": "f368a82774264156d72ecb2b7a5540ba35b4371928e63fb00dbf7025c2e9ddac"
+    },
+    "android/capacitor.settings.gradle": {
+      "sha256": "b6146c73191366881b1bd13bb1fe5dd4d9dda1b2ceec4633168c2e7cb1f548ac",
+      "base_sha256": "fed86f2fff81aac9f1e875ee68dae44b335a75d6c5d49abdbeab22f447d3d730"
+    },
+    "android/gradle/wrapper/gradle-wrapper.jar": {
+      "sha256": "a8451eeda314d0568b5340498b36edf147a8f0d692c5ff58082d477abe9146e4",
+      "base_sha256": "a8451eeda314d0568b5340498b36edf147a8f0d692c5ff58082d477abe9146e4"
+    },
+    "app/globals.css": {
+      "sha256": "11d0a22a5b749e45ed13dca1fe6dcd3d605c4abe8d7528e3e5cf69c8b48748ea",
+      "base_sha256": "709b9e606c9d1a2059dd90ed3459ad3d345f990feb4f7d7714b3ad0c808ef59d"
+    },
+    "app/layout.tsx": {
+      "sha256": "309adbe5f6ad9099a821f77e2d3ef2236467e949522b88b399e8fa94bfad076f",
+      "base_sha256": "fd32bdaff4db261eb9f8c108559e589c299e8389c6fad575848cb038f58fd779"
+    },
+    "capacitor.config.json": {
+      "sha256": "de1d6168bf21807508e6330b5fc6fac3940301f755aa586dc081a25aca6ecc80",
+      "base_sha256": "242ecb26ed3adbf17ba74ca316ea4d7654abdf16f858a7d801cc9a2ca1406c53"
+    },
+    "components/chat/chat-room.tsx": {
+      "sha256": "c6c3141bbb5e538ea83aaf3386cfc88f048f58805f948114fd2ba87a7bae61b9",
+      "base_sha256": "4d8f31f6e44cc0a8e7391bc9c22282f1756987c9569a24f343598b6ad82ddec4"
+    },
+    "components/chat/chat-settings-panel.tsx": {
+      "sha256": "fcfcf23a9c162722be596a12a7b2990f061753bde54ce73362b321967d5d07cc",
+      "base_sha256": "25d123773d482ad746449be4e53712fb38d03ca65e3f9f2bae640dfefe22f75f"
+    },
+    "components/chat/emoji-panel.tsx": {
+      "sha256": "870a31dbf19b33a8d882e1b1b86ae469b94d2232cf77df1c9b5a27de045e45a8",
+      "base_sha256": "6b692f6add6c5acb9e0b36150ef38cf42d62182b1fbdaf002bf919cf80a41f87"
+    },
+    "components/chat/message-bubble.tsx": {
+      "sha256": "16ef7c35c787564a0dc033cb64af1c2daab54c2ecfa2e7cf9b906423fcb15550",
+      "base_sha256": "f9e4dda0e89cb49fcc33cef296f1c7415f33935b896921d8207d8250ede6c53b"
+    },
+    "components/chat/offline-dialogue-text.tsx": {
+      "sha256": "c5d16f6abac54ef1dd2b70bbc672e78e9df0a95e7ef4e14cb82240dace6c5ceb",
+      "base_sha256": "d59a994540a8746a4c076f073632af3130394df76b032c1db49a4a4f060e2c1f"
+    },
+    "components/chat/offline-scene-controls.tsx": {
+      "sha256": "b1f2df53f902d164850a4c981bf7ddc7bc6470a1e5c00aea7445f104b7f25240",
+      "base_sha256": "8150b961d02c0c283f7988d224e1b7c2b85fc9c5c405511e8ed34bc903e0789f"
+    },
+    "components/chat/phone-lock-settings.tsx": {
+      "sha256": "6b5e93cae6150b121b0f39b0407bbc7dc4e3db3fc889dae6e6616e95fa1b5986",
+      "base_sha256": "9248a088c4a25788c157f92131157220de0220f8f680ded7305b89f97cabc321"
+    },
+    "components/chat/user-profile-panel.tsx": {
+      "sha256": "52a20b1a372e1fd2bcf0e1cd6242c6e607f1a0b140efd8e07de881fcf11c978d",
+      "base_sha256": "57dd4b8961f179335f098c1ecc2687482807e67dfad9fcffbddb4600495b5a86"
+    },
+    "components/interview/interview-magazine-app.tsx": {
+      "sha256": "6b6f7cafd55afef31ea3faac9fd245fa4eaf5f51a25982adfb2a459a24bf27cb",
+      "base_sha256": "d39c193261270a9d36c474042955339802025a0ffe69ed29ac4f3153ecb94352"
+    },
+    "components/main-app.tsx": {
+      "sha256": "92e3b595d45903df96528024d41b7bb968e0129ce211fd9e5b99dea3e935adfe",
+      "base_sha256": "02de7f69199fcc04f3996e61e648706fa2c4356322684e96205c4ef882935707"
+    },
+    "components/map/adventure-voice.tsx": {
+      "sha256": "ddf9ab5cb69302b028c1f2fcefb5a17d91b2c8a7e346ce60eaa02e1c6ec99399",
+      "base_sha256": null
+    },
+    "components/map/map-text-stream.tsx": {
+      "sha256": "581dd7cd7c2997fe4214499adf69f4c572361890babccd32506ac446b07f8591",
+      "base_sha256": "b6f72d0c59485b2ed416210b014063f79510d4e69002322983c67d3586892e3a"
+    },
+    "components/map/map-view.tsx": {
+      "sha256": "7aa69ea3e905f75d052dc2bc55d8488b358b9d9e6a24ebe1dd996e2bff0c1a59",
+      "base_sha256": "d8f0c4a158c57e76adf1f896e4a492fdcafec9050bfc171f116775342a9f72f2"
+    },
+    "components/offstage-app.tsx": {
+      "sha256": "2b9a40f3ce504a7aff58d042f764bc163a1ea41c49f3c28c2cfffaff9fc1d718",
+      "base_sha256": "524fa18f118265222afcf58d850cc397d2ca30ae18647e26e08b79960ddf0dbd"
+    },
+    "components/offstage-panels.tsx": {
+      "sha256": "68f42f33e67fdac40a17c35b7def0e2edffb62a86fed2a537f18854da2f04c66",
+      "base_sha256": null
+    },
+    "components/offstage.css": {
+      "sha256": "9571747f0b9bf0f24df297e5c13b8ee2dfb128838c9dcb0dd98c1076139847ce",
+      "base_sha256": "383790c6b47ca654c7879f8f51019da42c2e957804fefa1d75b7dc7076e87538"
+    },
+    "components/phone-settings-app.tsx": {
+      "sha256": "0a4a2b591003dbfdf080b04aac91fb1c38963ce477fb49c973444db01287cb33",
+      "base_sha256": "f0c4f4d4fa6544df202ce635f84585794e10ac7f20847ece2ab2a349c623fd51"
+    },
+    "components/settings/android-settings.tsx": {
+      "sha256": "d0e045698f07cb9e63bf3a16e6859f15945d747fea597de872b365063a1e3aa9",
+      "base_sha256": "466c1eb9d02c5f85339c3607f6c3dbf4b0c1c3a63a10d9f99db9e5f44e02e01f"
+    },
+    "components/sms/sms-app.module.css": {
+      "sha256": "dad0620d2899534b6ddf3579e9aac239378d98a6a69123d0c489e66fd40608c4",
+      "base_sha256": "9817df6906775361a01de5eee2fef482f44a84048f56f21d14f744368d78fab3"
+    },
+    "components/sms/sms-app.tsx": {
+      "sha256": "e1235b5af174fdc3ee985fcfe2677f509c372a57bb7dad7ba1e2f8c52ab365f0",
+      "base_sha256": "aa9b9af44a705a3769e03bbe56ae780886eab806cc888495ef5dcb8920ef9fcd"
+    },
+    "components/social-disclosure.tsx": {
+      "sha256": "50dd2243684d98eeeee108c38d70a0fe40c0d5025f812c0937b3137a140af0b3",
+      "base_sha256": "a44c62b543bda1b5312bc9723b557ef205e22bece14000bf74d7209f7cce24e8"
+    },
+    "components/storage-health.tsx": {
+      "sha256": "1f2e47b2d706958f3c75a85ed376b477b7b2f8b5b1e30f0e4c24138d61b2a65c",
+      "base_sha256": null
+    },
+    "docs/RELEASE_1.0.3.txt": {
+      "sha256": "2175aed74a51cf5a9df443b6126c022abe2be256facdeaef6ec63071b3fbcbc2",
+      "base_sha256": null
+    },
+    "docs/RELEASE_1.0.4.txt": {
+      "sha256": "6d74fe91bdd9c6e434f3fff8b1751042919444050a00166c7e22467fcc16cc9c",
+      "base_sha256": null
+    },
+    "docs/RELEASE_1.0.5.txt": {
+      "sha256": "665aa37416de1304c220bcf773265cfa9f9b8c3b7b4b9d0bea16f04361b3a038",
+      "base_sha256": null
+    },
+    "docs/RESOURCE_003.md": {
+      "sha256": "1ff8267c14a984632ef1d4d9e27a726ad2769dd833393f2f622c5ec1898d93ee",
+      "base_sha256": null
+    },
+    "docs/RESOURCE_UPDATES.md": {
+      "sha256": "7cb062e652c1959112985ce594d6e3665685f05d869d5126617f70e33adab803",
+      "base_sha256": null
+    },
+    "docs/offline-group-plan-2026-11-02.md": {
+      "sha256": "ffe0d25040c63407793131ce7fc11abe863db77060e30b6cb2724ba5d7c9b8e5",
+      "base_sha256": null
+    },
+    "lib/android-notifications.ts": {
+      "sha256": "e4dbd532690cc28da6f230635169f79be4123fe62326993fee7ec4ce05690260",
+      "base_sha256": null
+    },
+    "lib/android-runtime.ts": {
+      "sha256": "787390aad1ea35e9b5fe6fdbfc1030a25b99f8cc61cace2c65735c98c64b1572",
+      "base_sha256": "787390aad1ea35e9b5fe6fdbfc1030a25b99f8cc61cace2c65735c98c64b1572"
+    },
+    "lib/android-tts.ts": {
+      "sha256": "baeff668e524ed1480f5b6d3f7f86726e867ca04af9435178e1411525b2d3943",
+      "base_sha256": null
+    },
+    "lib/bilingual-prompt-defaults.ts": {
+      "sha256": "f2b0ac967f0611d6eb4ed965e6139bda1375c965db05558a99578df81d922b91",
+      "base_sha256": "462506760d50473c10d83815396e08bb19cb603e0088486fe25dcd36a2dbac97"
+    },
+    "lib/browser-notification.ts": {
+      "sha256": "80e8f979305fdf8e1bbaccf43fb4e8d2e5b440869525673ae9a62afd9aeb8a00",
+      "base_sha256": "3f83b0f956f9687d37b11310bb98a1ec422ac166d28f27e91d9d0c4fa9e5254d"
+    },
+    "lib/builtin-preset.ts": {
+      "sha256": "aeedaedbf4871a933d4204c0fc4d3fca1f52d2f2f888f3e329bd02f4e5e2cf97",
+      "base_sha256": "41ba8f5805d4ef78ff7d36ae6d819bc8f3a6a5def06bc4cf50bccb2307a129f3"
+    },
+    "lib/chat-db.ts": {
+      "sha256": "447f446ab53d7d002d85dc3103d543b0042c60fb815da36cd8ae24b6116c96fb",
+      "base_sha256": "28da99852a3140274c143435eeba6ca31050d3a78f4fed2ffa992d57dfa5bbd6"
+    },
+    "lib/chat-engine.ts": {
+      "sha256": "a93f706e44fc0bc1f0b29e4bc6e2de8e5876d5d5c0f7e53da3fa9d94d1f30280",
+      "base_sha256": "c79649fa73b178f45bb1004eab19007f545df8ef3acc9e3f1ac97d47934c96f1"
+    },
+    "lib/chat-offline-context.ts": {
+      "sha256": "ef5504dced16053318c0986bf2fe2135855a439d1075231450a7f555ea4f6631",
+      "base_sha256": "aab1c8a9639e91af38142d1bb1702c07f62898eca116c80cab2f87762f5a28f0"
+    },
+    "lib/chat-offline-scene-memory.ts": {
+      "sha256": "66cbe1f2d537822235093664c484c27b4730c5d5cbbcff3c53a37c51213eefef",
+      "base_sha256": "b91d3a9bb26dbb967c77f1d4bf7e1c00c0aa8e94779d14d7ea03e54c554206f3"
+    },
+    "lib/chat-offline-storage.ts": {
+      "sha256": "19ffee1a60bd1eff42d06d952c5a1150884ec5d3f21443c8bac73dc6de363df9",
+      "base_sha256": "7c215dc5ee5e226ad402876a187807bba3c4c26925d294b5e54f7e39e9a648cb"
+    },
+    "lib/follow-up-intent.ts": {
+      "sha256": "5de8374b488556a2b6c24149c5e11216e45ec1ca0e282f4b82c7b6d5d349d3b4",
+      "base_sha256": null
+    },
+    "lib/follow-up-service.ts": {
+      "sha256": "9f1a74366b4619385b88264bb486cd3dbb16e5b4a01de9cf51051506cb6a2335",
+      "base_sha256": "daab59cbd7e0994de95faa2720a1029ce9d2b7e87fe4aa9a9e2d30c012602182"
+    },
+    "lib/group-chat-engine.ts": {
+      "sha256": "b2c084e4883a9047765abcbf247f9aa2754128a7382723181a2db39a37bea0d8",
+      "base_sha256": "700ba7fa2045f34e6742166a9b72e8b7a52b3ecabd496b7dbca4dac314ba346c"
+    },
+    "lib/kv-db.ts": {
+      "sha256": "e3ae42241134a3f8d0f18ee28dc57a56b8f746d546e9fb0a79d01fe0ba491247",
+      "base_sha256": "ae5f4df642eab5c7b0e41f57a923653a42b02f8b38d0f646ee191d1ce6c782a6"
+    },
+    "lib/offline-dialogue.ts": {
+      "sha256": "41a3af1672ed631a71b180fcbe6b51b121bca11b34950402b1438d4d52f383a4",
+      "base_sha256": "d2d26dc13aa7d382edb508a586be7a7971994fbb63028ec5efb2543f083c4bfc"
+    },
+    "lib/offline-speakers.ts": {
+      "sha256": "27a81923088c6082a04aa21b085977fd70734406c224489057a88cdbb5720950",
+      "base_sha256": null
+    },
+    "lib/offstage-assets.d.ts": {
+      "sha256": "d0d9724c9454cdb9cf5de61b215517bf4ba52fe1163f17478901c12869c2c809",
+      "base_sha256": null
+    },
+    "lib/offstage-files.ts": {
+      "sha256": "d32d1adce5f19a10878ff9bbb08a90f1d8d0100f26fd0e09b2c14f879533ee93",
+      "base_sha256": null
+    },
+    "lib/offstage-models.ts": {
+      "sha256": "9b8616b5f48c347ba38c0208c757e5f2cb5278f9fa81f1aa0bab2f529499eac6",
+      "base_sha256": null
+    },
+    "lib/offstage-sources.ts": {
+      "sha256": "17b88ec9936c68dff1f5c50a535116ce005b43a2c81f2af8fb1b237989b79fac",
+      "base_sha256": null
+    },
+    "lib/offstage.ts": {
+      "sha256": "51e9b1b1fc65cac2ffdf61bf8f4b22a5c491079309dea54ad746196adccac64f",
+      "base_sha256": "01758a16a89654aba3965c845a608fa504cd9aa83950efba68644266f0eb601c"
+    },
+    "lib/resource-updates.ts": {
+      "sha256": "548594a11817e2efd082829696614964408964bda5543d0e59f08290e01a56ae",
+      "base_sha256": null
+    },
+    "lib/tts-service.ts": {
+      "sha256": "e5ac6774658ca5774ea0e7a8ee48d47639bdde96627b284ee67a92736e2ee7fd",
+      "base_sha256": "132a6c8f402fe648e08ee18e1fec960def6f59746b9fc02b314280a530c3c9d9"
+    },
+    "lib/update-notes.ts": {
+      "sha256": "ccb29a719f3ef4da50c4fb64ba2f466741099fb5aeefe2728a41679ea4a59931",
+      "base_sha256": null
+    },
+    "mobile/baselines/1.0.3-build5.json": {
+      "sha256": "c6e5ef42c45be93a76f8d4ad2e9ce0a808ebe0b00d1762af3da58d98ad2fe635",
+      "base_sha256": null
+    },
+    "mobile/baselines/1.0.4-build6.json": {
+      "sha256": "9323e64a528beaeb83c4ac21afef83194bcb5bcf359ae29f448b2fd967e87541",
+      "base_sha256": null
+    },
+    "mobile/baselines/1.0.5-build7.json": {
+      "sha256": "96e9151fe951f004ce9d29c076713cbe7857aa314d7842f31c8d8c1267e51d2e",
+      "base_sha256": null
+    },
+    "mobile/entry.tsx": {
+      "sha256": "a8c1fa67d89d03323a28d3364b50775b073da23043c6a0623b8d757f45360539",
+      "base_sha256": "e5d0c4191f559746c8a3fc8980162ce76e6f1f7f9a8eb112ec59dbbfb62e3579"
+    },
+    "mobile/version.json": {
+      "sha256": "607d57839e56d5ef681c76753370c6fa21df8dae20e17b509b66bfe89dfeb66a",
+      "base_sha256": "c1e64b8319d5ee1ef1b82aa2cd24e5eb7b12ccbd52a17d89377079f7f2e0ddc7"
+    },
+    "package-lock.json": {
+      "sha256": "7a4a3f28e092973caf68579e12b7ce9710a0ec81a2c50b5311e7de33b6c7b9e6",
+      "base_sha256": "0e27ead3d9513d0f24cf7a4ec9aad3b8c45a50c2e889a9e424bcffd91ddbf752"
+    },
+    "package.json": {
+      "sha256": "56d868b32e5f701611c8b5213a10c7c5157b64073c808c76c02043c9c94edb14",
+      "base_sha256": "ba09ffd7936bc471ab1ff785dcab3ad561b79b72ba81dfbca724ed40d29aa037"
+    },
+    "public/interview/presence-bedroom.png": {
+      "sha256": "c98e7ccad92ad0103d80e209697f2a1e3d31861e583169f75af4bc4150090178",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/LICENSE": {
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78-EUC-H.bcmap": {
+      "sha256": "d92a261336dc18b8c03a46eb4d462382d33f4338fa195d303256b2031434c874",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78-EUC-V.bcmap": {
+      "sha256": "61670bebc4e4827b67230c054fd0d820d6e30c3584d02e386804e62bbedc032a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78-H.bcmap": {
+      "sha256": "ece6415b853d61e1b2560165151407d35cf16e6556932b85a13ea75276b77402",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78-RKSJ-H.bcmap": {
+      "sha256": "696b1f973c97623496703809eaaa5f9b40696c77540057413f4b826a08edfa7b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78-RKSJ-V.bcmap": {
+      "sha256": "53cb6d560ab377da48cf65d6dcacb0bdb31f13fab7066c580de38c12a73a7ff9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78-V.bcmap": {
+      "sha256": "289000f02fd34872b6975503217f33abae6bee676e7d28f640473a67c8db1712",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78ms-RKSJ-H.bcmap": {
+      "sha256": "a2442595218f5f8bd8e1b42188e368587d876cfe0cc4cd87196f077c878f72e2",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/78ms-RKSJ-V.bcmap": {
+      "sha256": "f8ddceba96bfd9d3740bd1789ee30d1f47c78371520a8084f71f7df58f19be0b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/83pv-RKSJ-H.bcmap": {
+      "sha256": "44040051ec818fe09b9703472bea72efd2759d5eeb5ff0d77c718d6bb5e6d1df",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/90ms-RKSJ-H.bcmap": {
+      "sha256": "c13e043e85ff715b75bb03801e8fd0fb8f3a75e4a48496faa6baaf92b5b48ba1",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/90ms-RKSJ-V.bcmap": {
+      "sha256": "499bb916ce1adbe4289b6e5811f4dc20eb238cdc2ffad20cf26ae56716885bab",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/90msp-RKSJ-H.bcmap": {
+      "sha256": "7b8b3b8bbf821702e9a4df9f3596ce292380c8c1b0925dedadbb4e4b2d80498b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/90msp-RKSJ-V.bcmap": {
+      "sha256": "6296c2b5c07dca8128e96d5296d621a3268803d4fa0e5812a21e52fe2802aacb",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/90pv-RKSJ-H.bcmap": {
+      "sha256": "fb5103f03d3a34547e18d316e52b6d9b26e485c662999222f84d2ba54c2e4fa8",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/90pv-RKSJ-V.bcmap": {
+      "sha256": "7bcb5ad2ba55b9662ce379e16c2d9cc2b82d621a579807353741172e4af615c2",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Add-H.bcmap": {
+      "sha256": "a2ffab28b990998181bcca9b0e914bb2207820f100ae31d5c469444892e5ad8e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Add-RKSJ-H.bcmap": {
+      "sha256": "b29f4b52e2465d0485856d5e69f1ba69927deb2848d8fd328c8035583b35bb7e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Add-RKSJ-V.bcmap": {
+      "sha256": "2aa2232c283a3f5d0997c2834a36cead0b79ce2657944cfeed08140c293460ff",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Add-V.bcmap": {
+      "sha256": "25125d3b1be64e86b2df5b3344170b45a42bcaa0b46e43a34314ef73c166e542",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-0.bcmap": {
+      "sha256": "8c65be9d51a9f269a547dc12460707aaf4031ab67ebe8a2900f4b4cc6b3e450e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-1.bcmap": {
+      "sha256": "73152bc1a59cc594b414ac6068be48e5512b96ae85920c40e32a99269fdb0c04",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-2.bcmap": {
+      "sha256": "a1b8d353bdef9584c820464e8f1c9e2013d64ebf433cba0aa831dddf515818c2",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-3.bcmap": {
+      "sha256": "2ffc0c75c79fafde506163d3c08c390d183251009f3fbf6ae50d1167d14b9570",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-4.bcmap": {
+      "sha256": "98a1f470c878c6b9691a4d7aef776af8ac9b55f5587c9fafa00547f3bf655716",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-5.bcmap": {
+      "sha256": "ddd6e29955eb8cb545f2ebd09c628c3bbda5023256eda1b728f743c75fb77829",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-6.bcmap": {
+      "sha256": "317bb2db71e0e5b7b0c47b75de1da915c2e22f65f0c0861507f9ca7ba238f8a2",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-CNS1-UCS2.bcmap": {
+      "sha256": "e665837f2197c6bd08cd8955ad4d6932cee2398e2e328b25b00e6bfb3bd72af9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-GB1-0.bcmap": {
+      "sha256": "8b81cce8a11d510e505704953cfa4e4ab080c1a0cab991145a3512ee433946b9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-GB1-1.bcmap": {
+      "sha256": "0426983081788ec7202703e71f1efa4b860f75b936994236010b39d89251a81e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-GB1-2.bcmap": {
+      "sha256": "e67b37a83b160ab3831306a71a605893b24454ee81ac9b6123bf2d3984d268d5",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-GB1-3.bcmap": {
+      "sha256": "aa299afc3e12a28726147305f191be28c7498078c8b182ece7886ac79cd99078",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-GB1-4.bcmap": {
+      "sha256": "8fbd7d74c2ddb1350c1cecce54a73fde3f5453093d4bed445283ec0033d2097f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-GB1-5.bcmap": {
+      "sha256": "c22cb2fcff24112fa31dab2111bdc51957006576d31aad5a25e67793ac01428c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-GB1-UCS2.bcmap": {
+      "sha256": "20507620260c0c935c35afc1e70e5888aa7125d5ec7ffc03cef1959feb2c1641",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-0.bcmap": {
+      "sha256": "464f08905236f5703b1f5cf8358767c8b18e6bcc808840d081f1de2c7ab38134",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-1.bcmap": {
+      "sha256": "4c823848722187d1ffe75ae3f5f9126ccd2d7895a05fad14c919fb119e037008",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-2.bcmap": {
+      "sha256": "7810fb808e367e70429e90a9478fe6a3fdc3e214f25c7582ce9c2da6a242315c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-3.bcmap": {
+      "sha256": "84deb1828711ad3d390c9899c38abce1bf619d65ff7bf1a326ec95acc45f08f8",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-4.bcmap": {
+      "sha256": "3f8a4f974919c2b8bae5d10175ffa2673be140481e00840542c85d48ef184067",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-5.bcmap": {
+      "sha256": "1d3ce4ff28d977f8cf37a912ae4ec811f4175c3167b1ec0b2567feec3e79e1db",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-6.bcmap": {
+      "sha256": "5609797b9401b30be72ef9645da62a87829f058c3be4b5c623383119f584b1d9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Japan1-UCS2.bcmap": {
+      "sha256": "66c5d0dc4964f4093e77b194023f3a0f689324028ec8330e1e1d0570bcba7c2f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Korea1-0.bcmap": {
+      "sha256": "dfb8c3874f0e5a8c3acf597d2c12d2b63e90bc5e4f0fce990ec4c56077d80b32",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Korea1-1.bcmap": {
+      "sha256": "62f277b7b1c441c007797ae707d5c37258d029ce4661a2b911e2e1ee35e6adc1",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Korea1-2.bcmap": {
+      "sha256": "1d77068af462f96d7ad28ad7e7d43eef6423c685b479d7dc25ff5df38db0380d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Adobe-Korea1-UCS2.bcmap": {
+      "sha256": "857b723088be97255053562bfa41bd1075a7f7910d3bab59a0645c8bbc7060ff",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/B5-H.bcmap": {
+      "sha256": "718ad0ffbef4c34f8f3f31292c462e519cd567a5511fc8b346c60010d64f4ef9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/B5-V.bcmap": {
+      "sha256": "b5c37383517477620ced927b6b4ffd4f4cc6230d8051b5b46a21d6768e07f7d8",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/B5pc-H.bcmap": {
+      "sha256": "bab6028aead1d6149400e904ab10cfd319082d826473ed4c582c8eeed920f17e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/B5pc-V.bcmap": {
+      "sha256": "41543142b9767f3b76133899fc8453282b01ad3c653acaeea42d78c5a7d08c63",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/CNS-EUC-H.bcmap": {
+      "sha256": "e8f89cd61e6486b948205da46499d659ed0aed949b7095fd3c8e95ffe2b0e7a9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/CNS-EUC-V.bcmap": {
+      "sha256": "cae422bec2ac6dbe86bf921cec942bacd2d0b733ffcca5f91b3ba14e917025a0",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/CNS1-H.bcmap": {
+      "sha256": "e8487971ab20cd16f3de3e8ac56ec994b72b658ad113f2818239dfd5108f501a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/CNS1-V.bcmap": {
+      "sha256": "42df8076aaa7574505e7304af83a3323ec032c4177d64b1309db8c043d594a8a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/CNS2-H.bcmap": {
+      "sha256": "bc6024d274d440f0625c69e25f37036ef6cb6689432ceaa160d3432a2a716ca7",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/CNS2-V.bcmap": {
+      "sha256": "2e4f70a8afd23a121030fc2e5b5f3816e903b11e7ba8b8c09654b31c80399c38",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/ETHK-B5-H.bcmap": {
+      "sha256": "d2f10fa519336bc4efcc7b6deb9604b75429946b40d82e311cb3a97a1994c89a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/ETHK-B5-V.bcmap": {
+      "sha256": "1fea3fd0d9f0f679f80505800851ef2e4131d81127e18c006938ffa2f4c8b247",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/ETen-B5-H.bcmap": {
+      "sha256": "87ee6b3f5bfda5fe26fa35431264c7d73070d10dbbf398a75185d63ae322c18d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/ETen-B5-V.bcmap": {
+      "sha256": "47dc0d2c21e3bde317947aec1675ceabc1d5460a60bf9c24334b8c407a17172c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/ETenms-B5-H.bcmap": {
+      "sha256": "d5f5a73da4173b7da9a3a20e16f26f9cd5d12deb1553409919e0cec6fd37fdee",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/ETenms-B5-V.bcmap": {
+      "sha256": "18252fca90f472f479af1bddd60d6ab51c8e1b55dcf6845951426504934543e0",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/EUC-H.bcmap": {
+      "sha256": "f9939cd57fccdc65c5d9f4c205fd497ebdbd283643308da5663801a8c1d9c595",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/EUC-V.bcmap": {
+      "sha256": "1283a50a706507c4436da83ede9ad7a4440be25378f2e96f6c81a430081426a3",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Ext-H.bcmap": {
+      "sha256": "4000ed4e61a1c668ef453bbd0603cfa383defa793abd46a57ed870d7f527350b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Ext-RKSJ-H.bcmap": {
+      "sha256": "e0d2f0df337660e73813238dd4a725f11f0621b90f3273857db253d0e7694caa",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Ext-RKSJ-V.bcmap": {
+      "sha256": "f617a22b6d67febb187990952006c91a9f5a4db21155d268c656252d0c21985d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Ext-V.bcmap": {
+      "sha256": "c2087fb845a9e3acea0c2922cd40e6af67e11957bec74dcd597f1285edd490ce",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GB-EUC-H.bcmap": {
+      "sha256": "928bad06fd84a48f5ba7150d7716609119fb660f2aaa73eccad81ddab9b9d203",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GB-EUC-V.bcmap": {
+      "sha256": "a9ad88ac2479da529b16dc48abc5952332e27bc355335f91df5729a587533324",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GB-H.bcmap": {
+      "sha256": "1018c777a8910b5bb46d7d54a4aee9d51ca5cff8addb2b41c969d9101cb3fd1c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GB-V.bcmap": {
+      "sha256": "0b96789143c0bbf9f1641ae7165b3456dccd14dabffcbb0bd654d5bf6f94f863",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBK-EUC-H.bcmap": {
+      "sha256": "2103fed28650ede096a2281104a1a8a4304dae0db414342c636867522307123b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBK-EUC-V.bcmap": {
+      "sha256": "a7fd35dd14d9dbdb955f34e6c0630618b6620dfd09d4283b2f65a65ce77fcaea",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBK2K-H.bcmap": {
+      "sha256": "3d919ae72af16c5cc6846ec87a4326a9f125e493c59d3628429d35c2c95fe8c4",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBK2K-V.bcmap": {
+      "sha256": "b927fdfd595c07ce9158bf2ec13f4641b2e83b01c70989dadfabd6ed7c6ac2dc",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBKp-EUC-H.bcmap": {
+      "sha256": "d15ebd8e81fb4fe8a244f1b1e877922e03500ac69eddf5001093e502430451d2",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBKp-EUC-V.bcmap": {
+      "sha256": "fdc736d46e642625dccc8ad8c59f2c69fc7db7a13f2e799c6c6b779e707bb97a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBT-EUC-H.bcmap": {
+      "sha256": "dc5f44e48a39f3367ae28665027d8ab1d8cedb5a9dcc5068a900acd6709f60f9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBT-EUC-V.bcmap": {
+      "sha256": "a1ad24e63653b8aa388c18fa5e498f007564e43dde699a9f91ccb4645c999be8",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBT-H.bcmap": {
+      "sha256": "8afda745a505763f3ff54c8126eeb48ef376ea9ed07d9f42ff9a22c5c547ec57",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBT-V.bcmap": {
+      "sha256": "cdc2ec5c3c7c7033290c9a8894878202f08674eb9b1ae7d36218430326768771",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBTpc-EUC-H.bcmap": {
+      "sha256": "7b23e2f7bfdb6c918f567b7324bf858f398bd8cd5f268d74ece19a3c91bf4f32",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBTpc-EUC-V.bcmap": {
+      "sha256": "d7a1b13ead9ab511cf2cd01de6ce8b02aa8e8767e84895337d7a3b67f039f93b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBpc-EUC-H.bcmap": {
+      "sha256": "3c4a4eb82f05abe51f6650985c630e180438bfdd491318f5d20d2ec29236e1c3",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/GBpc-EUC-V.bcmap": {
+      "sha256": "215bdfa2842705624b4cf4cd29b8e3c720f1e192365e0305c11030a424c84d7c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/H.bcmap": {
+      "sha256": "a0233e21047ec00b852125b243cbcf30abee511155b6d8159c24f944384bc9ee",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKdla-B5-H.bcmap": {
+      "sha256": "5242bce18fb13ab4cc59b146a03eba36e4ce42667eeff09e10981a9d2aa4996b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKdla-B5-V.bcmap": {
+      "sha256": "2e0537f786c0791d41a925f72bad2d4e7268aa6cbf15a1400a722672cec38e2c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKdlb-B5-H.bcmap": {
+      "sha256": "fdc8159984bf5dbe475c0d5dfcb621ecee4dea07c38c668bd77f4c679e23b9b3",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKdlb-B5-V.bcmap": {
+      "sha256": "b249eb9dcb915ab45057c5d4d7aa55ef88d0efbb092af6bae0b2d4705d139abf",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKgccs-B5-H.bcmap": {
+      "sha256": "ab64c7fc5e9b2e97750cc4f269b0da14fd8649e49151b7598c8df86599bac591",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKgccs-B5-V.bcmap": {
+      "sha256": "02ebdf7cdffb5395fb21091cd58a013a18ae5388922822f9dc6292ef16b98956",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKm314-B5-H.bcmap": {
+      "sha256": "bfd8bbde6b36a9da4c1c902c74121a30d9807a7079a00eeea218be6adc223cef",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKm314-B5-V.bcmap": {
+      "sha256": "2a64a815cfb6fdd480674a868762e3d161fda17543b20c9209978559f0667164",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKm471-B5-H.bcmap": {
+      "sha256": "49d7c037758826b5b6c0fa329c35bbf25d3943197754e72ecd30c6fb04d745e6",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKm471-B5-V.bcmap": {
+      "sha256": "be24c109e78aa4fe3c1f27d30aab3ed0741e783fa1b6b6c2719741072b54b132",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKscs-B5-H.bcmap": {
+      "sha256": "08599378f41d96b40537adef6e6edcc4a787bc63f5accf47c026df4905a13914",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/HKscs-B5-V.bcmap": {
+      "sha256": "d073542b7dad1c4cbf01c1af5f0cd13218d1281a491956e310c55702fc8705c4",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Hankaku.bcmap": {
+      "sha256": "b454701f7aecd7856769016dfd04ca64280a060f2c67a2466d50b4395d24974e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Hiragana.bcmap": {
+      "sha256": "2ed669394756dd9458651cd9995ab29ab691ecb7686659003306cdf22767a414",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSC-EUC-H.bcmap": {
+      "sha256": "6784e16dbc5861c036c23d3e55f0d4ba0975a3e464da0ee8e49bcfff0be070c4",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSC-EUC-V.bcmap": {
+      "sha256": "fdb36bad85e9924823d49db374067988e024cf80fc894711f2c9178951cbbe95",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSC-H.bcmap": {
+      "sha256": "c1f6d61f1d3304fd539a65ae72624fa567ecc3853bf52e283958a7a2515b3eee",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSC-Johab-H.bcmap": {
+      "sha256": "939993d213f68db763bf156217c217ae23af082b91a0eacecf3d11eb4ff8ef8c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSC-Johab-V.bcmap": {
+      "sha256": "5d61967aac0e666def721e8b8d0fed8f95a879a14f2e76ce516c3d11c621e519",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSC-V.bcmap": {
+      "sha256": "d7da5afd9f1fe74816d79c9325f0139a4efb6438664ebfdf9a7aa92f3034360f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSCms-UHC-H.bcmap": {
+      "sha256": "5b70d8f6a4fa9e2283dc649f0ff95d906d56efbee50a20e8d2faec3a8fed078e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSCms-UHC-HW-H.bcmap": {
+      "sha256": "a5e6ba22aceb02fdedee11bfb9ed138463d89e85b87810b9f075b469d936f8ec",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSCms-UHC-HW-V.bcmap": {
+      "sha256": "890332a6a26880d463a12f2a6ff048bf9cf7e45077cfb1ca8815b89baa7bf411",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSCms-UHC-V.bcmap": {
+      "sha256": "1631b531c9a40c8cbe24c2317dba107362e49fa6e18af620414d627c111d570c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSCpc-EUC-H.bcmap": {
+      "sha256": "709480682c55cedbb0124b9960d78e28febeee0df2e34607d61aac6601647ec7",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/KSCpc-EUC-V.bcmap": {
+      "sha256": "031707887d6fc2378a36cdb6775334fd7a236c3f95048d8436abf43fe26fc49d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Katakana.bcmap": {
+      "sha256": "3b6ca6642fbf8822da00d5e58a8aa275216d5c32dbf2bd73e934197fc9fc5c53",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/LICENSE": {
+      "sha256": "aa92ab5a472974865a96fd4a4e9c13bb41bf6fe1b309cb6b8da48bc9e19839a2",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/NWP-H.bcmap": {
+      "sha256": "286c6c9e335da330928a01edc3c97a3a623f1f7f3c42762b0a7dc2f651b1a78f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/NWP-V.bcmap": {
+      "sha256": "3a75fb7b59adfb172710758c425d8ac6c93fd5360a64dd4afd5dd04e60ab4b4d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/RKSJ-H.bcmap": {
+      "sha256": "a70de61a22a898f693f02cc011c3e3cff2e10aaa7cddb4661e456a21ae859f78",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/RKSJ-V.bcmap": {
+      "sha256": "68c1a64506471a524ea5cfc3b3a9f8f70031989a6bd95427b1351f33ccf50b06",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/Roman.bcmap": {
+      "sha256": "1c6b3ef9d9e5cb1aa329142ce9414b90f9b6d7f9182a2a9e927378dab8f0d43f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UCS2-H.bcmap": {
+      "sha256": "779428116752f34e2490a1941d24e4634c71e3c22d053b811d2090ae2fb3c704",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UCS2-V.bcmap": {
+      "sha256": "1e5cc184b850ea44abc2df8ae5674279df668e8edf5e2a1a2ea2bd77adbd280f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UTF16-H.bcmap": {
+      "sha256": "32ff139b3c7b91d6ad25f994701f3ce7b242906022c418fd73e6493fc228bfe5",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UTF16-V.bcmap": {
+      "sha256": "278eb1e68d1a236c60ef59472cf0176ee0d45f364285e76ca12419a08d46fb9a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UTF32-H.bcmap": {
+      "sha256": "bf26eb67fe19ee5ba915799e80ca72408400aa8342fdf6a244a4f44de8f97336",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UTF32-V.bcmap": {
+      "sha256": "f7da3caf83ceb1cb37936fa10700d9ba6e9c3f72c5bc9724e3ac79bff0c0179e",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UTF8-H.bcmap": {
+      "sha256": "2f2a742bcd1a84a148a4a518b9eed51a8f9c6ca5ed3bc5e2e41fff97de5dc2d8",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniCNS-UTF8-V.bcmap": {
+      "sha256": "b7c3f10780a8c62dd1c8ff6c30dc1e4e23b6cdc87c3a96fcd514cc98ffd3af9d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UCS2-H.bcmap": {
+      "sha256": "9201569b402e81ad8860650bd86350c4fa28e5dd5971f05fcacaf40f51de18ed",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UCS2-V.bcmap": {
+      "sha256": "f10282335e4d64203bc2a653a3a47d745ec76c8ae04549f4d50180c1899be216",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UTF16-H.bcmap": {
+      "sha256": "386fd39581245c034da016a92d23f3df1117d169f996100050b264fc09a84e35",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UTF16-V.bcmap": {
+      "sha256": "0473cfbba612b92dd9918f0ff8aee9112897c48e0ffdc0eb82da3144ed8ea84a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UTF32-H.bcmap": {
+      "sha256": "f48a145dc4e3ed1dca1dde7111716a72306a2a4191ab05c6bae3a5c3a961cd2f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UTF32-V.bcmap": {
+      "sha256": "106acc49b7118bdef944e32107b4f348238f3929a0a15d3b7aab7b9101535993",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UTF8-H.bcmap": {
+      "sha256": "f217b439c80ee5fa1bc2cf6d1defcc319f8d84483d166a00ee199e05a68588df",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniGB-UTF8-V.bcmap": {
+      "sha256": "a64df947632878eacc532fa193c735c92a383b7d66e6f8374ac193af7c64fc63",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UCS2-H.bcmap": {
+      "sha256": "ad2352f40870880fbf7f8ee5abadff743fbd025fbf9830b8ada472d1c5e4da0b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UCS2-HW-H.bcmap": {
+      "sha256": "16e87edca954177c0881c874859d6783220925d821b5cdfb8755b61ebd93f9ce",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UCS2-HW-V.bcmap": {
+      "sha256": "1973457e2c0192819947e56068625b34fb9a72ecc8a476ce6d7eaae5f73e2e5c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UCS2-V.bcmap": {
+      "sha256": "42a133d8e2ce9dd6d2288018e01592d2bf2435b326d39b94ea0b6e6a44ac33d3",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UTF16-H.bcmap": {
+      "sha256": "f6a89c5688978548c83fcee990e205bc63c74274d5c69b49032a3bd4c49a05ee",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UTF16-V.bcmap": {
+      "sha256": "c67126fc7c73850855186bb0d6482ac0a365057e0b58778c4ab9f234683fef53",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UTF32-H.bcmap": {
+      "sha256": "96195950ce0fe24443d8eb426fa6b88534ec421d7bef9046f0b2362809cfba73",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UTF32-V.bcmap": {
+      "sha256": "ed4dafda402bdd19c4d5d8bf2ab41473c0f86f384552b4c7b963d6627daedeb1",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UTF8-H.bcmap": {
+      "sha256": "798fb0bf06ab0788d1f6a91c2db7de581612eef03c628f10e8f7ecd8f70ab448",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS-UTF8-V.bcmap": {
+      "sha256": "1021611424f913b2df0bfdbe94bd327c04e224ec89d8e821c6501ea3d21f4265",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS2004-UTF16-H.bcmap": {
+      "sha256": "710a32d7cb43fd6bd9dbf30da5971f8c941590f74441e208d852c2be0e74cc97",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS2004-UTF16-V.bcmap": {
+      "sha256": "3b149aff5c5707b57fb3215d1775852c8b1f413ec0f679ea628f25cf87fe098d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS2004-UTF32-H.bcmap": {
+      "sha256": "8d2658e18741af7937d586a57c89729a6fec0d86121197c1f8518aa58b29cdfb",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS2004-UTF32-V.bcmap": {
+      "sha256": "6dd475782f2897648a683c48b2fa015a15b8f06856760bddc8a17a63f418bacb",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS2004-UTF8-H.bcmap": {
+      "sha256": "691c614ce432b3e62486efb54e5c84c6da5afe9b51b21253bde4758feb484183",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJIS2004-UTF8-V.bcmap": {
+      "sha256": "40a8c7ea2d46711c5f78fc9a878a7db68b1543ba5cd60ecf14f519a2deb829b7",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJISPro-UCS2-HW-V.bcmap": {
+      "sha256": "6826f94d789d7bf1960668c1c5819c34c9585c1b23152fbc19ee81c7df08524b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJISPro-UCS2-V.bcmap": {
+      "sha256": "493de9fd1a08f7946065d8ab58f0c3c9fe489f5a0f109f2d05a3169b4bd5789f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJISPro-UTF8-V.bcmap": {
+      "sha256": "6181d382cf736c5e09492e8be9f26f31fa25b7462253f23ab16646af432cad81",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJISX0213-UTF32-H.bcmap": {
+      "sha256": "692044e1fb33445668632bc9fe7386805c624864be1ddeb29d65bb0c99fc630c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJISX0213-UTF32-V.bcmap": {
+      "sha256": "dd54e16ca7bffb3a886242549b2bf7d78a277087f7c60d2636f118c21a5b0646",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJISX02132004-UTF32-H.bcmap": {
+      "sha256": "f80ea5a989be30ccda5a8804baef6d3b4b044d2b339bf8b31c671b2466171cf6",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniJISX02132004-UTF32-V.bcmap": {
+      "sha256": "94c22bd99e771c5fbe0dd8dc39850570d4db0075074aca13e272813edd7cc57f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UCS2-H.bcmap": {
+      "sha256": "a1081396ab4adb6f4a5b6c15f896963c244c1c9bcb65ce5616d06096a1b9811c",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UCS2-V.bcmap": {
+      "sha256": "6cab547431958fbdc1d401d06ebd4dd61a73f5509a10f974df32bcbca11a2e43",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UTF16-H.bcmap": {
+      "sha256": "42d35b396286499dfae1737a07adb3a64500df37b426580bfb1d3ea872938519",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UTF16-V.bcmap": {
+      "sha256": "5bdb7390c80dcc136cb47d41dc7460082560969c17322ee739fe3020fb642410",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UTF32-H.bcmap": {
+      "sha256": "3a01ec51ed1b828101351e337ffb8250abe11880032e5210f881170fed2588de",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UTF32-V.bcmap": {
+      "sha256": "dfda895eceaed081af030dbbb962b49629eea817fc3c02bae15db93d0c68acd7",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UTF8-H.bcmap": {
+      "sha256": "3fac9c65145f72d7d42157a3b9c5ed6904632184e6a0888f2b828699afd2002f",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/UniKS-UTF8-V.bcmap": {
+      "sha256": "9ecc6cf30dd354b9778ddba163b6cc7302b087ce9f39d1ba73472d2b75ed13ca",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/V.bcmap": {
+      "sha256": "b9ad1c0c09ff14bca52f9a28a9767eb857ad0e8946e64ba14c7387a7eb69866a",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/cmaps/WP-Symbol.bcmap": {
+      "sha256": "543923bead225732aba30976690ee89095a19628277b5863efecc2c728d5d7bf",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitDingbats.pfb": {
+      "sha256": "845c752392b6c914fb989c75a08b7792b88f542d2499042ef2889f8c814a16ed",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitFixed.pfb": {
+      "sha256": "b6c8fe53f134b8b6d4578cd2d544df4cee9624c4efa8d51a560fb40ea296101b",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitFixedBold.pfb": {
+      "sha256": "f1b7159702973f54fc86254ea38bcf3712b2a736eb3a0995751e9f4bb45ad603",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitFixedBoldItalic.pfb": {
+      "sha256": "8a000945843bd31add06aee63bf9fd41b7578b4f3242a4b7cd46349ad9d24d4d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitFixedItalic.pfb": {
+      "sha256": "5007faf8320fa1fcc08b8894b356ad976f60b992ba29ee5272578bbdebaf3876",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitSerif.pfb": {
+      "sha256": "4f57d2b9d884af8f907bf22df6019b52d86cbf6214fdbd02b1ae05472a543f35",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitSerifBold.pfb": {
+      "sha256": "0bdf4b04e964139818d51eda03d566ba999fc3ba2421b1c6c51f9dc969022e80",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitSerifBoldItalic.pfb": {
+      "sha256": "a406cac82583bf98175cb62c87ed5e95c45fbb34eece63a10b0a13e793cb2e10",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitSerifItalic.pfb": {
+      "sha256": "610ae0687198045c4db5d1a6650fd5e92536631706382eb8b72e38df578d0ae9",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/FoxitSymbol.pfb": {
+      "sha256": "47967d055530e7357088a08403115425643ec2cdfd6201ba8af0fbd7116c1539",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/LICENSE_FOXIT": {
+      "sha256": "b578cdd2345840ada550bd12519533812320d5f1d21cf4c1c7e1b1b0a31c98b7",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/LICENSE_LIBERATION": {
+      "sha256": "d2c4d5b3e115a519cb58eb691aa64538397e2611f9ebe801392cf9667997e7dc",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/LiberationSans-Bold.ttf": {
+      "sha256": "361c61b82d575c5c35fd9157fda8b0194bcfcd0d88ea8521a4fb5dd53d33dddc",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/LiberationSans-BoldItalic.ttf": {
+      "sha256": "a224075ac17495ad0a3af3bc0a419ac0704a8b3fd1095456201fb9b095fc281d",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/LiberationSans-Italic.ttf": {
+      "sha256": "832b4406dbef23628800d3aaad21048534ac84d7e3ad955be83b8172ed8ef512",
+      "base_sha256": null
+    },
+    "public/offstage-pdf/standard_fonts/LiberationSans-Regular.ttf": {
+      "sha256": "f8ace1f892b2bd9dc1792ba7f097fa7588f84fed48321480e04de5390828221f",
+      "base_sha256": null
+    },
+    "scripts/build-android.mjs": {
+      "sha256": "e7985975e3e6a1d0709199a8ae43b8f4a138c4253446572c9ddf7243066becb0",
+      "base_sha256": "e45bd770294d6ec7381ce9a6d064e76280f4baa5527b02aca00e3e966b21e62e"
+    },
+    "scripts/build-resource-update.py": {
+      "sha256": "380a5ea76c98a4eb2466f3120e5e2159a788ebe57c88cd808d19941e72913125",
+      "base_sha256": null
+    },
+    "scripts/check-1102-followup.cjs": {
+      "sha256": "21e55025c33bf2567984d2ebad0d74828692d7e3581859529bdcafb96b301814",
+      "base_sha256": null
+    },
+    "scripts/check-1102-persistence.cjs": {
+      "sha256": "d5d0b8245f7d0c850b7fc858e1b942472ce9c21c6f1373dcf3bf872f8937f8a7",
+      "base_sha256": null
+    },
+    "scripts/check-android-tts.cjs": {
+      "sha256": "f0064c6e60ca8578bf9a240426addfeb317344a8407b7cf069cb253307bc69d1",
+      "base_sha256": null
+    },
+    "scripts/check-forward-refresh.cjs": {
+      "sha256": "a990caad9b965114564251f9cdc2b4cff34b7c2c3fa13d115a6f04d0ac378fd8",
+      "base_sha256": null
+    },
+    "scripts/check-nov01-integration.cjs": {
+      "sha256": "affbd4678253c11146e0cc3f0145a610edd2a7db5b801fc4dc2616172518a1e6",
+      "base_sha256": "4edb5048aea3c1e9a8acf250529c66619bea2d865fcee9a13eab731d7085c4cd"
+    },
+    "scripts/check-nov01-lock-live-offstage.cjs": {
+      "sha256": "f36b11d407b2468abf3975b6be1d9471b65a5926c145c62a5522771526a9e49b",
+      "base_sha256": "93ba59ec46b580b4235bf0eb4573ab1da42101aefc9d9c25dbe7c47fc7eae583"
+    },
+    "scripts/check-offline-empty-retry.cjs": {
+      "sha256": "c9fab3660cd74a667c360ea0c4d3493acb7a50c7e320a5038761ea05f4a1bd39",
+      "base_sha256": null
+    },
+    "scripts/check-offline-speech-scenes.cjs": {
+      "sha256": "d705730a9b71e97ce2469acdeb6bbddef0170d23b060ab2dfffaf8d477b02022",
+      "base_sha256": null
+    },
+    "scripts/check-offstage-director.cjs": {
+      "sha256": "362201b6ebd172876be82b387b0a30afab72866c1da0e14c7a2d7a47483bd550",
+      "base_sha256": null
+    },
+    "scripts/check-update-bridge.cjs": {
+      "sha256": "9f382e1a7473c028312542730968b4c05ad36fe10c24cdb8ba5a07234c28e7d7",
+      "base_sha256": null
+    },
+    "scripts/java-tests/GitHubUpdatesTest.java": {
+      "sha256": "91e76db99ae5555c47a92d2e2105261d613059bfe7bf1a22497b876e3a7505d9",
+      "base_sha256": null
+    },
+    "scripts/java-tests/ResourceUpdateTest.java": {
+      "sha256": "1e811173227034d4252c288ee0286eaef23dd401515e7d8c4461fea6221292f7",
+      "base_sha256": null
+    },
+    "scripts/write-bundle-manifest.mjs": {
+      "sha256": "267ce4bb110a73e538a204a855e768ad478d4434a29deb89911f1b19e027e941",
+      "base_sha256": null
+    },
+    "styles/chat.css": {
+      "sha256": "1e37750d147c6232e9d8e054bc8b4a84f50815ddef70482705f2db1415010010",
+      "base_sha256": "727a4a88a56f9d91059882407841166ae32dff7c552bcfa080017e39c79c01f0"
+    },
+    "styles/phone-shell.css": {
+      "sha256": "8e69b760e2fe10790a64142b9894cac60b4c893da6142dc79672f625f073de2e",
+      "base_sha256": "0bd43744ce0ff99a1abfbb11205a9114693b6aa12436408f1397fdc7170b5d97"
+    }
+  }
+}

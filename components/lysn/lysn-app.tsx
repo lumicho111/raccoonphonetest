@@ -1,5 +1,6 @@
 "use client";
 
+import {lysnCalendarContext} from "@/lib/lysn-calendar-context";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
@@ -31,6 +32,7 @@ import { LysnStickerManager } from "./lysn-sticker-manager";
 import { loadCharacters, CHARACTERS_UPDATED_EVENT } from "@/lib/character-storage";
 import type { Character } from "@/lib/character-types";
 import { getChatImageFromIndexedDB, saveChatImageToIndexedDB } from "@/lib/chat-asset-storage";
+import {notifyLysn} from "@/lib/lysn-notification";
 import { sendBrowserNotification } from "@/lib/browser-notification";
 import { resolveVoiceConfig, synthesizeSpeech, playAudioBlobViaMediaElement, unlockAudioPlayback } from "@/lib/tts-service";
 import { generateLysn } from "@/lib/lysn-engine";
@@ -97,9 +99,9 @@ function ArtistBadge() {
   return <span className={styles.artistBadgeImage}>ARTIST</span>;
 }
 
-function BubbleBrand({ days }: { days: number }) {
+function BubbleBrand({ days, subscribed = true }: { days: number; subscribed?: boolean }) {
   return (
-    <span className={styles.bubbleDays} aria-label={`bubble 订阅第 ${days} 天`}><span>bubble</span><svg viewBox="0 0 28 28" aria-hidden="true"><defs><linearGradient id="lysnHeart" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#ff9cc9"/><stop offset="1" stopColor="#965dff"/></linearGradient></defs><path d="M14 25 3.6 14.8C-3 8.1 5.8-1.9 13.9 5.7 22-1.9 31 8.1 24.4 14.8 14 25Z" fill="url(#lysnHeart)"/></svg><b>+ {days}</b></span>
+    <span className={styles.bubbleDays} aria-label={subscribed?`bubble 订阅第 ${days} 天`:"我们是不是可以再见呢？"}><span>bubble</span><svg viewBox="0 0 28 28" aria-hidden="true"><defs><linearGradient id="lysnHeart" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#ff9cc9"/><stop offset="1" stopColor="#965dff"/></linearGradient></defs><path d="M14 25 3.6 14.8C-3 8.1 5.8-1.9 13.9 5.7 22-1.9 31 8.1 24.4 14.8 14 25Z" fill={subscribed ? "url(#lysnHeart)" : "#d3d3d3"}/></svg><b style={!subscribed ? {color:"#aaa",fontWeight:400} : undefined}>{subscribed ? `+ ${days}` : "我们是不是可以再见呢？"}</b></span>
   );
 }
 
@@ -192,6 +194,7 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
+  const [resumeChoice,setResumeChoice]=useState<{id:string;step:1|2}|null>(null);
   const [subscriptionChoice, setSubscriptionChoice] = useState<string | null>(null);
   const [celebrationEvent, setCelebrationEvent] = useState<LysnCelebrationEvent | null>(null);
   const [celebrationLetter, setCelebrationLetter] = useState<LysnBirthdayCard | null>(null);
@@ -395,7 +398,7 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
 
   const openChat = (id: string) => {
     const current = loadLysn();
-    if (!current.subscribedIds.includes(id)) return;
+    if (!current.subscribedIds.includes(id) && !current.rooms[id]?.cancelledAt) return;
     current.readAt[id] = Date.now();
     commit(current);
     setSelected(id);
@@ -406,6 +409,7 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
     setRoute("chat");
     setTab("chats");
     const latest = loadLysn();
+    if (!latest.subscribedIds.includes(id)) return;
     if (!latest.rooms[id]?.openerShown && !openingRef.current.has(id)) {
       openingRef.current.add(id);
       setOpening(id);
@@ -414,12 +418,12 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
       const firstMessage = generateLysn(id, latest.messages.filter(m => m.characterId === id), "opening", undefined, configured, undefined, historicalDate);
       void firstMessage
         .then(async generated => {
-          if (!loadLysn().subscribedIds.includes(id) || !generated.length) return;
+          if (!loadLysn().subscribedIds.includes(id) || loadLysn().subscribedAt[id]!==latest.subscribedAt[id] || !generated.length) return;
           const latestState = loadLysn();
           if (latestState.rooms[id]?.openerShown) return;
           const prepared = await prepareLysnMessages(id, generated);
           const current = loadLysn();
-          if (!current.subscribedIds.includes(id) || current.rooms[id]?.openerShown || !prepared.length) return;
+          if (!current.subscribedIds.includes(id) || current.subscribedAt[id]!==latest.subscribedAt[id] || current.rooms[id]?.openerShown || !prepared.length) return;
           if (current.rooms[id]?.onboardingComplete && !current.rooms[id]?.historyInitialized) {
             const start = current.rooms[id]?.subscriptionDate || localDay(new Date());
             const historical = lysnDatedCards(id, start, localDay(new Date()), current.userProfile.birthday);
@@ -448,17 +452,18 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
 
   const subscribe = (id: string, chosenDate?: string) => {
     const next = loadLysn();
-    if (next.subscribedIds.includes(id)) next.subscribedIds = next.subscribedIds.filter(x => x !== id);
+    if (next.subscribedIds.includes(id)) { const count=subscriptionDays(next,id); next.subscribedIds = next.subscribedIds.filter(x => x !== id); next.rooms[id]={...next.rooms[id],cancelledAt:Date.now(),cancelledDays:count}; }
     else {
       const firstSubscription = !next.subscribedAt[id];
       next.subscribedIds = [...next.subscribedIds, id];
       next.subscribedAt[id] = Date.now();
       next.rooms[id] = {
         ...next.rooms[id],
+        cancelledAt: undefined, cancelledDays: undefined, nextArrivalAt: undefined, nextFanReadAt: undefined,
         subscriptionDate: chosenDate || (firstSubscription ? next.rooms[id]?.subscriptionDate || localDay(new Date()) : localDay(new Date())),
         openerShown: false,
-        onboardingComplete: chosenDate ? true : next.rooms[id]?.onboardingComplete,
-        historyInitialized: chosenDate ? false : next.rooms[id]?.historyInitialized,
+        onboardingComplete: next.rooms[id]?.cancelledAt ? false : chosenDate ? true : next.rooms[id]?.onboardingComplete,
+        historyInitialized: next.rooms[id]?.cancelledAt ? true : chosenDate ? false : next.rooms[id]?.historyInitialized,
         anniversariesShown: [],
         foldPhotos: next.rooms[id]?.foldPhotos ?? true,
       };
@@ -467,23 +472,26 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
     if (!next.subscribedIds.includes(id)) {
       setRoomSheet(false);
       setArtistReturn(null);
-      setRoute("artist");
-      setTab("friends");
+      setRoute("chat");
+      setTab("chats");
     } else openChat(id);
   };
 
   const beginSubscription = (id: string) => {
     if (loadLysn().subscribedIds.includes(id)) { openChat(id); return; }
     setSelected(id);
+    const previous=loadLysn().rooms[id];
+    if(previous?.cancelledAt){setResumeChoice({id,step:1});return;}
     setSubscriptionChoice(id);
   };
 
   const summonArtist = async () => {
-    if (!selected || busy) return;
+    if (!selected || busy || !loadLysn().subscribedIds.includes(selected)) return;
     const id = selected;
     if (draft.trim() && !sendFan()) return;
     setBusy(true);
     try {
+      const epoch=loadLysn().subscribedAt[id];
       const history = loadLysn().messages.filter(m => m.characterId === id);
       let latestArtistIndex = -1;
       history.forEach((message, index) => {
@@ -501,8 +509,8 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
         onNotice?.(mediaFailures.length ? `照片未发送：${mediaFailures.join("；")}` : "这次没有可发送的消息");
         return;
       }
-      if (!loadLysn().subscribedIds.includes(id)) return;
-      const newlyObserved = loadLysn().messages.filter(m => m.characterId === id && m.sender === "fan" && m.kind === "text" && !m.seenAt);
+      if (!loadLysn().subscribedIds.includes(id) || loadLysn().subscribedAt[id]!==epoch || !lysnCalendarContext(id).canSend) return;
+      const newlyObserved = loadLysn().messages.filter(m => m.characterId === id && m.sender === "fan" && m.kind === "text" && !m.seenAt && generated.some(row=>row.quote?.original===m.original));
       appendLysn(id, rows);
       newlyObserved.forEach(message => noteLysnFanMessage(id, message.original));
       if (generated[0]?.profileUpdate) await applyLysnProfileAction(id, JSON.stringify(generated[0].profileUpdate));
@@ -510,10 +518,7 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
       if (route === "chat" && selected === id) {
         latest.readAt[id] = Date.now();
         saveLysn(latest);
-      } else if (latest.settings.notificationsEnabled && !latest.rooms[id]?.muted) {
-        const name = latest.rooms[id]?.chatName || latest.profiles[id]?.name || character?.name || "艺人";
-        sendBrowserNotification(`${name} · Lysn`, { body: generated[0].original.slice(0, 90), url: `/#lysn=${encodeURIComponent(id)}` });
-      }
+      } else { notifyLysn(id); }
       onNotice?.(mediaFailures.length ? `收到 ${rows.length} 条 Bubble 消息；照片未发送：${mediaFailures.join("；")}` : `收到 ${rows.length} 条 Bubble 消息`);
     } catch (error) {
       onNotice?.(error instanceof Error ? error.message : "消息生成失败");
@@ -524,7 +529,7 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
 
   const sendFan = (): boolean => {
     const text = draft.trim();
-    if (!selected || !text) return false;
+    if (!selected || !text || !loadLysn().subscribedIds.includes(selected)) return false;
     const latest = loadLysn();
     if (latest.settings.deepRealism) {
       if (remainingFanReplies(latest, selected) <= 0) {
@@ -549,6 +554,7 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
       onNotice?.("已发满三条，等艺人发消息或满一天后可继续发送");
       return;
     }
+    if(!loadLysn().subscribedIds.includes(selected))return;
     appendLysn(selected, [{ sender: "fan", kind: "sticker", original: name, translated: name, imageUrl }]);
     setEmojiOpen(false);
   };
@@ -768,21 +774,21 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
         {searchOpen && tab !== "more" && <input autoFocus className={styles.searchInput} aria-label="搜索角色" placeholder="搜索艺人" value={query} onChange={e => setQuery(e.target.value)} />}
         <main className={styles.rootScroll} key={tab}>
           {tab === "friends" && <><p className={styles.sectionLabel}>我的资料</p><button type="button" className={styles.myMini} onClick={() => setRoute("myProfile")}><Avatar src={user.avatar} name={user.name}/><span><b>{user.name}</b></span><ChevronRight size={18}/></button><div className={styles.sectionRule}/><p className={styles.sectionLabel}>推荐好友 <span>{filteredCharacters.length}</span></p>{filteredCharacters.map(c => <button type="button" className={styles.friendRow} key={c.id} onClick={() => { setArtistReturn(null); setSelected(c.id); setRoute("artist"); }}><Avatar src={state.profiles[c.id]?.avatar || c.avatar} name={c.name}/><span><b>{state.profiles[c.id]?.name || c.name}</b><small>{state.profiles[c.id]?.bio || state.profiles[c.id]?.group || ""}</small></span><ChevronRight size={16}/></button>)}{!characters.length && <p className={styles.empty}>还没有角色，先在小手机的角色页面创建。</p>}</>}
-          {tab === "chats" && <><p className={styles.sectionLabel}>最近的聊天室</p>{characters.filter(c => state.subscribedIds.includes(c.id) && filteredCharacters.some(x => x.id === c.id)).sort((a, b) => Number(Boolean(state.rooms[b.id]?.pinned)) - Number(Boolean(state.rooms[a.id]?.pinned)) || (state.messages.filter(m => m.characterId === b.id).at(-1)?.createdAt || 0) - (state.messages.filter(m => m.characterId === a.id).at(-1)?.createdAt || 0)).map(c => { const rows = state.messages.filter(m => m.characterId === c.id); const last = rows.at(-1); const unread = rows.filter(m => m.sender === "artist" && m.createdAt > (state.readAt[c.id] || 0)).length; return <button type="button" className={styles.chatRow} key={c.id} onClick={() => openChat(c.id)}><Avatar src={state.profiles[c.id]?.avatar || c.avatar} name={c.name}/><span><b>{state.rooms[c.id]?.pinned ? "⌃ " : ""}{state.rooms[c.id]?.chatName || state.profiles[c.id]?.name || c.name}</b><small>{last?.original || "还没有消息"}</small></span><aside><time>{last ? new Date(last.createdAt).toLocaleDateString() : ""}</time>{unread > 0 && <i>{unread}</i>}</aside></button>; })}{!state.subscribedIds.length && <p className={styles.empty}>还没有聊天。到 FRIENDS 选择一位艺人，添加 bubble 好友。</p>}</>}
+          {tab === "chats" && <><p className={styles.sectionLabel}>最近的聊天室</p>{characters.filter(c => (state.subscribedIds.includes(c.id) || Boolean(state.rooms[c.id]?.cancelledAt)) && filteredCharacters.some(x => x.id === c.id)).sort((a, b) => Number(Boolean(state.rooms[b.id]?.pinned)) - Number(Boolean(state.rooms[a.id]?.pinned)) || (state.messages.filter(m => m.characterId === b.id).at(-1)?.createdAt || 0) - (state.messages.filter(m => m.characterId === a.id).at(-1)?.createdAt || 0)).map(c => { const rows = state.messages.filter(m => m.characterId === c.id); const last = rows.at(-1); const unread = rows.filter(m => m.sender === "artist" && m.createdAt > (state.readAt[c.id] || 0)).length; return <button type="button" className={styles.chatRow} key={c.id} onClick={() => openChat(c.id)}><Avatar src={state.profiles[c.id]?.avatar || c.avatar} name={c.name}/><span><b>{state.rooms[c.id]?.pinned ? "⌃ " : ""}{state.rooms[c.id]?.chatName || state.profiles[c.id]?.name || c.name}</b><small>{last?.original || "还没有消息"}</small></span><aside><time>{last ? new Date(last.createdAt).toLocaleDateString() : ""}</time>{unread > 0 && <i>{unread}</i>}</aside></button>; })}{!state.subscribedIds.length && <p className={styles.empty}>还没有聊天。到 FRIENDS 选择一位艺人，添加 bubble 好友。</p>}</>}
           {tab === "more" && <><button type="button" className={styles.moreProfile} onClick={() => setRoute("myProfile")}><Avatar src={user.avatar} name={user.name}/><b>{user.name}</b></button><div className={styles.sectionRule}/><button type="button" className={styles.moreRow} onClick={() => setRoute("myProfile")}><UserRound size={21}/>我的资料<ChevronRight size={19}/></button><button type="button" className={styles.moreRow} onClick={() => setRoute("myStickers")}><Smile size={21}/>我的表情包<ChevronRight size={19}/></button><button type="button" className={styles.moreRow} onClick={() => { setSettingsReturn(null); setRoute("settings"); }}><Settings2 size={21}/>设置<ChevronRight size={19}/></button><button type="button" className={styles.moreRow} onClick={onClose}><X size={21}/>返回桌面<ChevronRight size={19}/></button></>}
         </main>
         <nav className={styles.bottomNav} aria-label="Lysn 导航">{(["friends", "chats", "more"] as const).map(item => <button type="button" key={item} className={tab === item ? styles.activeTab : ""} onClick={() => { setTab(item); setSearchOpen(false); setQuery(""); }} aria-label={item === "friends" ? "好友" : item === "chats" ? "聊天" : "我的"}>{item === "friends" ? <UserRound size={24}/> : item === "chats" ? <MessageCircle size={24}/> : <MoreHorizontal size={25}/>}<small>{item === "friends" ? "好友" : item === "chats" ? "聊天" : "我的"}</small></button>)}</nav>
       </>}
 
-      {route === "artist" && character && <div className={styles.fullProfile}>{profile?.cover ? <AssetImage src={profile.cover} className={styles.coverImage}/> : <div className={styles.coverFallback}/>}<div className={styles.coverShade}/><button type="button" className={styles.coverBack} onClick={back} aria-label="返回"><X size={29}/></button><button type="button" className={styles.coverEdit} onClick={startArtistEdit} aria-label="编辑艺人资料"><Settings2 size={21}/></button><div className={styles.profileIdentity}><Avatar src={avatar} name={displayName} className={`${styles.largeAvatar} ${styles.artistAvatarRing}`}/><h2><ArtistBadge/>{displayName}</h2><p>{profile?.bio || ""}</p>{profile?.group && <span className={styles.groupPill}>{profile.group} · {character.name}</span>}</div><div className={styles.profileFooter}>{!subscribed && <button type="button" className={styles.preSubscribeButton} onClick={() => { setDetailsReturn("artist"); setRoomSheet(true); }}>订阅前设置</button>}<button type="button" onClick={() => subscribed ? openChat(character.id) : beginSubscription(character.id)}>{subscribed ? "进入 bubble 聊天" : "添加 bubble 好友"}</button></div></div>}
+      {route === "artist" && character && <div className={styles.fullProfile}>{profile?.cover ? <AssetImage src={profile.cover} className={styles.coverImage}/> : <div className={styles.coverFallback}/>}<div className={styles.coverShade}/><button type="button" className={styles.coverBack} onClick={back} aria-label="返回"><X size={29}/></button><button type="button" className={styles.coverEdit} onClick={startArtistEdit} aria-label="编辑艺人资料"><Settings2 size={21}/></button><div className={styles.profileIdentity}><Avatar src={avatar} name={displayName} className={`${styles.largeAvatar} ${styles.artistAvatarRing}`}/><h2><ArtistBadge/>{displayName}</h2><p>{profile?.bio || ""}</p>{profile?.group && <span className={styles.groupPill}>{profile.group} · {character.name}</span>}</div><div className={styles.profileFooter}>{!subscribed && <button type="button" className={styles.preSubscribeButton} onClick={() => { setDetailsReturn("artist"); setRoomSheet(true); }}>订阅前设置</button>}<button type="button" onClick={() => subscribed ? (window.confirm(`取消订阅 ${displayName}？旧消息保留，停止接收新消息。`) && subscribe(character.id)) : beginSubscription(character.id)}>{subscribed ? "手动取消订阅" : "添加 bubble 好友"}</button></div></div>}
 
-      {route === "chat" && character && <><header className={styles.chatHeader}><button type="button" aria-label="返回聊天室列表" onClick={back}><ChevronLeft size={25}/></button><div className={styles.chatTitle}><strong>{roomName}</strong><BubbleBrand days={days}/></div><div className={styles.chatHeaderActions}><button type="button" aria-label="搜索聊天记录" onClick={() => { setChatSearchOpen(v => !v); setChatSearchQuery(""); setChatSearchTarget(null); setEmojiOpen(false); }}><Search size={21}/></button><button type="button" aria-label="聊天详情" onClick={() => { setDetailsReturn("chat"); setRoute("details"); }}><MoreHorizontal size={22}/></button></div></header><div className={styles.chatView}>{chatSearchOpen && <div className={styles.chatSearchPanel}><div className={styles.chatSearchField}><Search size={17}/><input autoFocus aria-label="搜索聊天消息" placeholder="搜索原文或翻译" value={chatSearchQuery} onChange={e => setChatSearchQuery(e.target.value)}/><button type="button" onClick={() => { setChatSearchOpen(false); setChatSearchQuery(""); setChatSearchTarget(null); }} aria-label="关闭搜索"><X size={17}/></button></div>{chatSearchQuery.trim() && <div className={styles.chatSearchResults}><small>{searchedMessages.length ? `找到 ${searchedMessages.length} 条消息` : "没有找到消息"}</small>{searchedMessages.map(m => <button type="button" key={m.id} onClick={() => { setChatSearchTarget(m.id); document.getElementById(`lysn-msg-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }}><time>{formatDateGroup(m.createdAt)} {formatClock(m.createdAt)}</time><span>{m.original || m.translated}</span></button>)}</div>}</div>}{room.backgroundUrl && <div className={styles.chatBackground}><AssetImage src={room.backgroundUrl}/></div>}<main className={styles.messages}>{messageItems.length ? messageItems.map((item, index) => {
+      {route === "chat" && character && <><header className={styles.chatHeader}><button type="button" aria-label="返回聊天室列表" onClick={back}><ChevronLeft size={25}/></button><div className={styles.chatTitle}><strong>{roomName}</strong><BubbleBrand days={days} subscribed={subscribed}/></div><div className={styles.chatHeaderActions}><button type="button" aria-label="搜索聊天记录" onClick={() => { setChatSearchOpen(v => !v); setChatSearchQuery(""); setChatSearchTarget(null); setEmojiOpen(false); }}><Search size={21}/></button><button type="button" aria-label="聊天详情" onClick={() => { setDetailsReturn("chat"); setRoute("details"); }}><MoreHorizontal size={22}/></button></div></header><div className={styles.chatView}>{chatSearchOpen && <div className={styles.chatSearchPanel}><div className={styles.chatSearchField}><Search size={17}/><input autoFocus aria-label="搜索聊天消息" placeholder="搜索原文或翻译" value={chatSearchQuery} onChange={e => setChatSearchQuery(e.target.value)}/><button type="button" onClick={() => { setChatSearchOpen(false); setChatSearchQuery(""); setChatSearchTarget(null); }} aria-label="关闭搜索"><X size={17}/></button></div>{chatSearchQuery.trim() && <div className={styles.chatSearchResults}><small>{searchedMessages.length ? `找到 ${searchedMessages.length} 条消息` : "没有找到消息"}</small>{searchedMessages.map(m => <button type="button" key={m.id} onClick={() => { setChatSearchTarget(m.id); document.getElementById(`lysn-msg-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }}><time>{formatDateGroup(m.createdAt)} {formatClock(m.createdAt)}</time><span>{m.original || m.translated}</span></button>)}</div>}</div>}{room.backgroundUrl && <div className={styles.chatBackground}><AssetImage src={room.backgroundUrl}/></div>}<main className={styles.messages}>{messageItems.length ? messageItems.map((item, index) => {
           const first = Array.isArray(item) ? item[0] : item;
           const previous = messageItems[index - 1];
           const lastDate = previous ? formatDateGroup((Array.isArray(previous) ? previous[0] : previous).createdAt) : "";
           const date = formatDateGroup(first.createdAt);
           return <Fragment key={first.id}>{date !== lastDate && <div className={styles.timelineDate}>{date.replaceAll("/", "-")}</div>}{renderMessage(item)}</Fragment>;
-        }) : <div className={styles.empty}>{opening === selected ? "正在准备开场白…" : "还没有消息。点击发送召唤艺人。"}</div>}{room.historyInitialized && !messages.some(message => message.sender === "fan" || message.sender === "artist" && !message.opener) && <div className={styles.timelineNow}>今天 · 从这里开始聊天</div>}<div ref={endRef}/></main></div><div className={styles.composerWrap}><form className={styles.composer} onSubmit={e => { e.preventDefault(); void summonArtist(); }}><div className={styles.composerMain}><div className={styles.inputShell}><textarea rows={1} aria-label="回复艺人" placeholder={state.settings.deepRealism ? `${remaining}/3 条 · 每条 ${limit} 字` : "输入消息"} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendFan(); } }} /></div><button type="button" className={styles.emojiToggle} aria-label="选择表情" aria-expanded={emojiOpen} onClick={() => { setEmojiCategory(category => userPacks.some(pack => pack.id === category) ? category : "all"); setEmojiOpen(v => !v); setChatSearchOpen(false); }}><Smile size={23}/></button><button type="submit" disabled={busy} aria-label="发送并召唤艺人回复" title="发送并召唤艺人回复">{busy ? <LoaderCircle size={19} className={styles.spin}/> : <ArrowUp size={19}/>}</button></div>{emojiOpen && <div className={styles.emojiPanel}><div className={styles.emojiCategories}><button type="button" className={emojiCategory === "all" ? styles.emojiCategoryActive : ""} onClick={() => setEmojiCategory("all")}>全部</button>{userPacks.map(pack => <button type="button" key={pack.id} className={emojiCategory === pack.id ? styles.emojiCategoryActive : ""} onClick={() => setEmojiCategory(pack.id)}>{pack.name}</button>)}</div><div className={styles.quickEmoji}>{(emojiCategory === "all" ? userPacks.flatMap(pack => pack.stickers) : userPacks.find(pack => pack.id === emojiCategory)?.stickers || []).map(sticker => <button type="button" key={sticker.id} title={`发送${sticker.name}`} onClick={() => sendFanSticker(sticker.name, sticker.imageUrl)}><AssetImage src={sticker.imageUrl}/></button>)}{userPacks.length === 0 && QUICK_EMOJI.map(emoji => <button key={emoji} type="button" onClick={() => { setDraft(value => value + emoji); setEmojiOpen(false); }} aria-label={`插入${emoji}`}>{emoji}</button>)}</div></div>}</form></div></>}
+        }) : <div className={styles.empty}>{opening === selected ? "正在准备开场白…" : "还没有消息。点击发送召唤艺人。"}</div>}{room.historyInitialized && !messages.some(message => message.sender === "fan" || message.sender === "artist" && !message.opener) && <div className={styles.timelineNow}>今天 · 从这里开始聊天</div>}<div ref={endRef}/></main></div><div className={styles.composerWrap}><form className={styles.composer} onSubmit={e => { e.preventDefault(); void summonArtist(); }}><div className={styles.composerMain}><div className={styles.inputShell}><textarea disabled={!subscribed} rows={1} aria-label="回复艺人" placeholder={state.settings.deepRealism ? `${remaining}/3 条 · 每条 ${limit} 字` : "输入消息"} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendFan(); } }} /></div><button type="button" className={styles.emojiToggle} aria-label="选择表情" aria-expanded={emojiOpen} onClick={() => { setEmojiCategory(category => userPacks.some(pack => pack.id === category) ? category : "all"); setEmojiOpen(v => !v); setChatSearchOpen(false); }}><Smile size={23}/></button><button type="submit" disabled={busy || !subscribed} aria-label="发送并召唤艺人回复" title="发送并召唤艺人回复">{busy ? <LoaderCircle size={19} className={styles.spin}/> : <ArrowUp size={19}/>}</button></div>{emojiOpen && <div className={styles.emojiPanel}><div className={styles.emojiCategories}><button type="button" className={emojiCategory === "all" ? styles.emojiCategoryActive : ""} onClick={() => setEmojiCategory("all")}>全部</button>{userPacks.map(pack => <button type="button" key={pack.id} className={emojiCategory === pack.id ? styles.emojiCategoryActive : ""} onClick={() => setEmojiCategory(pack.id)}>{pack.name}</button>)}</div><div className={styles.quickEmoji}>{(emojiCategory === "all" ? userPacks.flatMap(pack => pack.stickers) : userPacks.find(pack => pack.id === emojiCategory)?.stickers || []).map(sticker => <button type="button" key={sticker.id} title={`发送${sticker.name}`} onClick={() => sendFanSticker(sticker.name, sticker.imageUrl)}><AssetImage src={sticker.imageUrl}/></button>)}{userPacks.length === 0 && QUICK_EMOJI.map(emoji => <button key={emoji} type="button" onClick={() => { setDraft(value => value + emoji); setEmojiOpen(false); }} aria-label={`插入${emoji}`}>{emoji}</button>)}</div></div>}</form></div></>}
 
       {route === "details" && character && <><>{header("聊天详情")}</><main className={styles.detailsScroll}>
         <section className={styles.detailsCard}><button type="button" className={styles.identityRow} onClick={() => { setArtistReturn("details"); setRoute("artist"); }}><Avatar src={avatar} name={displayName} className={styles.artistAvatarRing}/><span><b><ArtistBadge/> {displayName}</b><small>查看艺人资料</small></span><ChevronRight size={19}/></button><div className={styles.identityRow}><Avatar src={room.avatar || user.avatar} name={room.nickname || user.name}/><span><b>{room.nickname || user.name}</b><small>当前聊天室的我的资料</small></span></div><button type="button" className={styles.ourBoxButton} onClick={() => setRoute("ourBox")}><OurBoxMark/> OUR BOX</button></section>
@@ -806,12 +812,12 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
 
       {route === "myEdit" && <>{header("编辑个人资料", <button type="button" onClick={saveUser}>保存</button>)}<main className={styles.editScroll}><div className={styles.editCover}>{userDraft.cover ? <AssetImage src={userDraft.cover} className={styles.coverImage}/> : <div className={styles.coverFallback}/>}<button type="button" className={styles.editCoverButton} onClick={() => requestUpload("userCover")}><Camera size={18}/>更换背景</button><button type="button" className={styles.editAvatarButton} onClick={() => requestUpload("userAvatar")}><Avatar src={userDraft.avatar} name={userDraft.name} className={styles.editAvatar}/><Camera size={17}/></button></div><div className={styles.fields}>{editField("昵称", userDraft.name, value => setUserDraft(prev => ({ ...prev, name: value })))}{editField("生日（可选，例：2001-07-17）", userDraft.birthday, value => setUserDraft(prev => ({ ...prev, birthday: value })))}{editField("性别（可选）", userDraft.gender, value => setUserDraft(prev => ({ ...prev, gender: value })))}<button type="button" className={styles.primaryButton} onClick={saveUser}>保存个人资料</button></div></main></>}
 
-      {route === "settings" && <>{header("设置")}<main className={styles.settingsScroll}><h3>基本信息</h3><button type="button" className={styles.settingRow} onClick={startUserEdit}><Avatar src={user.avatar} name={user.name}/><span>{user.name}</span><small>编辑个人资料</small><ChevronRight size={18}/></button><h3>通知与体验</h3>{settingsSwitch("Lysn 新消息通知", state.settings.notificationsEnabled, value => updateSetting({ notificationsEnabled: value }))}{settingsSwitch("艺人自主发消息", state.settings.autonomousMessages, value => updateSetting({ autonomousMessages: value }), "关闭后只在点发送时尝试生成新消息")}{settingsSwitch("加深拟真", state.settings.deepRealism, value => updateSetting({ deepRealism: value }), "每次艺人回复后或一天后可再发三条；字数随订阅天数增加")}{settingsSwitch("测试模式", state.settings.testMode === true, value => updateSetting({ testMode: value }), "打开后优先执行明确的发照片、语音和引用请求；默认关闭")}
+      {route === "settings" && <>{header("设置")}<main className={styles.settingsScroll}><h3>基本信息</h3><button type="button" className={styles.settingRow} onClick={startUserEdit}><Avatar src={user.avatar} name={user.name}/><span>{user.name}</span><small>编辑个人资料</small><ChevronRight size={18}/></button><h3>通知与体验</h3><label className={styles.field}><span>泡泡新消息音效</span><input type="file" accept="audio/*" onChange={e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>8*1024*1024){onNotice?.("音频请控制在8MB以内");return;}const reader=new FileReader();reader.onload=()=>updateSetting({notificationSound:String(reader.result)});reader.readAsDataURL(file);e.target.value="";}}/></label>{state.settings.notificationSound&&<div className={styles.roomBackgroundActions}><button onClick={()=>void new Audio(state.settings.notificationSound).play().catch(()=>{})}>试听</button><button onClick={()=>updateSetting({notificationSound:""})}>清除音效</button></div>}{settingsSwitch("Lysn 新消息通知", state.settings.notificationsEnabled, value => updateSetting({ notificationsEnabled: value }))}{settingsSwitch("艺人自主发消息", state.settings.autonomousMessages, value => updateSetting({ autonomousMessages: value }), "关闭后只在点发送时尝试生成新消息")}{settingsSwitch("加深拟真", state.settings.deepRealism, value => updateSetting({ deepRealism: value }), "每次艺人回复后或一天后可再发三条；字数随订阅天数增加")}{settingsSwitch("测试模式", state.settings.testMode === true, value => updateSetting({ testMode: value }), "打开后优先执行明确的发照片、语音和引用请求；默认关闭")}
         <h3>翻译显示</h3>{([ ["fold", "折叠翻译"], ["replace", "覆盖原文"] ] as const).map(([value, label]) => <button type="button" className={styles.settingRow} key={value} onClick={() => updateSetting({ translationMode: value })}><span>{label}</span>{state.settings.translationMode === value && <Check size={20} className={styles.selectedCheck}/>}</button>)}
 
       </main></>}
 
-      {roomSheet && (route === "details" || (route === "artist" && !subscribed)) && <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) setRoomSheet(false); }}><section className={`${styles.sheet} ${styles.roomSheet}`} role="dialog" aria-label="聊天室设置"><header><b>聊天室设置</b><button type="button" onClick={() => setRoomSheet(false)} aria-label="关闭"><X size={21}/></button></header><div className={styles.roomSheetScroll}><p className={styles.roomSection}>个人资料 <small>仅当前聊天室生效</small></p><button type="button" className={styles.settingRow} onClick={() => requestUpload("roomAvatar")}><span>个人头像</span><Avatar src={room.avatar || user.avatar} name={room.nickname || user.name}/><Camera size={17}/></button><label className={styles.field}><span>我的昵称 · 艺人称呼你时使用</span><input value={room.nickname || ""} placeholder={user.name} onChange={e => updateRoom({ nickname: e.target.value })}/></label><p className={styles.roomSection}>艺人</p><label className={styles.field}><span>聊天室名称 · 你看到的名字</span><input value={room.chatName || ""} placeholder={displayName} onChange={e => updateRoom({ chatName: e.target.value })}/></label><p className={styles.roomSection}>艺人泡泡状态</p><label className={styles.field}><span>出现频率</span><select value={room.activity || "normal"} onChange={e => updateRoom({ activity: e.target.value as LysnRoom["activity"] })}><option value="quiet">不常来</option><option value="normal">普通</option><option value="frequent">经常来</option></select></label><label className={styles.field}><span>看粉丝消息</span><select value={room.readStyle || "normal"} onChange={e => updateRoom({ readStyle: e.target.value as LysnRoom["readStyle"], nextFanReadAt: undefined })}><option value="rare">不常看</option><option value="normal">普通</option><option value="often">经常看</option></select></label><label className={styles.field}><span>引用粉丝消息</span><select value={room.quoteStyle || "normal"} onChange={e => updateRoom({ quoteStyle: e.target.value as LysnRoom["quoteStyle"] })}><option value="rare">很少引用</option><option value="normal">偶尔引用</option><option value="often">喜欢引用</option></select></label><p className={styles.settingsNote}>这些是大致偏好，看消息和引用会有随机变化；看过消息不一定马上回复。</p><p className={styles.roomSection}>当前聊天室背景</p><div className={styles.roomBackgroundControl}><div className={styles.roomBackgroundPreview}>{room.backgroundUrl ? <AssetImage src={room.backgroundUrl}/> : <span>默认背景</span>}</div><div className={styles.roomBackgroundActions}><button type="button" onClick={() => requestUpload("roomBackground")}>上传图片</button>{room.backgroundUrl && <button type="button" onClick={() => updateRoom({ backgroundUrl: "" })}>恢复默认</button>}</div></div><label className={styles.field}><span>或输入背景图片链接</span><input type="url" value={room.backgroundUrl?.startsWith("asset://") ? "" : room.backgroundUrl || ""} placeholder="https://…" onChange={e => updateRoom({ backgroundUrl: e.target.value.trim() })}/></label><p className={styles.roomSection}>通知与显示</p>{settingsSwitch("置顶聊天", Boolean(room.pinned), value => updateRoom({ pinned: value }))}{settingsSwitch("消息免打扰", Boolean(room.muted), value => updateRoom({ muted: value }))}{settingsSwitch("多图折叠展示", room.foldPhotos !== false, value => updateRoom({ foldPhotos: value }), "连续发送的多张图片叠放轮播，点击展开可逐张看")}</div></section></div>}
+      {roomSheet && (route === "details" || (route === "artist" && !subscribed)) && <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) setRoomSheet(false); }}><section className={`${styles.sheet} ${styles.roomSheet}`} role="dialog" aria-label="聊天室设置"><header><b>聊天室设置</b><button type="button" onClick={() => setRoomSheet(false)} aria-label="关闭"><X size={21}/></button></header><div className={styles.roomSheetScroll}><p className={styles.roomSection}>个人资料 <small>仅当前聊天室生效</small></p><button type="button" className={styles.settingRow} onClick={() => requestUpload("roomAvatar")}><span>个人头像</span><Avatar src={room.avatar || user.avatar} name={room.nickname || user.name}/><Camera size={17}/></button><label className={styles.field}><span>我的昵称 · 艺人称呼你时使用</span><input value={room.nickname || ""} placeholder={user.name} onChange={e => updateRoom({ nickname: e.target.value })}/></label><p className={styles.roomSection}>艺人</p><label className={styles.field}><span>聊天室名称 · 你看到的名字</span><input value={room.chatName || ""} placeholder={displayName} onChange={e => updateRoom({ chatName: e.target.value })}/></label><p className={styles.roomSection}>泡泡风格</p><label className={styles.field}><textarea value={room.bubbleStyle||""} onChange={e=>updateRoom({bubbleStyle:e.target.value})} placeholder="称呼、亲密程度、断句与接粉丝话的方式，例如男友感或群主朋友感；留空按人设。"/></label><p className={styles.roomSection}>艺人泡泡状态</p><label className={styles.field}><span>出现频率</span><select value={room.activity || "normal"} onChange={e => updateRoom({ activity: e.target.value as LysnRoom["activity"] })}><option value="quiet">不常来</option><option value="normal">普通</option><option value="frequent">经常来</option></select></label><label className={styles.field}><span>看粉丝消息</span><select value={room.readStyle || "normal"} onChange={e => updateRoom({ readStyle: e.target.value as LysnRoom["readStyle"], nextFanReadAt: undefined })}><option value="rare">不常看</option><option value="normal">普通</option><option value="often">经常看</option></select></label><label className={styles.field}><span>引用粉丝消息</span><select value={room.quoteStyle || "normal"} onChange={e => updateRoom({ quoteStyle: e.target.value as LysnRoom["quoteStyle"] })}><option value="rare">很少引用</option><option value="normal">偶尔引用</option><option value="often">喜欢引用</option></select></label><p className={styles.settingsNote}>这些是大致偏好，看消息和引用会有随机变化；看过消息不一定马上回复。</p><p className={styles.roomSection}>当前聊天室背景</p><div className={styles.roomBackgroundControl}><div className={styles.roomBackgroundPreview}>{room.backgroundUrl ? <AssetImage src={room.backgroundUrl}/> : <span>默认背景</span>}</div><div className={styles.roomBackgroundActions}><button type="button" onClick={() => requestUpload("roomBackground")}>上传图片</button>{room.backgroundUrl && <button type="button" onClick={() => updateRoom({ backgroundUrl: "" })}>恢复默认</button>}</div></div><label className={styles.field}><span>或输入背景图片链接</span><input type="url" value={room.backgroundUrl?.startsWith("asset://") ? "" : room.backgroundUrl || ""} placeholder="https://…" onChange={e => updateRoom({ backgroundUrl: e.target.value.trim() })}/></label><p className={styles.roomSection}>通知与显示</p>{settingsSwitch("置顶聊天", Boolean(room.pinned), value => updateRoom({ pinned: value }))}{settingsSwitch("消息免打扰", Boolean(room.muted), value => updateRoom({ muted: value }))}{settingsSwitch("多图折叠展示", room.foldPhotos !== false, value => updateRoom({ foldPhotos: value }), "连续发送的多张图片叠放轮播，点击展开可逐张看")}</div></section></div>}
 
       {messageMenu && <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) setMessageMenu(null); }}><section className={`${styles.sheet} ${styles.actionSheet}`} role="dialog" aria-label="消息操作"><button type="button" className={styles.actionSheetButton} onClick={() => { toggleFavorite(messageMenu.id); setMessageMenu(null); }}><Bookmark size={18}/>{(room.favoriteMessageIds || []).includes(messageMenu.id) ? "取消收藏" : "收藏"}</button><button type="button" className={styles.actionSheetButton} onClick={() => openEditMessage(messageMenu)}><Pencil size={18}/>编辑</button><button type="button" className={styles.actionSheetButton} onClick={() => { setRerollTarget(messageMenu); setMessageMenu(null); }}><RotateCcw size={18}/>重回</button><button type="button" className={`${styles.actionSheetButton} ${styles.actionDanger}`} onClick={() => removeMessage(messageMenu.id)}><Trash2 size={18}/>删除</button><button type="button" className={styles.actionCancel} onClick={() => setMessageMenu(null)}>取消</button></section></div>}
 
@@ -821,6 +827,7 @@ export function LysnApp({ onClose, onNotice }: { onClose: () => void; onNotice?:
 
       {viewerUrl && <div className={styles.imageViewer} role="dialog" aria-label="查看图片" onClick={() => setViewerUrl("")}><button type="button" aria-label="关闭图片"><X size={26}/></button><AssetImage src={viewerUrl}/></div>}
 
+      {resumeChoice && <div className={styles.overlay} onMouseDown={e=>{if(e.target===e.currentTarget)setResumeChoice(null);}}><section className={styles.sheet} role="dialog" aria-label="重新订阅"><header><b>{resumeChoice.step===1?"是否继承订阅天数？":"是否延续中断期间的天数？"}</b><button onClick={()=>setResumeChoice(null)} aria-label="关闭"><X size={21}/></button></header><p className={styles.settingsNote}>上次订阅 {state.rooms[resumeChoice.id]?.cancelledDays||subscriptionDays(state,resumeChoice.id)} 天，取消至今 {Math.max(0,Math.floor((Date.parse(localDay(new Date())+"T12:00:00Z")-Date.parse(localDay(new Date(state.rooms[resumeChoice.id]?.cancelledAt||Date.now()))+"T12:00:00Z"))/86400000))} 天。</p>{resumeChoice.step===1?<><button className={styles.primaryButton} onClick={()=>setResumeChoice({...resumeChoice,step:2})}>继承原有天数</button><button className={styles.settingRow} onClick={()=>{const id=resumeChoice.id;setResumeChoice(null);subscribe(id,localDay(new Date()));}}>不继承，从第 1 天开始</button></>:<><button className={styles.primaryButton} onClick={()=>{const id=resumeChoice.id,r=loadLysn().rooms[id],gap=Math.max(0,Math.floor((Date.parse(localDay(new Date())+"T12:00:00Z")-Date.parse(localDay(new Date(r.cancelledAt!))+"T12:00:00Z"))/86400000));const start=new Date();start.setDate(start.getDate()-((r.cancelledDays||1)+gap));setResumeChoice(null);subscribe(id,localDay(start));}}>延续，计入中断天数</button><button className={styles.settingRow} onClick={()=>{const id=resumeChoice.id,r=loadLysn().rooms[id],start=new Date();start.setDate(start.getDate()-(r.cancelledDays||1));setResumeChoice(null);subscribe(id,localDay(start));}}>不延续，原有天数 +1</button></>}</section></div>}
       {subscriptionChoice && <LysnSubscriptionPicker artistName={state.profiles[subscriptionChoice]?.name || characters.find(c => c.id === subscriptionChoice)?.name || "艺人"} onClose={() => setSubscriptionChoice(null)} onChoose={date => { const id = subscriptionChoice; setSubscriptionChoice(null); if (id) subscribe(id, date); }}/>} 
       {celebrationEvent && route === "chat" && <LysnCelebrationCardView event={celebrationEvent} artistName={displayName} avatar={avatar || ""} letter={celebrationLetter} loading={celebrationLoading} error={celebrationError} onRetry={() => openCelebration(celebrationEvent)} onClose={() => setCelebrationEvent(null)}/>}
 

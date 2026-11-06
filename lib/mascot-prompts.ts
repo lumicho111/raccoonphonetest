@@ -538,7 +538,7 @@ prompt 仅在所有 tag 都匹配当前场景时才会注入。
 · moments — 朋友圈
 · story — 剧情模式
 · calendar — 日程生成
-· diary — 日记 / 便签墙
+· diary — iCity 日记
 · xiaohongshu — 小红书 app
 · dwelling — 栖所（查看角色的住处状态）
 · reading — 阅读 app
@@ -554,7 +554,7 @@ prompt 仅在所有 tag 都匹配当前场景时才会注入。
 · timed_wake — chat 子细化（稍后主动联系触发）
 · explore / items / full — dwelling 子细化
 · activity / reaction / comment / mention — xiaohongshu 子细化
-· entries / notewall / notewall_reply — diary 子细化
+· entries — diary 日记生成
 · annotate / discuss — reading 子细化
 
 【判断 tag 含义的方法】

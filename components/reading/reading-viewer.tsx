@@ -2124,7 +2124,7 @@ export function ReadingViewer({ book, onBack }: Props) {
     };
 
     return (
-        <div className="reading-app-surface absolute inset-0 z-[100] flex flex-col bg-[var(--c-page-body-bg)]" data-immersive={immersive} style={{ paddingTop: "var(--page-header-safe-top, 48px)" }}>
+        <div data-reverse-book-id={book.id} className="reading-app-surface absolute inset-0 z-[100] flex flex-col bg-[var(--c-page-body-bg)]" data-immersive={immersive} style={{ paddingTop: "var(--page-header-safe-top, 48px)" }}>
             {/* Page flip overlay */}
             {flipAnim && (
                 <>

@@ -1,3 +1,4 @@
+import { loadChatSessions, loadChatContacts, loadChatMessages } from './chat-storage';
 import {kvGet,kvSet,registerKvMigration} from './kv-db';
 import {loadCharacters} from './character-storage';
 import {loadOwnerCalendarPlans} from './calendar-storage';
@@ -24,10 +25,25 @@ export function getCharacterSleep(id:string,at=new Date()):SleepState|null{
   const day=wall+d*86400000,key=id+':'+new Date(day).toISOString().slice(0,10);let c=cycles[key];
   if(!c){let from=minute(r.sleepFrom),to=minute(r.sleepTo);if(to<from)to+=1440;const spread=r.regularity==='regular'?.35:1,mid=(from+to)/2;const m=mid+(Math.random()-.5)*(to-from)*spread;c={start:zonedEpoch(day+Math.round(m)*60000,zone),duration:(Math.max(1,r.minHours)+Math.random()*Math.max(0,r.maxHours-r.minHours))*3600000,night:Math.random()};cycles[key]=c;changed=true;}
   let start=c.start,end=start+c.duration;
+  // An already active conversation may postpone this one persisted sleep cycle.
+  const contacts=loadChatContacts().filter(x=>x.characterId===id).map(x=>x.id);
+  const history=loadChatSessions().filter(x=>!x.isGroup&&(x.contactId===id||contacts.includes(x.contactId))).flatMap(x=>loadChatMessages(x.id,30)).filter(m=>!m.isRetracted&&(m.role==='user'||m.role==='assistant')&&Date.parse(m.createdAt)<=now).sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt));
+  const recent=history.filter(m=>Date.parse(m.createdAt)>=now-12*60000);
+  const engaged=recent.some(m=>m.role==='user')&&recent.some(m=>m.role==='assistant')&&!recent.slice(-3).some(m=>/^(晚安[。！!～~ ]*|good night[.! ]*)$/i.test(m.content.trim()));
+  let to=minute(r.sleepTo);if(to<minute(r.sleepFrom))to+=1440;
+  const latest=zonedEpoch(day+to*60000,zone);
+  const saved=c as typeof c & {postponedUntil?:number};
+  if(engaged&&now>=c.start-12*60000&&now<=latest+15*60000){const defer=Math.min(latest+15*60000,Date.parse(recent[recent.length-1].createdAt)+12*60000);if(defer>(saved.postponedUntil||c.start)){saved.postponedUntil=defer;changed=true;}}
+  start=Math.max(start,saved.postponedUntil||start);end=start+c.duration;
   for(const event of work){if(event.end<=start||event.start>=end)continue;if(event.start<=start+30*60000){start=event.end+30*60000;end=start+c.duration;}else{end=event.start-30*60000;}}
   // A short wake window is only an opportunity, never an automatic outgoing message.
   const wakeAt=start+(end-start)*.55,hasWake=c.night<(r.regularity==='regular'?.12:.35),brief=hasWake&&now>=wakeAt&&now<wakeAt+8*60000;
   if(now>=start&&now<end){if(changed)kvSet(CYCLE_KEY,JSON.stringify(cycles));return {sleeping:!brief,briefAwake:brief,endsAt:brief?wakeAt+8*60000:end,cycleId:key};}
  }
  if(changed){const cutoff=new Date(wall-7*86400000).toISOString().slice(0,10);cycles=Object.fromEntries(Object.entries(cycles).filter(([k])=>k.slice(-10)>=cutoff));kvSet(CYCLE_KEY,JSON.stringify(cycles));}return null;
+}
+
+export function routineConversationPrompt(id:string):string {
+ const r=loadCharacterRoutine(id);if(!r.enabled)return '';
+ return `\n【弹性作息】通常在 ${r.sleepFrom}～${r.sleepTo} 之间自然准备入睡。这是浮动范围，不是到最早时间必须说晚安的指令。正在来回聊天时先接住话题，可自然表达困意或今晚晚点睡；不要机械催睡或突然结束。对方明确道别或话题告一段落后再自然休息；不要把刚才仍在聊的人写成已经睡着。`;
 }

@@ -1,4 +1,7 @@
 "use client";
+import {extractMotionVideo} from '@/lib/motion-photo';
+import {prepareSocialMedia,markMediaSent,type SocialMedia} from '@/lib/social-media';
+
 
 import { useEffect, useState, useRef } from "react";
 import { loadCharacters } from "@/lib/character-storage";
@@ -6,17 +9,22 @@ import { loadChatContacts } from "@/lib/chat-storage";
 import { addMomentPost } from "@/lib/moments-storage";
 import { onUserPost } from "@/lib/moments-engine";
 import { resolveUserIdentity } from "@/lib/settings-storage";
+import {saveChatImageToIndexedDB} from "@/lib/chat-asset-storage";
 import { saveMomentsImage } from "@/lib/moments-image-upload";
 import { ChatFallbackAvatar } from "./chat-fallback-avatar";
 
 type Props = {
+    initialPhoto?:Blob|null;
     onClose: () => void;
     onPublished: () => void;
 };
 
-export function MomentsCompose({ onClose, onPublished }: Props) {
+export function MomentsCompose({ onClose, onPublished, initialPhoto }: Props) {
+    const [media,setMedia]=useState<SocialMedia|null>(null);
     const [text, setText] = useState("");
     const [photos, setPhotos] = useState<{ url: string; preview: string }[]>([]);
+    const [photoImportError,setPhotoImportError]=useState(''),[photoImporting,setPhotoImporting]=useState(false),[photoRetry,setPhotoRetry]=useState(0);
+    useEffect(()=>{if(!initialPhoto)return;let cancelled=false;const preview=URL.createObjectURL(initialPhoto);setPhotoImporting(true);setPhotoImportError('');void saveChatImageToIndexedDB(initialPhoto).then(id=>{if(!cancelled)setPhotos([{url:'asset://'+id,preview}]);}).catch(()=>{if(!cancelled)setPhotoImportError('截图保存失败，原图还在，可以重试。');}).finally(()=>{if(!cancelled)setPhotoImporting(false);});return()=>{cancelled=true;URL.revokeObjectURL(preview);};},[initialPhoto,photoRetry]);
     const [uploading, setUploading] = useState(false);
     const [photoDesc, setPhotoDesc] = useState("");
     const [location, setLocation] = useState("");
@@ -95,12 +103,13 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
         setUploading(true);
         try {
             for (const file of files) {
+                if(file.type.startsWith('video/') || file.type === 'image/gif' || (file.type==='image/jpeg' && file.size<=40*1024*1024 && extractMotionVideo(new Uint8Array(await file.arrayBuffer())))){setMedia(await prepareSocialMedia(file));continue;}
                 const url = await saveMomentsImage(file);
                 const preview = URL.createObjectURL(file);
                 previewsRef.current.push(preview);
                 setPhotos(prev => prev.length < 9 ? [...prev, { url, preview }] : prev);
             }
-        } catch (error) { console.error("[Moments] photo upload failed", error); }
+        } catch (error) { alert(error instanceof Error ? error.message : "媒体处理失败"); }
         finally { setUploading(false); }
     };
 
@@ -134,7 +143,7 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
     };
 
     const handlePublish = () => {
-        if ((!text.trim() && !photos.length) || uploading) return;
+        if ((!text.trim() && !photos.length && !media) || uploading || photoImporting || photoImportError) return;
 
         // Build content with @mentions appended
         let content = text.trim();
@@ -155,6 +164,7 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
             authorType: "user",
             authorId: "user",
             content,
+            media: media || undefined,
             photoUrl: photos[0]?.url,
             photoUrls: photos.map(p => p.url),
             photoDescription: photoDesc.trim() || undefined,
@@ -163,12 +173,13 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
         });
 
         if (post) {
+            if(media)markMediaSent(post.id);
             try { onUserPost(post); } catch (e) { console.warn("[Compose] onUserPost error:", e); }
         }
         onPublished();
     };
 
-    const canPublish = !uploading && (text.trim().length > 0 || photos.length > 0);
+    const canPublish = !photoImporting && !photoImportError && !uploading && (text.trim().length > 0 || photos.length > 0 || !!media);
 
     // Get char name/avatar helpers
     const getCharName = (charId: string) => chars.find(c => c.id === charId)?.name ?? "未知";
@@ -196,7 +207,7 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
                         </svg>
                     </button>
                 </div>
-                <div className="compose-modal-body">
+                <div className="compose-modal-body">{photoImporting&&<p role="status">正在保存截图…</p>}{photoImportError&&<p role="alert">{photoImportError}<button type="button" onClick={()=>setPhotoRetry(n=>n+1)}>重试</button></p>}
                 {/* ── Main Top Area: textarea + photo grid ── */}
                 <div className="compose-top-area">
                     <textarea
@@ -219,7 +230,8 @@ export function MomentsCompose({ onClose, onPublished }: Props) {
                             {uploading ? "上传中…" : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>}
                         </button>}
                     </div>
-                    <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />
+                    {media && <div style={{position:'relative',width:130}}><img src={media.cover} alt="附件预览" style={{width:'100%',aspectRatio:'1 / 1',objectFit:'cover',objectPosition:'center',borderRadius:10}}/><button type="button" onClick={()=>setMedia(null)}>移除{media.kind==='gif'?' GIF':'实况'}</button></div>}
+                    <input ref={fileRef} type="file" accept="image/*,video/*" multiple onChange={handleFileChange} className="hidden" />
                 </div>
 
                 {/* ── Action Rows (Location, Mention, Visibility) ── */}

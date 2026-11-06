@@ -80,3 +80,13 @@ export async function generatePhoneReply(characterId: string, transcript: PhoneT
   }
   return { lines, hangup };
 }
+
+/** Prepare the caller's actual opening before ringing; never write it into Chat. */
+export async function generatePhoneOpening(characterId:string):Promise<PhoneReplyLine>{
+ const session=phoneContextSession(characterId);
+ const raw=flattenCompletionResult(await generateChatCompletion(session,loadChatMessages(session.id),{
+  appId:'phone',appTags:['chat','voice'],callFormatInstruction:`${VOICE_CALL_FORMAT}\n你决定主动拨打这通独立的 Phone 电话。现在准备接通后你要先说的第一句，结合当前人设、关系、联系动机和上下文。只输出一句你自己的自然开场白及对应翻译，不编造用户已经说话，不输出拨号动作、长篇对白或挂断标记。此句将在用户真正接听后才发送。`
+ }));
+ const parsed=parseAIResponse(raw,[]);for(const part of parsed.parts.filter(p=>!p.mediaType))for(const line of splitCallTranscript(part.content,false))if(line.kind==='speech'&&line.text.trim())return {id:phoneId('phone_opening'),...splitOriginalTranslated(line.text)};
+ throw Error('开场白生成失败，请重试');
+}

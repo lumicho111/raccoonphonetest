@@ -2,6 +2,7 @@ import { jsonrepair } from "jsonrepair";
 import type { DiaryEntryBlock, DiaryEntryTodoItem } from "./diary-entry-types";
 
 export type ParsedDiaryEntry = {
+  visibility?: "world"|"friends"|"private";
   title: string;
   dateLabel: string;
   mood: string;

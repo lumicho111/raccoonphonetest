@@ -571,9 +571,8 @@ export function TheqooApp({ onClose, onNotice: externalNotice, visible = true, o
     </main>}
 
     {page === "sources" && <main className={styles.content}>
-      <p className={styles.hint}>{t("연동된 일정은 가끔 주제 참고용으로만 사용하며, 모든 새 글에 등장하지 않습니다. 휴대폰 캘린더의 개인 일정은 공개 제보처럼 사용하지 않고, WVS는 공개 일정만 참고합니다.", "关联日程只偶尔作为话题参考，不会每次刷新都出现。手机日历中的私人安排不会被当作公开爆料；WVS 只参考公开日程。")}</p>
+      <p className={styles.hint}>{t("연동된 일정은 가끔 주제 참고용으로만 사용하며, 모든 새 글에 등장하지 않습니다. 휴대폰 캘린더의 개인 일정은 공개 제보처럼 사용하지 않고, WVS는 공개 일정만 참고합니다.", "关联日程只偶尔作为话题参考，不会每次刷新都出现。手机日历中的私人安排不会被当作公开爆料；仅参考日历中已公开的行程和节点。")}</p>
       <label className={styles.check}><input type="checkbox" checked={state.includeCalendar} onChange={e => setState(s => ({ ...s, includeCalendar: e.target.checked }))} />{t("휴대폰 캘린더 연동", "参考手机日历")}</label>
-      <label className={styles.check}><input type="checkbox" checked={state.includeWeverseSchedule} onChange={e => setState(s => ({ ...s, includeWeverseSchedule: e.target.checked }))} />{t("WVS 공개 일정 연동", "参考 WVS 公开日程")}</label>
     </main>}
 
     {page === "editor" && <main className={styles.content}><div className={styles.editor}>

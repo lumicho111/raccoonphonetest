@@ -277,6 +277,7 @@
 }
 
 .status-time {
+  grid-column: 1; grid-row: 1;
   font-size: calc(13px*var(--app-text-scale,1));
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -287,6 +288,7 @@
 }
 
 .status-right {
+  grid-column: 3; grid-row: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;

@@ -1,3 +1,4 @@
+import {restoreChatListEntry} from './chat-list-entry';
 import { loadChatSessions } from "./chat-storage";
 import { formatChatTimestamp } from "./llm-prompt-assembler";
 import { kvGet, kvRemove, kvSet, registerDynamicPrefix } from "./kv-db";
@@ -12,7 +13,7 @@ export type ChatOfflineScene = {
     storyStartedAt?: string; storyEndedAt?: string; status?: "active" | "paused"; pausedAt?: string;
 };
 export type ChatOfflineArchive = ChatOfflineScene & {
-    endedAt: string; archivedAt?: string; summary: string; memoryId?: string; memoryTarget?: "short_term" | "long_term"; turns: ChatOfflineTurn[];
+    participantIds?: string[]; endedAt: string; archivedAt?: string; summary: string; memoryId?: string; memoryTarget?: "short_term" | "long_term"; turns: ChatOfflineTurn[];
 };
 export type ChatOfflineSceneState = { version: 1; active?: ChatOfflineScene; archives: ChatOfflineArchive[] };
 
@@ -50,6 +51,7 @@ export function updateChatOfflineScene(sessionId: string, patch: Partial<Pick<Ch
     if (!state?.active) return;
     const active = { ...state.active, ...patch };
     if (patch.status === "paused") active.pausedAt = new Date().toISOString();
+    else if (patch.status === "active") delete active.pausedAt;
     saveSceneState(sessionId, { ...state, active });
     if (typeof window !== "undefined") window.dispatchEvent(new Event(OFFLINE_SCENE_UPDATED));
 }
@@ -206,6 +208,7 @@ export function appendChatOfflineTurn(input: {
         createdAt: new Date().toISOString(),
     };
     saveChatOfflineTurns(input.sessionId, [...loadChatOfflineTurns(input.sessionId), turn]);
+    if(input.userContent.trim()) restoreChatListEntry(input.sessionId);
     return turn;
 }
 
@@ -265,12 +268,13 @@ export function loadChatOfflineProjectionEntries(
 
     const entries: ChatOfflineProjectionEntry[] = [];
     for (const session of sessions) {
-        const managed = !session.isGroup ? loadChatOfflineSceneState(session.id) : null;
+        const managed = loadChatOfflineSceneState(session.id);
         if (managed) {
             // Old archives were already committed directly to long-term memory.
             // Only new short-term archives project a scene summary, never raw turns.
             for (const archive of managed.archives) {
                 if (archive.memoryTarget !== "short_term") continue;
+                if (session.isGroup && !archive.participantIds?.includes(characterId)) continue;
                 const start = archive.storyStartedAt || archive.startedAt;
                 const timestamp = new Date(start).toISOString();
                 const recordedAt = archive.archivedAt || archive.endedAt;
@@ -279,6 +283,7 @@ export function loadChatOfflineProjectionEntries(
                 const occurredTo = archive.storyEndedAt ? new Date(archive.storyEndedAt).toISOString() : undefined;
                 const label = `${formatChatTimestamp(timestamp)}${occurredTo ? ` — ${formatChatTimestamp(occurredTo)}` : "（结束时间未指定）"}`;
                 entries.push({ id: `chat_offline_archive_${archive.id}`, sessionId: session.id,
+                    ...(session.isGroup ? {groupSessionId: session.id} : {}),
                     timestamp, recordedAt, occurredTo,
                     content: `【线下归档：${archive.title}｜故事时间：${label}】\n${archive.summary}` });
             }

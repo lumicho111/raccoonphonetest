@@ -1,4 +1,5 @@
 "use client";
+import {DraggableMediaWindow} from "@/components/ui/draggable-media-window";
 import { VoiceFavoriteDialog } from "./voice-favorite-dialog";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { ChevronLeft, Users, X, Send, Sparkles, MessageSquare, Mic, PhoneOff, Phone, Volume2 } from "lucide-react";
@@ -77,7 +78,7 @@ export function GroupCallScreen({ type, session, characters, onEnd, initiator = 
     const messagesRef = useRef<ChatMessage[]>([]);
     const userNameRef = useRef(resolveUserIdentity(undefined, "group_chat")?.name || "你");
     const minimizedRef = useRef(minimized);
-    minimizedRef.current = minimized;
+    minimizedRef.current = isVideo && minimized;
     const onEndRef = useRef(onEnd);
     onEndRef.current = onEnd;
     const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,7 +163,7 @@ export function GroupCallScreen({ type, session, characters, onEnd, initiator = 
     useEffect(() => { interimTextRef.current = interimText; }, [interimText]);
     useEffect(() => { if (isVideo && subtitleScrollRef.current)
         subtitleScrollRef.current.scrollTop = subtitleScrollRef.current.scrollHeight; }, [isVideo, subtitles, interimText]);
-    useEffect(() => { if (!minimized)
+    useEffect(() => { if (!minimized || !isVideo)
         return; stopAudio(); sttRef.current?.abort(); sttRef.current = null; setInputOpen(false); setInterimText(""); if (["AI_SPEAKING", "USER_SPEAKING"].includes(stateRef.current))
         setCallState("IDLE"); }, [minimized, stopAudio, setCallState]);
     const [resolvedBgs, setResolvedBgs] = useState<Record<string, string>>({});
@@ -477,7 +478,7 @@ export function GroupCallScreen({ type, session, characters, onEnd, initiator = 
     if (!started)
         return <div className="gcall-setup-root voicecall-cards"><div className="chat-call-dialog-backdrop"><div className="chat-call-dialog chat-call-member-dialog" role="dialog" aria-modal="true" aria-label="选择通话成员"><header><strong>发起群{callTypeLabel}</strong><button aria-label="取消发起通话" onClick={() => onEnd(false)}><X /></button></header><p>选择本次参与的人 你会默认加入</p>{characters.map(char => <label key={char.id} className="chat-call-member-row"><span className="chat-call-member-avatar">{groupMemberAvatar(char) ? <img src={groupMemberAvatar(char) || ""} alt=""/> : char.name[0]}</span><span>{groupMemberName(session, char.id, char)}</span><input type="checkbox" checked={chosen.includes(char.id)} onChange={e => setChosen(ids => e.target.checked ? [...ids, char.id] : ids.filter(id => id !== char.id))}/></label>)}<button className="chat-call-start" disabled={!chosen.length} onClick={startSelected}>开始通话{chosen.length > 0 ? ` · ${chosen.length + 1}人` : ""}</button></div></div></div>;
     if (minimized)
-        return <button className="call-mini-window" style={{ backgroundImage: `url(${voiceBgResolved || session.groupAvatar || effectiveUserAvatar})` }} onClick={onRestore} aria-label="返回群通话"><span className="call-mini-window-overlay"/><span className="call-mini-window-name">{session.groupName || "群聊"} · {participantIds.length + 1}人</span></button>;
+        return <DraggableMediaWindow label="返回群通话" onOpen={onRestore} style={{backgroundImage:`url(${voiceBgResolved || session.groupAvatar || effectiveUserAvatar})`}}><span className="call-mini-window-overlay"/><span className="call-mini-window-name">{session.groupName || "群聊"} · {participantIds.length+1}人</span></DraggableMediaWindow>;
     if (isVideo) {
         // Grid: participants + self-cam — auto layout to fit screen
         const totalSlots = activeCharacters.length + 1; // +1 for self

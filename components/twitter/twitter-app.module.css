@@ -476,3 +476,11 @@
 .replyAccountPicker{position:absolute;bottom:calc(100% + 10px);left:0;width:min(290px,85vw);padding:7px;border-radius:17px;background:#fff;border:1px solid #e4e8eb;box-shadow:0 8px 30px #0002;z-index:8}
 .replyAccountPicker button{width:100%;display:flex;align-items:center;gap:9px;text-align:left;padding:10px;border:0;border-radius:11px;background:transparent}
 .replyAttachments{display:flex;gap:7px;width:100%}.replyAttachments button{position:relative;width:54px;height:54px;padding:0;overflow:hidden;border-radius:10px}.replyAttachments img{width:100%;height:100%;object-fit:cover}.replyAttachments span{position:absolute;right:2px;top:0;background:#fff;color:#333}
+
+/* Calendar sources: five portraits per row; grey means selected. */
+.calendarSourceGrid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:16px 8px; margin:17px 0 12px; }
+.calendarSourceButton { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:7px; min-width:0; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.calendarSourceButton .manageRowAvatar { width:44px; height:44px; min-width:44px!important; font-size:1em; }
+.calendarSourceButton[aria-pressed="true"] .manageRowAvatar { filter:grayscale(1); opacity:.4; }
+.calendarSourceButton:focus-visible { outline:2px solid var(--tw-blue,#1d9bf0); outline-offset:4px; border-radius:8px; }
+.calendarSourceName { display:block; width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:.82em; line-height:1.5; font-weight:400; }

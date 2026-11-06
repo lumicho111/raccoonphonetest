@@ -1,3 +1,5 @@
+import type { SocialMedia } from './social-media';
+import {restoreChatListEntry} from './chat-list-entry';
 import type { ForwardedChatRecord } from "./chat-forward";
 import type { WalletCurrency } from "./wallet-types";
 // lib/chat-storage.ts
@@ -163,6 +165,7 @@ export type ChatMessage = {
     origin?: "chat" | "reading_discuss" | "custom_app" | "custom_app_background" | "story_floating_phone";
     mediaUrl?: string;
     mediaData?: {
+        socialMedia?: SocialMedia;
         forwardRecord?: ForwardedChatRecord;
         amount?: number;          // 红包/转账金额
         count?: number;           // 红包个数
@@ -304,6 +307,7 @@ export type ChatMessage = {
         appId?: string;
         appName?: string;
         appCardTitle?: string;
+        cityDiarySnapshot?: {title:string;text:string;handle:string;photos?:string[]};
         appCardBody?: string;
         appCardSummary?: string;
         appCardTone?: string;
@@ -1594,6 +1598,7 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
     if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent(CHAT_MESSAGE_PUSHED_EVENT, { detail: { message: newMsg } }));
     }
+    if (newMsg.role === "user") restoreChatListEntry(newMsg.sessionId);
     emitChatPluginEvent("message.persisted", { message: newMsg });
 
     return newMsg;

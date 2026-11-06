@@ -1,6 +1,6 @@
 {
   "appId": "app.ii.phone",
-  "appName": "float",
+  "appName": "兔版float",
   "webDir": "mobile-dist",
   "server": {
     "androidScheme": "https",

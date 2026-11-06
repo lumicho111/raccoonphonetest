@@ -20,6 +20,7 @@ export type LysnMessage = {
 export type LysnProfile = { name: string; avatar: string; cover?: string; bio?: string; group?: string; updatedAt: number };
 export type LysnUserProfile = { name: string; avatar: string; cover: string; birthday: string; gender: string; stickers?: LysnSticker[]; stickerPacks?: LysnStickerPack[] };
 export type LysnSettings = {
+  notificationSound?: string;
   notificationsEnabled: boolean; fontSize: "small" | "normal" | "large";
   enterToSend: boolean; translationMode: "replace" | "fold";
   autonomousMessages: boolean; deepRealism: boolean;
@@ -28,11 +29,13 @@ export type LysnSettings = {
 export type LysnSticker = { id: string; name: string; imageUrl: string };
 export type LysnStickerPack = { id: string; name: string; note?: string; stickers: LysnSticker[] };
 export type LysnRoom = {
+  cancelledAt?: number; cancelledDays?: number; bubbleStyle?: string;
   subscriptionDate?: string; nickname?: string; avatar?: string; chatName?: string;
   backgroundUrl?: string;
   pinned?: boolean; muted?: boolean; foldPhotos?: boolean;
   openerText?: string; openerShown?: boolean;
   onboardingComplete?: boolean; historyInitialized?: boolean;
+  nextArrivalAt?: number;
   activity?: "quiet" | "normal" | "frequent";
   quoteStyle?: "rare" | "normal" | "often";
   readStyle?: "rare" | "normal" | "often"; nextFanReadAt?: number;
@@ -83,10 +86,12 @@ export function saveLysn(state: LysnState): void {
 export function lysnId(): string { return `lysn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`; }
 export function appendLysn(characterId: string, rows: Omit<LysnMessage, "id" | "characterId" | "createdAt">[]): LysnState {
   const state = loadLysn();
+  if(!state.subscribedIds.includes(characterId))return state;
   const now = Date.now();
-  if (rows.some(row => row.sender === "artist" && !row.opener)) {
+  const quoted=new Set(rows.filter(row=>row.sender==="artist"&&row.quote?.original).map(row=>row.quote!.original));
+  if (quoted.size) {
     for (const message of state.messages) {
-      if (message.characterId === characterId && message.sender === "fan" && !message.seenAt) message.seenAt = now;
+      if (message.characterId === characterId && message.sender === "fan" && !message.seenAt && quoted.has(message.original)) message.seenAt = now;
     }
   }
   state.messages.push(...rows.map((row, i) => ({ ...row, id: lysnId(), characterId, createdAt: now + i })));
@@ -97,6 +102,7 @@ export function localDay(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 export function subscriptionDays(state: LysnState, id: string, today = new Date()): number {
+  if (!state.subscribedIds.includes(id) && state.rooms[id]?.cancelledDays) return state.rooms[id].cancelledDays!;
   const initial = state.rooms[id]?.subscriptionDate || (state.subscribedAt[id] ? localDay(new Date(state.subscribedAt[id])) : localDay(today));
   const start = new Date(`${initial}T12:00:00`);
   if (Number.isNaN(start.getTime())) return 1;

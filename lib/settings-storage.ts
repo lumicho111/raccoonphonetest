@@ -183,6 +183,8 @@ function preserveCustomAppPresetPrompts(fresh: PresetConfig, previous: PresetCon
 
 
 const REMOVED_BUILTIN_PROMPT_IDS = new Set([
+    "diary_notewall_generation",
+    "diary_notewall_reply",
     "vn_output_format",
     "vn_story_beats",
     "cocreate_write",

@@ -56,12 +56,16 @@ export function worldlineEnabledForApp(world: Worldline, appId: string): boolean
 export function worldlineContextForApp(appId: string, options?: { publicEvents?: boolean; focusText?: string }): string {
   const world = activeWorldline();
   if (!world || !worldlineEnabledForApp(world, appId)) return "";
+  if (appId === "lysn") {
+    const now=Date.now(),current=world.progressHistory?.at(-1)?.text||world.currentState;
+    return [`【世界线：${world.name}｜Lysn公开参考】`,current?`最新进展：${current.slice(0,2400)}`:"",...world.events.filter(e=>e.visibility==="public"&&Date.parse(e.occurredAt)<=now&&now-Date.parse(e.endsAt||e.occurredAt)<14*86400000).sort((a,b)=>b.occurredAt.localeCompare(a.occurredAt)).slice(0,5).map(e=>`${worldlineTimeLabel(e,true)} ${e.title}：${e.detail.slice(0,400)}`),...world.archive.flatMap(g=>g.entries).slice(0,3).map(e=>`背景：${e.title} ${e.content.slice(0,400)}`),"以上公开事实可作为生活延续，不必逐条提及，最新进展优先。"].filter(Boolean).join("\n");
+  }
   if (appId === "theqoo") return theqooWorldlineContext(world, options?.focusText);
   if (["theqoo", "twitter", "xiaohongshu"].includes(appId)) return publicPlatformWorldlineContext(world, options);
   const archive = (world.archive || []).flatMap(group => group.entries.map(entry => `${group.name} / ${entry.title}：${entry.content}`));
   const history = (world.progressHistory || []).slice(0, -1).map(progress => `${progress.recordedAt}：${progress.text}`);
   const current = world.progressHistory?.at(-1)?.text || world.currentState;
-  const publicEvents = options?.publicEvents ? world.events.filter(event => event.visibility === "public")
+  const publicEvents = options?.publicEvents ? world.events.filter(event => event.visibility === "public" && Date.parse(event.occurredAt)<=Date.now())
     .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
     .map(event => `${worldlineTimeLabel(event,true)} ${event.title}：${event.detail}`) : [];
   return [

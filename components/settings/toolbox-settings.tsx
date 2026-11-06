@@ -30,7 +30,6 @@ import {
     loadInternalCapabilities,
     saveInternalCapabilities,
     MUSIC_CONTROL_CAPABILITY_ID,
-    NOTE_WALL_CAPABILITY_ID,
     TOOLBOX_MANAGEMENT_CAPABILITY_ID,
 } from "@/lib/internal-capability-storage";
 import { discoverMcpTools, startMcpOAuth } from "@/lib/tool-executor";
@@ -261,20 +260,18 @@ export function ToolboxSettings() {
     }
 
     function defaultInternalMode(id: string): InternalCapabilityConfig["mode"] {
-        return id === NOTE_WALL_CAPABILITY_ID || id === MUSIC_CONTROL_CAPABILITY_ID || id === CALENDAR_MANAGEMENT_CAPABILITY_ID || id === LOCAL_DATA_LIBRARY_CAPABILITY_ID || id === TOOLBOX_MANAGEMENT_CAPABILITY_ID ? "auto" : "confirm";
+        return id === MUSIC_CONTROL_CAPABILITY_ID || id === CALENDAR_MANAGEMENT_CAPABILITY_ID || id === LOCAL_DATA_LIBRARY_CAPABILITY_ID || id === TOOLBOX_MANAGEMENT_CAPABILITY_ID ? "auto" : "confirm";
     }
 
     function isAutoOnlyInternalCapability(id: string): boolean {
-        return id === NOTE_WALL_CAPABILITY_ID || id === MUSIC_CONTROL_CAPABILITY_ID || id === CALENDAR_MANAGEMENT_CAPABILITY_ID || id === LOCAL_DATA_LIBRARY_CAPABILITY_ID || id === TOOLBOX_MANAGEMENT_CAPABILITY_ID;
+        return id === MUSIC_CONTROL_CAPABILITY_ID || id === CALENDAR_MANAGEMENT_CAPABILITY_ID || id === LOCAL_DATA_LIBRARY_CAPABILITY_ID || id === TOOLBOX_MANAGEMENT_CAPABILITY_ID;
     }
 
     function getAutoOnlyCapabilityDetail(id: string): string {
         if (id === MUSIC_CONTROL_CAPABILITY_ID) {
             return "网易云音乐开启后，角色可以通过工具读取你的本地歌单、网易云歌单、歌单歌曲和当前播放列表，并执行加入播放列表、查看当前歌曲、切换歌曲等播放操作。";
         }
-        if (id === NOTE_WALL_CAPABILITY_ID) {
-            return "便签墙开启后，角色可以通过工具向公共便签墙写入便签，用来留下留言、记录想法或把聊天中的内容整理成可回看的便签。";
-        }
+
         if (id === CALENDAR_MANAGEMENT_CAPABILITY_ID) {
             return "日历管理开启后，角色可以通过工具查看当前角色的日程，并添加、修改或取消日程安排；相关操作会走工具箱能力，不再依赖旧的日程指令。";
         }
@@ -1703,7 +1700,7 @@ export function ToolboxSettings() {
                             <div className="ui-group-card">
                                 <span className="menu-label">建议</span>
                                 <span className="menu-desc !mt-0">
-                                    {capability.id === NOTE_WALL_CAPABILITY_ID || capability.id === MUSIC_CONTROL_CAPABILITY_ID
+                                    {capability.id === MUSIC_CONTROL_CAPABILITY_ID
                                         ? "这是服务型工具，开启后日常提示词里只会出现服务入口，具体工具会在角色获取后返回。"
                                         : "默认使用“执行前确认”。这样角色可以提出工具请求，但真正落库前仍由你决定。"}
                                 </span>

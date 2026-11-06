@@ -1011,3 +1011,26 @@
 .photos-story-editor textarea { width: 100%; min-height: 124px; resize: vertical; box-sizing: border-box; padding: 12px; border: 1px solid rgba(125,125,135,.2); border-radius: 14px; background: rgba(145,145,155,.07); color: inherit; font: inherit; font-size: 13px; line-height: 1.65; }
 .photos-story-content { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.65; }
 .photos-story-empty { opacity: .5; }
+
+/* Dedicated sizing prevents generic inspector span rules from moving the thumb. */
+.photos-app button.photos-switch {box-sizing:border-box;min-width:45px;max-width:45px;min-height:27px;max-height:27px;overflow:hidden}
+.photos-app button.photos-switch > span {position:absolute;display:block;inset:2px auto auto 2px;width:23px;min-width:23px;max-width:23px;height:23px;margin:0;padding:0;transform:none}
+.photos-app button.photos-switch.is-on > span {left:auto;right:2px;transform:none}
+.photos-sheet-backdrop {background:rgba(16,20,30,.48)}
+.photos-sheet {background:var(--c-card,#f5f5f7)}
+.photos-grid-stack {left:auto;right:5px;top:5px}
+.photos-grid-item {touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.photos-grid-item img {-webkit-user-drag:none;pointer-events:none}
+.photos-grid-item.is-dragging {opacity:.45;touch-action:none}
+.photos-grid-item.is-drop-target {outline:3px solid #68a7f8;outline-offset:-3px;transform:scale(.96)}
+.photos-grid-origin {position:absolute;left:4px;bottom:4px;padding:3px 5px;background:#0009;border-radius:5px;color:white;font-size:10px;max-width:95%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 016: centered dialogs, with one compact name/save row. */
+.photos-sheet-backdrop{align-items:center;justify-content:center;padding:24px 18px}
+.photos-sheet{width:100%;max-width:390px;max-height:85%;border-radius:14px;background:var(--c-card,#f7f8fb);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 12px 42px #0003}
+.photos-sheet::before{display:none}.photos-sheet-header{padding-top:14px}
+.photos-album-create{display:flex;align-items:center;gap:9px;padding:12px 0}
+.photos-album-create>.photos-edit-row{flex:1;min-width:0;margin:0;display:flex;flex-direction:column;align-items:stretch;gap:5px;border:0;padding:0;background:none}
+.photos-album-create .photos-edit-row>span{font-size:11px;color:#85858c}.photos-album-create .photos-edit-row input{width:100%;min-width:0;flex:1;padding:10px;border-radius:7px;background:#eaeaec}
+.photos-album-create .photos-organize-actions{margin:18px 0 0;padding:0;flex-shrink:0;gap:4px}
+.photos-album-create .photos-organize-actions>button{padding:10px 14px;border-radius:7px;background:#e1e9f3;color:#537ca3}

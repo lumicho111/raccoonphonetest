@@ -1,4 +1,6 @@
 "use client";
+import {hasPlayChats} from "@/lib/checkphone-play";
+import {PhonePlayComposer} from "./checkphone-play-composer";
 import { COMMUNICATIONS_UPDATED_EVENT } from "@/lib/checkphone-communications";
 import { projectCheckPhoneChat } from "@/lib/checkphone-engine";
 
@@ -790,7 +792,7 @@ export function CheckPhoneChatPage({
     setConfirmClearOpen(false);
   }
 
-  const payload = snapshot?.payload ? projectCheckPhoneChat(character.id, snapshot.payload) : null;
+  const payload = snapshot?.payload ? projectCheckPhoneChat(character.id, snapshot.payload) : hasPlayChats(character.id) ? projectCheckPhoneChat(character.id,{headerTitle:"聊天",headerSubtitle:"",conversations:[],groups:[],momentsFeed:[],contacts:[]}) : null;
   const [characterRemarkRevision, setCharacterRemarkRevision] = useState(0);
   useEffect(() => {
     const handleRemarkUpdated = (event: Event) => {
@@ -2044,7 +2046,7 @@ export function CheckPhoneChatPage({
                 })}
               </div>
             </div>
-            <CheckPhoneChatComposer />
+            <PhonePlayComposer key={activeConversation.id} owner={character.id} conversation={activeConversation}/>
           </div>
         )}
 

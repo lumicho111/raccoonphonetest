@@ -1,4 +1,5 @@
 "use client";
+import {InspectionPermissionSettings} from "./inspection-permission-settings";
 import { CHARACTER_REMARK_LANGUAGE_INSTRUCTION } from "@/lib/social-language-instructions";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -1387,15 +1388,10 @@ export function ChatSettingsPanel({
                     )}
                 </div>
 
+                {!session.isGroup&&<InspectionPermissionSettings owner={session.contactId}/>}
                 {/* Toggles */}
                 <div className="menu-group">
-                    <div className="menu-item">
-                        <ChatInfoIcon icon={Pin} color={BINDING_ACCENTS.preset} />
-                        <div className="menu-label-group"><span className="menu-label">置顶聊天</span></div>
-                        <div className="menu-right">
-                            <Toggle checked={isPinned} onChange={c => { setIsPinned(c); updateSession({ isPinned: c }); }} />
-                        </div>
-                    </div>
+
                     {/* 仿真拉黑：仅私聊提供 */}
                     {!session.isGroup && (
                         <div className="menu-item">

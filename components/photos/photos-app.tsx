@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  MoreHorizontal,
   ChevronLeft,
   Image as ImageIcon,
   Images,
@@ -130,9 +131,11 @@ export function PhotosApp({ onClose, onNotice }: Props) {
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [albumSheet, setAlbumSheet] = useState<{ characterId: string; photoIds: string[] } | null>(null);
+  const [albumSheet, setAlbumSheet] = useState<{ characterId: string; photoIds: string[]; mode?: "create" | "manage" } | null>(null);
   const [stackPickerIds, setStackPickerIds] = useState<string[] | null>(null);
   const hold = useRef<{ timer?: ReturnType<typeof setTimeout>; x: number; y: number; consumed: boolean }>({ x: 0, y: 0, consumed: false });
+  const [dragId,setDragId]=useState<string|null>(null),[dropId,setDropId]=useState<string|null>(null);
+  const dragRef=useRef<string|null>(null), dropRef=useRef<string|null>(null);
   const [importMenu, setImportMenu] = useState(false);
   const [urlSheet, setUrlSheet] = useState(false);
   const [currentTraitsByCharacter, setCurrentTraitsByCharacter] = useState(initialLibrary.currentTraitsByCharacter);
@@ -412,8 +415,18 @@ export function PhotosApp({ onClose, onNotice }: Props) {
     }
   };
 
-  useEffect(() => () => { clearTimeout(hold.current.timer); }, []);
+  useEffect(() => {
+    const stopScroll=(event:TouchEvent)=>{if(dragRef.current && event.cancelable)event.preventDefault();};
+    document.addEventListener('touchmove',stopScroll,{passive:false});
+    return ()=>{document.removeEventListener('touchmove',stopScroll);clearTimeout(hold.current.timer);};
+  }, []);
 
+  function mergeDragged(draggedId:string,targetId:string){
+    if(draggedId===targetId)return;
+    const changes=arrangePhotoStack(photos,[draggedId],targetId);if(changes.length<2)return;
+    const targetCover=photoStackCover(photos.find(p=>p.id===targetId)!,photos);
+    updatePhotoRecords(changes.map(p=>({...p,stackId:p.id===draggedId?undefined:draggedId,stackStoryNote:p.id===draggedId?targetCover.stackStoryNote:p.stackStoryNote,seriesId:targetCover.seriesId||p.seriesId})));
+  }
   const stackPhotos = (ids: string[], targetId?: string) => {
     const records = arrangePhotoStack(loadPhotoLibrary().photos, ids, targetId);
     if (!records.length) return;
@@ -599,9 +612,9 @@ export function PhotosApp({ onClose, onNotice }: Props) {
       return (
         <div className="photos-empty">
           <span className="photos-empty-icon"><Images size={30} strokeWidth={1.5} /></span>
-          <strong>还没有照片</strong>
-          <p>从图库批量导入，再把照片关联给角色。</p>
-          <button type="button" onClick={openPicker}>导入照片</button>
+          <strong>{tab === 'library' && !scope ? '还没有生成图片' : '还没有照片'}</strong>
+          <p>{tab === 'library' && !scope ? '应用内生成的图片会汇总在这里。' : '在当前相册上传照片。'}</p>
+          {!(tab === 'library' && !scope) && <button type="button" onClick={openPicker}>上传照片</button>}
         </div>
       );
     }
@@ -616,16 +629,16 @@ export function PhotosApp({ onClose, onNotice }: Props) {
           const privateChannels = ["dm_user", "moments", "bubble", ...(Object.entries(loadTwitterState().accounts).some(([id, profile]) => id.endsWith(":alt") && profile.disclosure === "full") ? ["twitter_alt"] : [])] as const;
           const publicChannels = ["wvs_artist", "twitter_main"] as const;
           const locked = used.some((item) => item.channel === "wvs_official") || (used.some((item) => privateChannels.includes(item.channel as typeof privateChannels[number])) && privateChannels.every((channel) => used.some((item) => item.channel === channel))) || (used.some((item) => publicChannels.includes(item.channel as typeof publicChannels[number])) && publicChannels.every((channel) => used.some((item) => item.channel === channel)));
-          return <button type="button" aria-label={photo.displayName || photo.originalName || "照片"} aria-pressed={selecting ? selectedIds.includes(photo.id) : undefined} className={`photos-grid-item${locked ? " is-used" : ""}${selecting && selectedIds.includes(photo.id) ? " is-selected" : ""}`} key={photo.id} draggable={!selecting} onDragStart={(event) => event.dataTransfer.setData("text/plain", photo.id)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (selecting) return; const draggedId = event.dataTransfer.getData("text/plain"); if (draggedId && draggedId !== photo.id) stackPhotos([draggedId], photo.stackId || photo.id); }} onPointerDown={event => {
-              clearTimeout(hold.current.timer);
-              hold.current = { x: event.clientX, y: event.clientY, consumed: false };
-              if (!selecting) hold.current.timer = setTimeout(() => { hold.current.consumed = true; setSelecting(true); setSelectedIds([photo.id]); }, 500);
-            }} onPointerMove={event => { if (Math.hypot(event.clientX - hold.current.x, event.clientY - hold.current.y) > 9) clearTimeout(hold.current.timer); }} onPointerUp={() => clearTimeout(hold.current.timer)} onPointerCancel={() => clearTimeout(hold.current.timer)} onDragStartCapture={() => clearTimeout(hold.current.timer)} onContextMenu={event => { event.preventDefault(); clearTimeout(hold.current.timer); hold.current.consumed = true; setSelecting(true); setSelectedIds(ids => ids.includes(photo.id) ? ids : [...ids, photo.id]); }} onClick={() => { if (hold.current.consumed) { hold.current.consumed = false; return; } if (selecting) setSelectedIds(ids => ids.includes(photo.id) ? ids.filter(id => id !== photo.id) : [...ids, photo.id]); else if (stackCount > 0 && !expandedStackId) setExpandedStackId(photo.id); else setDetailId(photo.id); }}>
+          return <button type="button" aria-label={photo.displayName || photo.originalName || "照片"} aria-pressed={selecting ? selectedIds.includes(photo.id) : undefined} data-photo-id={photo.id} className={`photos-grid-item${dropId===photo.id ? " is-drop-target" : ""}${dragId===photo.id ? " is-dragging" : ""}${locked ? " is-used" : ""}${selecting && selectedIds.includes(photo.id) ? " is-selected" : ""}`} key={photo.id} draggable={!selecting} onDragStart={event=>{event.dataTransfer.setData("text/plain",photo.id);dragRef.current=photo.id;setDragId(photo.id);}} onDragEnd={()=>{dragRef.current=null;setDragId(null);setDropId(null);}} onDragOver={event=>{event.preventDefault();setDropId(photo.id);}} onDrop={event=>{event.preventDefault();const id=event.dataTransfer.getData("text/plain");if(id&&id!==photo.id)mergeDragged(id,photo.id);setDragId(null);setDropId(null);}} onPointerDown={event=>{
+ clearTimeout(hold.current.timer);hold.current={x:event.clientX,y:event.clientY,consumed:false};
+ if(!selecting){const el=event.currentTarget, pid=event.pointerId;hold.current.timer=setTimeout(()=>{hold.current.consumed=true;dragRef.current=photo.id;setDragId(photo.id);el.setPointerCapture(pid);},450);}
+ }} onPointerMove={event=>{if(dragRef.current){event.preventDefault();const target=document.elementsFromPoint(event.clientX,event.clientY).map(x=>x.closest<HTMLElement>('[data-photo-id]')).find(x=>x&&x.dataset.photoId!==dragRef.current);dropRef.current=target?.dataset.photoId||null;setDropId(dropRef.current);}else if(Math.hypot(event.clientX-hold.current.x,event.clientY-hold.current.y)>9)clearTimeout(hold.current.timer);}} onPointerUp={()=>{clearTimeout(hold.current.timer);if(dragRef.current&&dropRef.current)mergeDragged(dragRef.current,dropRef.current);dragRef.current=null;dropRef.current=null;setDragId(null);setDropId(null);}} onPointerCancel={()=>{clearTimeout(hold.current.timer);dragRef.current=null;dropRef.current=null;setDragId(null);setDropId(null);}} onContextMenu={event=>event.preventDefault()} onClick={() => { if (hold.current.consumed) { hold.current.consumed = false; return; } if (selecting) setSelectedIds(ids => ids.includes(photo.id) ? ids.filter(id => id !== photo.id) : [...ids, photo.id]); else if (stackCount > 0 && !expandedStackId) setExpandedStackId(photo.id); else setDetailId(photo.id); }}>
             {imageMap[photo.assetId]
               ? <img src={imageMap[photo.assetId]} alt="" loading="lazy" />
               : <span className="photos-grid-placeholder"><ImageIcon size={20} /></span>}
+            {tab === "library" && !scope && photo.origin === "generated" ? <span className="photos-grid-origin">{photo.linkedCharacterIds.map(id=>characterById.get(id)?.name).filter(Boolean).join("、") || characterById.get(photo.sourceAccountId?.replace(/:alt$/,"")||"")?.name || (photo.sourceAppId ? `${photo.sourceAppId} · 未标注角色` : "未标注角色")}</span> : null}
             {!photo.aiUsable ? <span className="photos-grid-lock">仅手动</span> : null}
-            {stackCount > 0 ? <span className="photos-grid-stack"><Images size={12} /> {stackCount + 1}</span> : null}
+            {stackCount > 0 ? <span className="photos-grid-stack">套图 · {stackCount + 1}张</span> : null}
             {used.length ? <span className="photos-grid-used">{locked ? "已暂锁" : `已用 ${used.length}`}</span> : null}
             {selecting ? <span className={`photos-grid-select${selectedIds.includes(photo.id) ? " is-selected" : ""}`}>{selectedIds.includes(photo.id) ? <Check size={13} /> : null}</span> : null}
           </button>;
@@ -639,7 +652,7 @@ export function PhotosApp({ onClose, onNotice }: Props) {
     const items = photos.filter(photo => photo.linkedCharacterIds.includes(characterId));
     const ownAlbums = albums.filter(album => album.characterId === characterId);
     const unfiled = items.filter(photo => !ownAlbums.some(album => album.photoIds.includes(photo.id)));
-    const cards = [{ id: "all", name: "全部照片", items }, { id: "unfiled", name: "未分类", items: unfiled },
+    const cards = [{ id: "all", name: "全部照片", items },
       ...ownAlbums.map(album => ({ id: album.id, name: album.name, items: items.filter(photo => album.photoIds.includes(photo.id)) }))];
     return <><div className="photos-library-summary"><strong>我的相册</strong><span>{ownAlbums.length} 个自建相册</span></div>
       <div className="photos-album-grid">{cards.map(card => <button type="button" className="photos-album-card" key={card.id} onClick={() => setSelectedAlbumId(card.id)}>
@@ -653,7 +666,7 @@ export function PhotosApp({ onClose, onNotice }: Props) {
       {uploadDraft ? renderUploadSheet() : null}
       {importMenu ? <div className="photos-sheet-backdrop"><section className="photos-sheet" role="dialog" aria-modal="true" aria-label="导入照片方式"><header className="photos-sheet-header"><button type="button" onClick={() => setImportMenu(false)} aria-label="关闭"><X size={19} /></button><div><strong>导入照片</strong><span>选择导入方式</span></div></header><div className="photos-sheet-scroll photos-import-options"><button type="button" onClick={() => { setImportMenu(false); openPicker(); }}><ImageIcon size={18} /> 本地图片</button><button type="button" onClick={() => { setImportMenu(false); setUrlSheet(true); }}><Link2 size={18} /> 图片 URL · 可批量导入</button></div></section></div> : null}
       {urlSheet ? <PhotoUrlSheet onClose={() => setUrlSheet(false)} onReady={(files, urls) => { setUrlSheet(false); handleFiles(files, urls); }} /> : null}
-      {albumSheet ? <PhotoAlbumSheet key={albumSheet.characterId} {...albumSheet} albums={albums} onClose={() => setAlbumSheet(null)} /> : null}
+      {albumSheet ? <PhotoAlbumSheet key={albumSheet.characterId} {...albumSheet} albums={albums} onCreated={id => setSelectedAlbumId(id)} onClose={() => setAlbumSheet(null)} /> : null}
     </>;
   }
 
@@ -684,8 +697,7 @@ export function PhotosApp({ onClose, onNotice }: Props) {
 
           <section className="photos-inspector-card">
             <label className="photos-edit-row"><span>照片名称</span><input maxLength={120} value={photoName} placeholder={detailPhoto.originalName || "给这张照片起个名字"} onChange={event => setPhotoName(event.target.value)} onBlur={() => updateDetail({ displayName: photoName })} onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>
-            <span className="photos-note">名称和相册分类会参与检索，重新识图会保留。原文件名：{detailPhoto.originalName || "未记录"}</span>
-            {detailPhoto.linkedCharacterIds.map(characterId => <div key={characterId} className="photos-detail-albums"><button type="button" className="photos-detail-action" onClick={() => setAlbumSheet({ characterId, photoIds: [detailPhoto.id] })}>整理到 {characterById.get(characterId)?.name || "角色"} 的相册</button><span className="photos-note">{albums.filter(album => album.characterId === characterId && album.photoIds.includes(detailPhoto.id)).map(album => album.name).join(" · ") || "尚未分类"}</span></div>)}
+            <span className="photos-note">原文件名：{detailPhoto.originalName || "未记录"}</span>
           </section>
 
           <section className="photos-inspector-card photos-vision-card">
@@ -844,7 +856,7 @@ export function PhotosApp({ onClose, onNotice }: Props) {
           </section>
           <section className="photos-inspector-card">
             <div className="photos-inspector-heading"><strong>系列与套图</strong></div>
-            <label className="photos-edit-row"><span>{detailPhoto.stackId || stackMemberCount ? "套图名称" : "系列名称"}</span><input value={storyCover.seriesId || ""} placeholder="如：王子套" onChange={(event) => updateDetail({ seriesId: event.target.value })} /></label>
+            <label className="photos-edit-row"><span>{detailPhoto.stackId || stackMemberCount ? "套图名称" : "系列名称"}</span><input value={storyCover.seriesId || ""} placeholder="" onChange={(event) => updateDetail({ seriesId: event.target.value })} /></label>
             <button type="button" className="photos-stack-preview" onClick={() => setStackPickerIds([detailPhoto.id])}>
               {(() => { const cover = photos.find(photo => photo.id === (detailPhoto.stackId || detailPhoto.id)); return cover && imageMap[cover.assetId] ? <img src={imageMap[cover.assetId]} alt="" /> : <Images size={26} />; })()}
               <span><strong>{detailPhoto.stackId || stackMemberCount ? "更换套图归属" : "加入套图"}</strong><small>查看缩略图选择，不用记名字</small></span><span aria-hidden="true">›</span>
@@ -886,10 +898,10 @@ export function PhotosApp({ onClose, onNotice }: Props) {
             <span>{scopedPhotos.length} 张照片</span>
           </div>
           {scope.type !== "character" ? <button type="button" className="photos-text-btn" onClick={() => { setSelecting(!selecting); setSelectedIds([]); }}>{selecting ? "取消" : "选择"}</button> : null}
-          <button type="button" className="photos-round-btn" onClick={() => setImportMenu(true)} aria-label="导入照片"><Plus size={20} /></button>
+          <button type="button" className="photos-round-btn" onClick={() => { if(scope.type === "character" && !selectedAlbumId) setAlbumSheet({characterId:scope.characterId,photoIds:[],mode:"create"}); else if(selectedAlbumId === "all") onNotice?.("请先进入一个自建相册，再上传照片。"); else setImportMenu(true); }} aria-label={scope.type === "character" && !selectedAlbumId ? "新建相册" : "上传照片"}><Plus size={20} /></button>
         </header>
         {scope.type === "character" ? <div className="photos-organize-bar">
-          {!selectedAlbumId ? <button type="button" onClick={() => setAlbumSheet({ characterId: scope.characterId, photoIds: [] })}>新建 / 管理相册</button> : <>
+          {!selectedAlbumId ? <button type="button" aria-label="管理已有相册" onClick={() => setAlbumSheet({ characterId: scope.characterId, photoIds: [], mode: "manage" })}><MoreHorizontal size={18}/></button> : <>
             <button type="button" onClick={() => { setSelecting(!selecting); setSelectedIds([]); }}>{selecting ? "取消选择" : "选择照片"}</button>
             {selecting ? <button type="button" onClick={() => setSelectedIds((expandedStackId ? scopedPhotos.filter(photo => photo.id === expandedStackId || photo.stackId === expandedStackId) : scopedPhotos).map(photo => photo.id))}>全选</button> : expandedStackId ? <button type="button" onClick={() => setAlbumSheet({ characterId: scope.characterId, photoIds: scopedPhotos.filter(photo => photo.id === expandedStackId || photo.stackId === expandedStackId).map(photo => photo.id) })}>整套加入相册</button> : null}
           </>}
@@ -1013,12 +1025,12 @@ export function PhotosApp({ onClose, onNotice }: Props) {
         </button>
         <div>
           <span>PHOTOS</span>
-          <h1>{tab === "library" ? "图库" : tab === "people" ? "人物" : tab === "pools" ? "专用媒体池" : "共享"}</h1>
+          <h1>{tab === "library" ? "首页" : tab === "people" ? "人物" : tab === "pools" ? "专用媒体池" : "共享"}</h1>
         </div>
         {tab === "library" ? <button type="button" className="photos-text-btn" onClick={() => { setSelecting(!selecting); setSelectedIds([]); }}>{selecting ? "取消" : "选择"}</button> : null}
-        <button type="button" className="photos-add-btn" onClick={() => setImportMenu(true)} aria-label="导入照片">
+        {tab !== "library" && tab !== "people" && <button type="button" className="photos-add-btn" onClick={() => setImportMenu(true)} aria-label="导入照片">
           <Plus size={20} />
-        </button>
+        </button>}
       </header>
 
       <main className="photos-library-scroll photos-home-scroll">
@@ -1062,11 +1074,11 @@ export function PhotosApp({ onClose, onNotice }: Props) {
             </details>
             {photos.length > 0 ? (
               <div className="photos-library-summary">
-                <strong>全部照片</strong>
-                <span>{photos.length}</span>
+                <strong>生图图库</strong>
+                <span>{photos.filter(p=>p.origin === "generated").length}</span>
               </div>
             ) : null}
-            {renderPhotoGrid(photos)}
+            {renderPhotoGrid(photos.filter(p=>p.origin === "generated"))}
           </>
         ) : null}
 
@@ -1139,7 +1151,7 @@ export function PhotosApp({ onClose, onNotice }: Props) {
 
       <nav className="photos-tabbar" aria-label="Photos 导航">
         <button type="button" className={tab === "library" ? "is-active" : ""} onClick={() => setTab("library")}>
-          <Images size={20} /><span>图库</span>
+          <Images size={20} /><span>首页</span>
         </button>
         <button type="button" className={tab === "people" ? "is-active" : ""} onClick={() => setTab("people")}>
           <Users size={20} /><span>人物</span>

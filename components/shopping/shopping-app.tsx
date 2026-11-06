@@ -1,4 +1,6 @@
 "use client";
+import {useAppBack} from "@/lib/back-navigation";
+import {reversePageIntent} from "@/lib/reverse-phone-state";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -420,6 +422,7 @@ function buildOrderFromCart(
 }
 
 export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: ShoppingAppProps) {
+  useAppBack(()=>{if(selectedProduct)setSelectedProduct(null);else if(selectedOrderId)setSelectedOrderId(null);else if(selectedTab!=="home")setSelectedTab("home");else onClose();},()=>visible&&!!document.querySelector('[data-active-app="shopping"]'),18);
   const [state, setState] = useState<ShoppingState>(() => createDefaultShoppingState());
   const currentRegion = shoppingRegionConfig(state, state.region);
   const regionConfig = (id: ShoppingRegion) => shoppingRegionConfig(state, id);
@@ -427,6 +430,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
   const [loadingTask, setLoadingTask] = useState<"refresh" | "search" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [debugRawOutput, setDebugRawOutput] = useState<string | null>(null);
+  useEffect(()=>{const fn=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.app==='shopping'){setCartMode(d.mode==='food'?'food':'shop');setOrdersMode(d.mode==='food'?'food':'shop');setSelectedProduct(null);setSelectedOrderId(null);setSelectedTab(d.view==='orders'?'orders':'cart');}};window.addEventListener('rabbit-reverse-page',fn);if(reversePageIntent())fn(new CustomEvent('rabbit-reverse-page',{detail:reversePageIntent()}));return()=>window.removeEventListener('rabbit-reverse-page',fn);},[]);
   const [selectedTab, setSelectedTab] = useState<ShoppingTabId>("home");
   const [selectedProduct, setSelectedProduct] = useState<ShoppingProductDetail | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -1668,7 +1672,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
               {selectedTab === "cart" && cartMode === "food" && <section style={{ display: "grid", gap: 12 }}>
                 <h2 style={{ fontSize: 17, margin: 0 }}>外卖购物车</h2>
                 {Array.from(new Set(state.foodCartItems.map(item => item.currency || "CNY"))).length > 1 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{Array.from(new Set(state.foodCartItems.map(item => item.currency || "CNY"))).map(currency => <button key={currency} type="button" onClick={() => setSelectedFoodCurrency(currency)} style={{ padding: "7px 12px", borderRadius: 14, border: currency === foodCurrency ? "1px solid #ff6b00" : "1px solid #ddd", background: currency === foodCurrency ? "#fff4ea" : "white" }}>{currency}</button>)}</div>}
-                {!state.foodCartItems.length ? <div className="cp-shopping-status">暂时没有外卖商品</div> : checkoutFoodItems.map(item => <div key={item.id} style={{ background: "#fff", padding: 14, borderRadius: 16, display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 25 }}>{/(?:https?:\/\/|www\.)/i.test(item.previewIcon || "") ? "🥡" : item.previewIcon || "🥡"}</span><div style={{ flex: 1, minWidth: 0 }}><strong style={{ fontSize: 12 }}>{item.title}</strong><p style={{ fontSize: 11, color: "#888", margin: "3px 0" }}>{item.selectedOptions?.join(" / ") || item.merchantLabel} · {item.priceLabel}</p></div><button type="button" onClick={() => persist(current => ({ ...current, foodCartItems: current.foodCartItems.filter(entry => entry.id !== item.id) }))} aria-label="从外卖购物车删除" style={{ border: 0, background: "#fff", color: "#777" }}><Trash2 size={15} /></button></div>)}
+                {!state.foodCartItems.length ? <div className="cp-shopping-status">暂时没有外卖商品</div> : checkoutFoodItems.map(item => <div key={item.id} data-reverse-shopping-id={item.id} style={{ background: "#fff", padding: 14, borderRadius: 16, display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 25 }}>{/(?:https?:\/\/|www\.)/i.test(item.previewIcon || "") ? "🥡" : item.previewIcon || "🥡"}</span><div style={{ flex: 1, minWidth: 0 }}><strong style={{ fontSize: 12 }}>{item.title}</strong><p style={{ fontSize: 11, color: "#888", margin: "3px 0" }}>{item.selectedOptions?.join(" / ") || item.merchantLabel} · {item.priceLabel}</p></div><button type="button" onClick={() => persist(current => ({ ...current, foodCartItems: current.foodCartItems.filter(entry => entry.id !== item.id) }))} aria-label="从外卖购物车删除" style={{ border: 0, background: "#fff", color: "#777" }}><Trash2 size={15} /></button></div>)}
                 {state.foodCartItems.length > 0 && <><strong style={{ textAlign: "right", fontSize: 14 }}>{formatCurrencyAmount(foodTotal, foodCurrency)}</strong><button type="button" onClick={() => { setRecipientId(""); setRecipientAddressId(""); setPaymentError(null); setFoodCheckoutOpen(true); }} style={{ padding: 13, border: 0, borderRadius: 16, background: "#ff6b00", color: "#fff" }}>去结算</button></>}
               </section>}
 
@@ -1692,6 +1696,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                       return (
                         <div
                           key={item.id}
+                          data-reverse-shopping-id={item.id}
                           onClick={() => openProduct(item, { detailLabel: "Description" })}
                           onKeyDown={(event) => {
                             if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
@@ -1769,7 +1774,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                 </section>
               )}
 
-              {selectedTab === "orders" && ordersMode === "food" && <section style={{ display: "grid", gap: 12 }}><h2 style={{ margin: 0, fontSize: 17 }}>外卖订单</h2>{state.orders.filter(order => order.mode === "food" && !order.canceledAt).length === 0 ? <div className="cp-shopping-status">暂无外卖订单</div> : state.orders.filter(order => order.mode === "food" && !order.canceledAt).map(order => <button type="button" key={order.id} onClick={() => setSelectedOrderId(order.id)} style={{ border: 0, background: "#fff", borderRadius: 16, padding: 15, textAlign: "left", display: "grid", gap: 6 }}><strong>{order.merchantLabel} · {order.totalLabel}</strong><span style={{ fontSize: 12, color: "#777" }}>{order.summary}</span><span style={{ fontSize: 11, color: "#999" }}>{resolveOrderShipping(order, nowTick).statusLabel} · {order.timeLabel}</span></button>)}</section>}
+              {selectedTab === "orders" && ordersMode === "food" && <section style={{ display: "grid", gap: 12 }}><h2 style={{ margin: 0, fontSize: 17 }}>外卖订单</h2>{state.orders.filter(order => order.mode === "food" && !order.canceledAt).length === 0 ? <div className="cp-shopping-status">暂无外卖订单</div> : state.orders.filter(order => order.mode === "food" && !order.canceledAt).map(order => <button type="button" key={order.id} data-reverse-shopping-id={order.id} onClick={() => setSelectedOrderId(order.id)} style={{ border: 0, background: "#fff", borderRadius: 16, padding: 15, textAlign: "left", display: "grid", gap: 6 }}><strong>{order.merchantLabel} · {order.totalLabel}</strong><span style={{ fontSize: 12, color: "#777" }}>{order.summary}</span><span style={{ fontSize: 11, color: "#999" }}>{resolveOrderShipping(order, nowTick).statusLabel} · {order.timeLabel}</span></button>)}</section>}
 
               {selectedTab === "orders" && ordersMode === "shop" && (
                 <section style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -1788,7 +1793,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                     const shipping = resolveOrderShipping(order, nowTick);
                     return (
                       <button
-                        key={order.id}
+                        key={order.id} data-reverse-shopping-id={order.id}
                         type="button"
                         onClick={() => {
                           setTranslationPreview(null);

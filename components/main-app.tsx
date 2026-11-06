@@ -1,5 +1,6 @@
 "use client";
 
+import {isAndroidApp} from "@/lib/android-runtime";
 import { ensureBuiltinAppleFont } from "@/lib/builtin-apple-font";
 import { useEffect, useState } from "react";
 
@@ -11,6 +12,7 @@ import { OfflinePushRevampAnnouncement } from "./offline-push-revamp-announcemen
 import { PhoneLockScreen } from "./phone-lock-screen";
 import { MusicProvider } from "@/lib/music-context";
 import { startContactRecommendationScheduler } from "@/lib/contact-recommendation";
+import { acknowledgeResourceStartup } from "@/lib/resource-updates";
 import { hydrateKvDb, isKvHydrated } from "@/lib/kv-db";
 import { getThemeAssetMap, readThemeProfile } from "@/lib/theme-storage";
 import { resolveActiveIconSkins, type ThemeProfile } from "@/lib/theme-types";
@@ -220,6 +222,7 @@ async function prepareDesktopThemeForFirstPaint(): Promise<PreparedDesktopTheme>
 export function MainApp() {
   const [preparedDesktopTheme, setPreparedDesktopTheme] = useState<PreparedDesktopTheme | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { if (!hydrated) return; const frame = requestAnimationFrame(() => { void acknowledgeResourceStartup(); }); return () => cancelAnimationFrame(frame); }, [hydrated]);
   const [splashDismissed, setSplashDismissed] = useState(false);
   const [kvHydrateFailed, setKvHydrateFailed] = useState(false);
   const [initAttempt, setInitAttempt] = useState(0);
@@ -268,7 +271,7 @@ export function MainApp() {
     };
 
     function tryFullscreen() {
-      if (!shouldRequestPwaFullscreen()) return;
+      if (isAndroidApp() || !shouldRequestPwaFullscreen()) return;
       const doc = document.documentElement;
       if (document.fullscreenElement) return;
       doc.requestFullscreen?.().catch(() => { });

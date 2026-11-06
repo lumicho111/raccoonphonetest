@@ -1,4 +1,11 @@
 "use client";
+import {preparePhoneOpening,discardPhoneOpening} from '@/lib/phone-opening';
+import {BrowserApp} from "@/components/browser/browser-app";
+import {PhoneInspectionManager} from "@/components/chat/phone-inspection-manager";
+import {ReversePhoneOverlay,ReversePhoneStatus,useReverseVisit} from "./chat/reverse-phone-overlay";
+import {setReversePageIntent} from "@/lib/reverse-phone-state";
+import {REVERSE_NAV} from "@/lib/reverse-phone-runtime";
+import {useAppBack} from "@/lib/back-navigation";
 import { PhoneLockScreen } from "./phone-lock-screen";
 import { OffstageApp } from "./offstage-app";
 import { isRingtoneSource } from "@/lib/ringtone-source";
@@ -16,6 +23,7 @@ import { PhoneThemeApp } from "@/components/phone-theme-app";
 import { PhoneCharacterApp } from "@/components/phone-character-app";
 import { PhotosApp } from "@/components/photos/photos-app";
 import { WeverseApp } from "@/components/weverse/weverse-app";
+import {LiveBackgroundWindows} from "./live-background-windows";
 import { YoutubeBackground, useYoutubeBackground } from "@/components/ytb/ytb-background";
 import { YtbApp } from "@/components/ytb/ytb-app";
 import { LysnApp } from "@/components/lysn/lysn-app";
@@ -971,6 +979,7 @@ function useAndroidCaretKeyboardLift() {
         return;
       }
 
+      if(element.closest('.city-editor')){applyLift(0);return;}
       const keyboardTop = viewport.offsetTop + viewport.height;
       const keyboardInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
       const targetRect = getKeyboardTargetRect(element);
@@ -1059,6 +1068,7 @@ const MusicShellOverlays = memo(function MusicShellOverlays({
 });
 
 export function DesktopShell({ initialThemeProfile, initialThemeAssets }: DesktopShellProps) {
+  useEffect(()=>{const e=new Event("rabbit-inspection-runtime-start");window.dispatchEvent(e);},[]);
   useEffect(() => {
     const openTogether = () => {
       setActiveApp("music");
@@ -1086,8 +1096,23 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   const [desktopReady, setDesktopReady] = useState(false);
   const [glassPaintPass, setGlassPaintPass] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const reverseVisitState=useReverseVisit();
   const [activeApp, setActiveApp] = useState<DesktopIconId | null>(null);
+  useEffect(()=>{let cancelled=false,navRevision=0;const timers:ReturnType<typeof setTimeout>[]=[];const fn=(event:Event)=>{const d=(event as CustomEvent).detail||{};if(d.scroll){const root=document.querySelector('[data-active-app]');const targets=Array.from(root?.querySelectorAll<HTMLElement>('*')||[]).filter(e=>e.getClientRects().length&&e.scrollHeight>e.clientHeight+30&&['auto','scroll'].includes(getComputedStyle(e).overflowY));const target=targets.sort((a,b)=>b.clientHeight-a.clientHeight)[0];target?.scrollBy({top:d.scroll*target.clientHeight*.65,behavior:'smooth'});return;}
+    if(!d.app)return;const revision=++navRevision;const app=d.app as DesktopIconId;const keys=Object.keys(layoutRef.current);let folderId:string|undefined;let pageIndex=keys.findIndex(key=>(layoutRef.current[key as keyof DesktopLayout]||[]).some(tile=>tile.id===app));
+    if(pageIndex<0){folderId=Object.keys(foldersRef.current).find(id=>foldersRef.current[id].icons.includes(app));if(folderId)pageIndex=keys.findIndex(key=>(layoutRef.current[key as keyof DesktopLayout]||[]).some(tile=>tile.id===folderId));}
+    if(app==='chat')setChatInitSessionId(d.view==='thread'&&typeof d.sessionId==='string'?d.sessionId:null);
+    const currentApp=shellRef.current?.dataset.activeApp;if(currentApp===app){setReversePageIntent(d);return;}
+    setActiveApp(null);setOpenFolderId(null);if(pageIndex>=0)setCurrentPageIndex(pageIndex);
+    if(folderId)timers.push(setTimeout(()=>{if(!cancelled&&revision===navRevision)setOpenFolderId(folderId!);},160));
+    timers.push(setTimeout(()=>{if(cancelled||revision!==navRevision)return;setOpenFolderId(null);setReversePageIntent(d);setActiveApp(app);timers.push(setTimeout(()=>{if(revision===navRevision)setReversePageIntent(null);},1500));},folderId?420:220));
+  };window.addEventListener(REVERSE_NAV,fn);return()=>{cancelled=true;timers.forEach(clearTimeout);window.removeEventListener(REVERSE_NAV,fn);};},[]);
+
+  useAppBack(()=>{if(openFolderId)setOpenFolderId(null);else setActiveApp(null);},()=>!!activeApp||!!openFolderId,1);
   const youtubeBackground = useYoutubeBackground();
+  const [chatVisited,setChatVisited]=useState(false),[wvsVisited,setWvsVisited]=useState(false),[ytbVisited,setYtbVisited]=useState(false);
+  useEffect(()=>{if(activeApp==='chat')setChatVisited(true);if(activeApp==='weverse')setWvsVisited(true);if(activeApp==='ytb')setYtbVisited(true);window.dispatchEvent(new CustomEvent('rabbit-app-visibility',{detail:activeApp}));},[activeApp]);
+
   useEffect(() => {
     const timer = window.setInterval(() => { void maybeGenerateLysnBackgroundMessage(); void maybeGenerateSmsBackgroundMessage(); }, 60_000);
     return () => window.clearInterval(timer);
@@ -1162,6 +1187,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     } else stopRingtone = startChatSoundLoop("incomingCall", findChatSessionById(incomingCall.sessionId));
     const stopVibration = startIncomingCallVibration();
     const missedTimer = window.setTimeout(() => {
+      discardPhoneOpening(incomingCall.sessionId);
       if (!incomingCall.sessionId.startsWith("diy-")) {
         const session = findChatSessionById(incomingCall.sessionId);
         if (session && !session.isGroup) {
@@ -1237,11 +1263,13 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       if (!message || !thread || activeSmsThreadRef.current === thread.id) return;
       const character = loadCharacters().find(item => item.id === thread.characterId);
       enqueueIslandNotice({ sessionId: `sms:${thread.id}`, title: smsContactDisplayName(thread.characterId, character?.name || thread.characterNumber || "短信"), body: message.original, avatar: character?.avatar || null });
+      sendBrowserNotification(smsContactDisplayName(thread.characterId, character?.name || "短信"), {body:message.original.slice(0,90),url:`/#sms=${encodeURIComponent(thread.id)}`,independent:true});
       const url = loadSms().ringtoneUrl?.trim();
       if (url && isRingtoneSource(url)) { const audio = new Audio(url); void audio.play().catch(() => undefined); }
     };
     const onMissed = (event: Event) => {
       const detail = (event as CustomEvent<{name: string; avatar: string | null}>).detail;
+      sendBrowserNotification(detail?.name || "电话",{body:"未接来电",url:"/#phone",independent:true});
       enqueueIslandNotice({ sessionId: "phone:missed", title: detail?.name || "未接来电", body: "未接来电", avatar: detail?.avatar || null });
     };
     refreshSms(); refreshPhone();
@@ -1273,6 +1301,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       const character = loadCharacters().find(item => item.id === characterId);
       if (!character || !loadSms().realNumber.trim()) return;
       const session = createOrGetSession(characterId);
+      preparePhoneOpening(session.id,characterId);
       setIncomingCall(current => current || {
         sessionId: session.id, type: "voice", charName: smsContactDisplayName(character.id, character.name),
         charAvatar: character.avatar || null, source: "sms",
@@ -2035,6 +2064,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
           content: `[我向${userName}发起了${callLabel}]`,
         });
       }
+      if(detail.type === "phone" && !isGroup)preparePhoneOpening(detail.sessionId,session.contactId);
       setIncomingCall({
         sessionId: detail.sessionId,
         type: detail.type,
@@ -2044,6 +2074,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       });
       sendBrowserNotification("来电", {
         body: `${charName} ${isGroup ? "群" : ""}${callLabel}`,
+        independent: detail.type === "phone", url: detail.type==="phone"?"/#phone":undefined,
         icon: char?.avatar || undefined,
       });
     };
@@ -2596,6 +2627,8 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     }
   }, [dismissIslandNotice]);
 
+  useEffect(()=>{const fn=(e:Event)=>{const id=(e as CustomEvent<{sessionId:string}>).detail?.sessionId;if(!id)return;setActiveApp("chat");setChatInitSessionId(id);window.setTimeout(()=>window.dispatchEvent(new CustomEvent(CHAT_OPEN_SESSION_EVENT,{detail:{sessionId:id}})),30);};window.addEventListener("rabbit-restore-call",fn);return()=>window.removeEventListener("rabbit-restore-call",fn);},[]);
+  useEffect(()=>{const fn=(e:Event)=>{const url=(e as CustomEvent<string>).detail;if(url.startsWith('/#sms=')){setSmsOpenThreadId(decodeURIComponent(url.slice(7)));setActiveApp('sms');}else if(url.startsWith('/#phone'))setActiveApp('phone');else setActiveApp('chat');};window.addEventListener('rabbit-notification-open',fn);return()=>window.removeEventListener('rabbit-notification-open',fn);},[]);
   const handleNoticeClick = useCallback(() => {
     if (noticeDragRef.current.far) { noticeDragRef.current.far = false; return; }
     if (chatMessageNotice?.sessionId.startsWith("lysn:")) {
@@ -4070,19 +4103,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       );
     }
 
-    if (activeApp === "chat") {
-      return (
-        <PhoneChatApp
-          onClose={() => {
-            setActiveApp(null);
-            setActiveChatSession(null);
-            setChatInitSessionId(null);
-          }}
-          initialSessionId={chatInitSessionId}
-          onSessionChange={setActiveChatSession}
-        />
-      );
-    }
+    if (activeApp === "chat") return null;
 
     if (activeApp === "theme") {
       return (
@@ -4106,11 +4127,9 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       return <PhotosApp onClose={() => setActiveApp(null)} onNotice={setNotice} />;
     }
 
-    if (activeApp === "weverse") {
-      return <WeverseApp onClose={() => setActiveApp(null)} onNotice={setNotice} />;
-    }
+    if (activeApp === "weverse") return null;
     if (activeApp === "ytb") {
-      return <YtbApp onClose={() => setActiveApp(null)} onNotice={setNotice} />;
+      return null;
     }
     if (activeApp === "lysn") {
       return <LysnApp onClose={() => setActiveApp(null)} onNotice={setNotice} />;
@@ -4193,6 +4212,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       return <StoryApp onClose={() => setActiveApp(null)} />;
     }
 
+    if (activeApp === "browser") return <BrowserApp onClose={()=>setActiveApp(null)}/>;
     if (activeApp === "reading") {
       return <ReadingApp onClose={() => setActiveApp(null)} />;
     }
@@ -4257,7 +4277,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       >
         {/* User's global custom CSS is injected via useEffect into document.head */}
         <div className="phone-case">
-          <div className="phone-frame">
+          <div className="phone-frame"><PhoneInspectionManager/><ReversePhoneOverlay islandEnabled={!draftTheme.hideTopBar&&draftTheme.cssOverrides["--status-island-visibility"]!=="hidden"}/>
             <div
               ref={shellRef}
               className={activeApp ? "phone-shell app-open-shell" : "phone-shell"}
@@ -4284,7 +4304,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
 
               <header className="phone-status-bar">
                 <StatusClock />
-                {incomingCall || activePhoneCall || activeChatCall || chatMessageNotice ? <button
+                {reverseVisitState && !draftTheme.hideTopBar && draftTheme.cssOverrides["--status-island-visibility"]!=="hidden" ? <ReversePhoneStatus/> : incomingCall || activePhoneCall || activeChatCall || chatMessageNotice ? <button
                   type="button"
                   className="status-island status-island-active"
                   aria-label={incomingCall ? `来电：${incomingCall.charName}` : activePhoneCall || activeChatCall ? "返回通话" : `新消息：${chatMessageNotice?.title}`}
@@ -4317,11 +4337,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
                     <path d="M131.9,27.8c5.4,0.1,9.8,2,13.6,5.5c1.1,1,1.2,2,0.1,3c-0.9,0.9-1.9,1.8-2.7,2.8c-1.1,1.4-2.1,1.3-3.4,0.2c-3.6-3-7.7-3.7-12.1-1.9c-1.3,0.5-2.4,1.3-3.4,2.2c-0.9,0.8-1.8,0.9-2.6-0.1c-1.1-1.1-2.1-2.2-3.2-3.3c-0.9-1-0.8-1.8,0.1-2.8C122.2,29.8,126.8,27.9,131.9,27.8z" />
                     <path d="M132,41.6c1.8,0,3.5,0.5,5,1.6c0.9,0.6,1.1,1.3,0.2,2.2c-1.5,1.5-2.9,2.9-4.4,4.4c-0.7,0.7-1.2,0.6-1.8,0c-1.5-1.6-2.9-3.1-4.4-4.6c-0.7-0.8-0.5-1.3,0.2-1.9C128.4,42.1,130.1,41.5,132,41.6z" />
                   </svg>
-                  <svg viewBox="0 0 26 12" className="status-battery" fill="currentColor">
-                    <rect x="0.5" y="0.5" width="22" height="11" rx="2.6" fill="none" stroke="currentColor" strokeOpacity="0.42" strokeWidth="1" />
-                    <rect x="22.7" y="4" width="1.8" height="4" rx="0.7" opacity="0.42" />
-                    <rect x="2" y="2" width="14" height="8" rx="1.5" />
-                  </svg>
+                  <svg viewBox="0 0 26 12" className="status-battery" fill="currentColor"><rect x="0.5" y="0.5" width="22" height="11" rx="2.6" fill="none" stroke="currentColor" strokeOpacity="0.42" strokeWidth="1"/><rect x="22.7" y="4" width="1.8" height="4" rx="0.7" opacity="0.42"/><rect x="2" y="2" width="14" height="8" rx="1.5"/></svg>
                 </div>
               </header>
 
@@ -4453,7 +4469,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
               ) : null}
 
               {/* Incoming call bar — global overlay */}
-              {incomingCall && islandExpanded && (
+              {incomingCall && (islandExpanded || draftTheme.hideTopBar || draftTheme.cssOverrides["--status-island-visibility"]==="hidden") && (
                 <div className="incoming-call-bar">
                   <div className="incoming-call-bar-info">
                     {incomingCall.charAvatar ? (
@@ -4475,6 +4491,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
                       className="incoming-call-bar-btn incoming-call-bar-decline"
                       onClick={() => {
                         const call = incomingCall;
+                        discardPhoneOpening(call.sessionId);
                         const callLabel = call.type === "voice" ? "语音通话" : call.type === "video" ? "视频通话" : "电话";
                         playChatSoundOnce("hangup", findChatSessionById(call.sessionId)); // 拒接也是结束通话：播挂断音
                         if (call.type === "phone" || call.source === "sms") {
@@ -4544,7 +4561,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
                 </div>
               )}
 
-              {chatMessageNotice && !incomingCall && islandExpanded ? (
+              {chatMessageNotice && !incomingCall && (islandExpanded || draftTheme.hideTopBar || draftTheme.cssOverrides["--status-island-visibility"]==="hidden") ? (
                 <button
                   type="button"
                   className="chat-message-notice-bar"
@@ -4581,6 +4598,8 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
               {/* Music custom CSS — injected at shell level so it persists across apps */}
               {musicCustomCss && <style dangerouslySetInnerHTML={{ __html: musicCustomCss }} />}
 
+              {(draftTheme.hideTopBar||draftTheme.cssOverrides["--status-island-visibility"]==="hidden")&&(activePhoneCall||activeChatCall)&&<button className="floating-call-status" onClick={()=>{if(activePhoneCall)setActiveApp('phone');else if(activeChatCall)openChatSessionFromNotice(activeChatCall.sessionId);}}>☎ {activePhoneCall?"电话通话中":"Chat 通话中"} · 点击返回</button>}
+              <LiveBackgroundWindows youtube={youtubeBackground} showYoutube={draftTheme.hideTopBar||draftTheme.cssOverrides["--status-island-visibility"]==="hidden"} activeApp={activeApp} onOpen={(app,id)=>{setActiveApp(app);window.setTimeout(()=>window.dispatchEvent(new CustomEvent(app==='ytb'?'youtube-open-stream':'wvs-open-live',{detail:id})),60);}}/>
               {/* Music overlays are isolated so playback progress does not rerender the desktop shell. */}
               <MusicShellOverlays
                 activeApp={activeApp}
@@ -4847,7 +4866,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
                   </>
                 ) : (
                   <>
-                    <section className="phone-app-pane" style={activeApp === "dwelling" || activeApp === "xiaohongshu" || activeApp === "shopping" || activeApp === "theqoo" || activeApp === toCustomAppIconId("theqoo.float.forum") ? { display: "none" } : undefined}>
+                    <section className="phone-app-pane" style={activeApp === "chat" || activeApp === "weverse" || activeApp === "ytb" || activeApp === "dwelling" || activeApp === "xiaohongshu" || activeApp === "shopping" || activeApp === "theqoo" || activeApp === toCustomAppIconId("theqoo.float.forum") ? { display: "none" } : undefined}>
                       {renderAppBody()}
                     </section>
                     {/* DwellingApp stays mounted while generating — auto-unmounts when idle */}
@@ -4862,6 +4881,9 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
                     )}
                   </>
                 )}
+                {(chatVisited||activeApp==="chat")&&<section className="phone-app-pane" style={activeApp!=="chat"?{display:"none"}:undefined}><PhoneChatApp onClose={()=>{setActiveApp(null);setActiveChatSession(null);setChatInitSessionId(null);}} initialSessionId={chatInitSessionId} onSessionChange={setActiveChatSession}/></section>}
+                {(ytbVisited||activeApp==="ytb")&&<section className="phone-app-pane" style={activeApp!=="ytb"?{display:"none"}:undefined}><YtbApp visible={activeApp==="ytb"} onClose={()=>setActiveApp(null)} onNotice={setNotice}/></section>}
+                {(wvsVisited||activeApp==="weverse")&&<section className="phone-app-pane" style={activeApp!=="weverse"?{display:"none"}:undefined}><WeverseApp visible={activeApp==="weverse"} onClose={()=>setActiveApp(null)} onNotice={setNotice}/></section>}
                 {xiaohongshuMounted && (
                   <section className="phone-app-pane" style={activeApp !== "xiaohongshu" ? { display: "none" } : undefined}>
                     <XiaohongshuApp

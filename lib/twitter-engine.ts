@@ -78,8 +78,8 @@ export async function generateTwitterText(input: {
   });
   const operationRule = input.kind !== "dm" ? `本账号运营与发言方式：${input.accountProfile?.operationStyle?.trim().slice(0,1600) || "本人运营，按角色性格正常分享与交流"}。公开发帖和互动依照该方式，主账号也可以是普通网友。` : "";
   const publicRule = `X 的帖子和回复是公开的。你可以有私下记忆，但不得随意公开地下关系、私人聊天内容或未公开身份。用户主账号在 X 上的昵称是“${input.state.profile.name}”，网友对用户的称呼是“${twitterPublicAddress(input.state)}”；公开发言和生成的路人评论不得仅凭私下人设或记忆知道其本名就公开使用。`;
-  const linkedSources = anonymous ? "" : roleSocialContext(character.id, input.state.socialSourcesByCharacter[character.id]);
-  const sourceRule = linkedSources ? `本人可参考关联来源：${linkedSources}。日历不是公开信息；发公开帖子或回复时只可提已公开的活动，不得泄漏私人安排。` : "";
+  const linkedSources = anonymous ? "" : roleSocialContext(character.id, input.state.socialSourcesByCharacter[character.id], "self");
+  const sourceRule = linkedSources ? `本人可参考关联来源：${linkedSources}。日历不是公开信息；你知道自己的私人安排，可按性格选择是否分享、分享多少；不必说明正在做什么，不公开他人的秘密、地址或未公开项目。未说出口的事外界不知道。` : "";
   const stateRule = input.state.worldRules.trim() ? `补充世界观：${input.state.worldRules.slice(0, 2500)}` : "";
   const selfAccount = input.accountKind === "alternate" ? `${character.id}:alt` : character.id;
   const identityRules = publicIdentityBoundary + "\n" + Object.entries(input.state.accounts).filter(([id])=>id.endsWith(":alt")).map(([id,p])=>`${p.name}：${twitterRecognizes(input.state,id,selfAccount)?`你私下知道真实主人是${id.startsWith("user")?resolveUserIdentity()?.name:loadCharacters().find(c=>c.id===id.replace(/:alt$/,""))?.name||"已关联角色"}，但公开不得越界`:"你不认识真实主人，只认网名"}`).join("\n");
@@ -93,7 +93,7 @@ export async function generateTwitterText(input: {
       : "";
     const accountRule = input.accountKind === "alternate" ? `你以副账号“${input.accountProfile?.name || "副账号"}”发帖；对外身份是“${input.accountProfile?.identity || "未设定"}”。${twitterClueGuidance(input.state, altId)}${priorClueDiscussion ? `此前网友公开讨论过：“${priorClueDiscussion}”。只依据之后实际公开的新线索变化，不要突然升级为实锤。` : ""}发帖时尊重本账号设定，不得仅凭幕后身份主动泄漏私密记忆。` : "";
     const communityRule = input.communityName ? `这条发在“${input.communityName.slice(0, 60)}”社区，内容要贴合社区主题，不能因关联角色而公开其未公开的小号。` : "";
-    instruction = `${publicRule}\n${stateRule}\n${sourceRule}\n${accountRule}\n${communityRule}\n近期公开帖子：\n${recent || "暂无"}\n根据本人设定、记忆与时间，自然发布一条适合当前情境的新帖子，可以回应近期公开话题，但不要机械模仿。可偶尔发照片；只有这次确实想配图时才填写 photoDescription，描述照片的主体、人物或场景，便于从该账号可用相册匹配；不发图时留空。${shared}\nJSON 格式：{"mediaReason":"真实视觉分享动机，无图留空","original":"帖子原文","translated":"中文译文","photoDescription":"配图描述，若不发图则留空"${input.withComments ? ',"comments":[{"name":"路人昵称","handle":"路人账号","original":"短评论原文","translated":"中文译文"}]' : ""}}。${input.withComments ? "同时给 5 至 10 条自然的路人评论；路人只能依据公开内容，若有副账号线索，按上面的线索规则决定是否出现少量未经证实的猜测，不能因后台归属直接宣布身份。" : ""}`;
+    instruction = `${publicRule}\n${stateRule}\n${sourceRule}\n${accountRule}\n${communityRule}\n近期公开帖子：\n${recent || "暂无"}\n根据本人设定、记忆与时间，自然发布一条适合当前情境的新帖子，可以回应近期公开话题，但不要机械模仿。可偶尔发照片；只有这次确实想配图时才填写 photoDescription，描述照片的主体、人物或场景，便于从该账号可用相册匹配；不发图时留空。${shared}\nJSON 格式：{"mediaReason":"真实视觉分享动机，无图留空","original":"帖子原文","translated":"中文译文","photoDescription":"配图描述，若不发图则留空"${false ? ',"comments":[{"name":"路人昵称","handle":"路人账号","original":"短评论原文","translated":"中文译文"}]' : ""}}。${false ? "同时给 5 至 10 条自然的路人评论；路人只能依据公开内容，若有副账号线索，按上面的线索规则决定是否出现少量未经证实的猜测，不能因后台归属直接宣布身份。" : ""}`;
   } else if (input.kind === "reply") {
     if (!input.targetPost) throw new Error("找不到要回复的帖子。");
     instruction = `${publicRule}\n${stateRule}\n${sourceRule}\n你正在回复一条 X 帖子，内容：“${input.targetPost.original.slice(0, 900)}”。直接回应具体内容，自然简短，不要离题。${shared}\nJSON 格式：{"original":"回复原文","translated":"中文译文"}`;
@@ -132,11 +132,5 @@ export async function generateTwitterText(input: {
   }
   if (!lines.length) throw new Error("这次没有生成有效内容，请重试。");
   const result = (input.kind === "dm" ? lines : lines.slice(0, 1)) as TwitterGeneratedLine[] & { comments?: TwitterCommentDraft[] };
-  if (input.kind === "post" && input.withComments) {
-    try {
-      const object = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { comments?: TwitterCommentDraft[] };
-      result.comments = Array.isArray(object.comments) ? object.comments.filter(c => typeof c?.original === "string" && !!c.original.trim()).slice(0, 10) : [];
-    } catch { result.comments = []; }
-  }
   return result;
 }

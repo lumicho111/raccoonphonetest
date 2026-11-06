@@ -1,3 +1,5 @@
+import {projectReconciliations} from './phone-reconcile';
+import {projectPlayChats} from "./checkphone-play";
 import { withdrawYtbIncome } from "./ytb-runtime";
 import {ytbCheckPhonePrompt,parseLiveFeelings} from "./ytb-checkphone-bridge";
 import { sharedCommunicationsPrompt, sharedCommunicationRows, isUserCommunicationName } from "./checkphone-communications";
@@ -8322,5 +8324,14 @@ export async function generateCheckPhoneAppBatch(
 }
 
 export function projectCheckPhoneChat(characterId: string, cached: CheckPhoneChatPayload): CheckPhoneChatPayload {
-  return mergeChatPayload(buildRealCheckPhoneChatPayload(characterId), cached, characterId);
+  return projectReconciliations(characterId, projectPlayChats(characterId, mergeChatPayload(buildRealCheckPhoneChatPayload(characterId), cached, characterId)));
+}
+
+/** Interactive phone replies read the recipient character's full prompt context. */
+export async function requestPhonePlay(characterId: string, instruction: string, signal?: AbortSignal): Promise<string> {
+ const {apiConfig,preset,worldBooks,regexes}=resolveCheckPhoneConfigs(characterId);
+ if(!apiConfig)throw new Error("未找到可用的 API 配置");
+ const messages=await buildCheckPhoneAppMessages(characterId,"chat",preset,worldBooks,regexes);
+ messages.push({role:"system",content:"本轮为交互式手机操作。忽略此前快照格式，本轮严格按最后指令输出。"},{role:"user",content:instruction});
+ return sendLLMRequest(apiConfig,preset,messages,regexes,{characterName:loadCharacters().find(c=>c.id===characterId)?.name},{skipOutputRegex:true,appId:"checkphone_play",signal});
 }

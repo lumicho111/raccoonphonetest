@@ -280,7 +280,7 @@ export const CONTENT_APP_IDS: ContentAppId[] = [
 
 export const CONTENT_APP_LABELS: Record<ContentAppId, string> = {
     chat: "聊天",
-    diary: "手记",
+    diary: "iCity",
     music: "音乐",
     reading: "阅读",
     cocreate: "共创",

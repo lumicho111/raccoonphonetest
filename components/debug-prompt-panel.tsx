@@ -40,8 +40,6 @@ import { previewReadingAnnotationPrompt, previewReadingDiscussPrompt } from "@/l
 import { previewDwellingPromptPayload, type DwellingRefreshMode } from "@/lib/dwelling-engine";
 import { loadDiaryEntries } from "@/lib/diary-entry-storage";
 import { previewDiaryEntryPromptPayload } from "@/lib/diary-entry-engine";
-import { fetchNoteWall, fetchNoteWallComments } from "@/lib/notewall-client";
-import { previewNoteWallPromptPayload, type NoteWallReplyCandidate } from "@/lib/notewall-engine";
 import { loadXiaohongshuState } from "@/lib/xiaohongshu-storage";
 import { previewXiaohongshuPromptPayload } from "@/lib/xiaohongshu-engine";
 import { loadCoCreateSession } from "@/lib/cocreate-storage";
@@ -165,7 +163,6 @@ export function DebugPromptPanel() {
     const [readingStorageVersion, setReadingStorageVersion] = useState(0);
     const [readingMode, setReadingMode] = useState<"annotate" | "discuss">("annotate");
     const [dwellingMode, setDwellingMode] = useState<DwellingRefreshMode | "explore">("full");
-    const [noteWallMode, setNoteWallMode] = useState<"note" | "reply">("note");
     const [xiaohongshuMode, setXiaohongshuMode] = useState<"activity" | "reaction" | "comment" | "mention">("activity");
     const [coCreateMode, setCoCreateMode] = useState<CoCreateMode>("write");
     const [shoppingMode, setShoppingMode] = useState<"catalog" | "search">("catalog");
@@ -549,15 +546,6 @@ export function DebugPromptPanel() {
             } else if (extraAppId === "diary") {
                 const entries = loadDiaryEntries().filter(entry => entry.characterId === extraCharacterId);
                 result = await previewDiaryEntryPromptPayload(extraCharacterId, entries);
-            } else if (extraAppId === "notewall") {
-                const wall = await fetchNoteWall().catch(() => ({ notes: [] }));
-                const candidates: NoteWallReplyCandidate[] = noteWallMode === "reply"
-                    ? await Promise.all(wall.notes.slice(0, 5).map(async note => ({
-                        note,
-                        comments: await fetchNoteWallComments(note.id).catch(() => []),
-                    })))
-                    : [];
-                result = await previewNoteWallPromptPayload(extraCharacterId, noteWallMode, wall.notes, candidates);
             } else if (extraAppId === "xiaohongshu") {
                 const state = loadXiaohongshuState();
                 result = await previewXiaohongshuPromptPayload(extraCharacterId, xiaohongshuMode, state.notes, state.settings);
@@ -939,9 +927,6 @@ export function DebugPromptPanel() {
         if (extraAppId === "dwelling" && dwellingMode === "explore") {
             return "实际上下文以栖所当前点击的房间、家具和物品注入，此处仅用首个物品模拟";
         }
-        if (extraAppId === "notewall" && noteWallMode === "reply") {
-            return "实际上下文以便签墙真实触发的便签和评论注入，此处仅取候选便签模拟";
-        }
         if (extraAppId === "xiaohongshu") {
             return "实际上下文以小红书当前触发的笔记、评论或@注入，此处仅取现有数据模拟";
         }
@@ -996,12 +981,6 @@ export function DebugPromptPanel() {
                     <option value="full">完整栖所</option>
                     <option value="items">刷新物品</option>
                     <option value="explore">探索物品</option>
-                </select>
-            )}
-            {extraAppId === "notewall" && (
-                <select value={noteWallMode} onChange={e => setNoteWallMode(e.target.value as "note" | "reply")} className="pv-select">
-                    <option value="note">生成便签</option>
-                    <option value="reply">回复便签</option>
                 </select>
             )}
             {extraAppId === "xiaohongshu" && (

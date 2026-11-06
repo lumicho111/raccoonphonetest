@@ -6027,3 +6027,12 @@
 .chat-sound-editor-row .ui-input { flex:1 1 0; min-width:0; max-width:100%; box-sizing:border-box; }
 .chat-sound-file-btn { max-width:100%; }
 .chat-sound-subtoggle .menu-label-group { min-width:0; }
+
+.icity-share-backdrop{position:fixed;inset:0;z-index:12000;background:#0006;display:grid;place-items:center;padding:24px;font:inherit}.icity-share-dialog{width:100%;max-width:420px;max-height:75vh;overflow:auto;background:var(--c-card,#fff);color:var(--c-text,#333);padding:20px;border-radius:14px;box-shadow:0 12px 40px #0002}.icity-share-dialog header{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:var(--c-text-secondary,#888)}.icity-share-dialog header button{font:inherit;font-size:22px;border:0;background:none;color:inherit;padding:4px 8px;-webkit-tap-highlight-color:transparent}.icity-share-dialog h3{font-size:15px;margin:18px 0 12px}.icity-share-dialog p{font-size:14px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}.icity-share-dialog img{max-width:100%;height:auto;border-radius:6px;margin:8px 0}
+
+/* A sheet placed in a centered modal must not retain drawer-only corners. */
+.modal-overlay:not(.modal-overlay-bottom) > .modal-sheet {
+ border-radius:20px;overflow:hidden;min-height:0;
+}
+.modal-overlay:not(.modal-overlay-bottom) > .modal-sheet > .modal-body {min-height:0;overflow-y:auto}
+.modal-overlay:not(.modal-overlay-bottom) > .modal-sheet {animation:modalFadeIn .18s ease-out}

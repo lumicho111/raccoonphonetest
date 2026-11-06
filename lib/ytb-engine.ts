@@ -1,3 +1,4 @@
+// Public audiences must receive only published dialogue/visible scenes; never host-private calendar or memories.
 import { loadApiConfigs, loadBindingConfig, loadPresets, loadWorldBooks, loadRegexes, resolveBinding, resolveUserIdentity } from "./settings-storage";
 import { sendLLMRequest } from "./chat-engine";
 import { assemblePromptPayload } from "./llm-prompt-assembler";
@@ -58,7 +59,7 @@ export async function generateYtb<T extends Record<string, unknown>>(channel: Yt
     "必须区分主播内部认知与观众可知信息。不披露=观众只按频道形象理解，本人仍参考完整人设；部分披露=只公开频道介绍明确允许的身份信息；完全披露=人设身份可公开，但私人记忆、未公开事件和秘密仍不属于观众知识。角色彼此认识不等于网友知道他们是谁。",
     "动作只用中文。台词遵循说话人的母语、沟通语言和频道设定，提供对应中文翻译；语音只读 original。翻译保留原语言语感。",
     "观众分布可以包含各个国家。不要依据语言单独推断国家。不要编造用户没说过的话或没做过的动作。",
-    options.publicOnly ? "本次只处理给定公开素材，不参考任何用户私人资料或角色记忆。" : channel ? ytbIdentityContext(state, channel) : "",
+    options.publicOnly ? "本次只处理给定公开素材，不参考任何用户私人资料或角色记忆。评论、社群、粉丝群应有不同动机和语气：提问、玩梗、具体感想、普通生活、不同意见或温和质疑，不统一夸奖期待，不机械凑类型。" : channel ? ytbIdentityContext(state, channel) : "",
     "匿名身份边界高于私人记忆里的熟悉感：即使现实认识，也不能凭系统角色ID、相似措辞、头像或后台绑定认出未披露的小号。知道对方身份也不能在公开弹幕中泄露。",
     "聊天室由不同观众组成：允许延迟讨论此前几段已经播出的内容、闲聊、表白、无意义刷屏、新观众问是谁、合理质疑和吐槽。不整齐回应最新一句，不全部正面，也不每轮硬塞恶评。同一话题避免近义重复刷满屏。",
     context, instruction,
@@ -85,11 +86,7 @@ export async function generateYtbRound(channel: YtbChannel, stream: YtbStream | 
     const witnessed = (stream?.lines || []).filter(l => l.at >= entered && l.at <= now).map(l => l.original).join("\n");
     const visibility = `该观众入场时间${entered}，只见过：${witnessed || "刚入场，没看过此前内容"}。不得回应入场前的话题。\n${ytbIdentityContext(state,c)}`;
     if (c.ownerType !== "character") return `${channelPublic(c)}\n${visibility}`;
-    const person = loadCharacters().find(char => char.id === c.ownerId);
-    const cfg = loadMemoryConfig();
-    const [long, core] = await Promise.all([retrieveMemoriesForPrompt(c.ownerId, contextLines || stream?.theme || c.style || "Youtube直播", cfg), retrieveCoreMemoriesForPrompt(c.ownerId, cfg)]);
-    const recent = prepareShortTermContext(c.ownerId, "ytb", { history: [] });
-    return `${channelPublic(c)}\n${visibility}\n以下只供该角色内部认知，不是粉丝知道的内容：${person?.persona || c.style}\n${formatLongTermMemories(long)}\n${formatCoreMemories(core)}\n${recent.recentBlocks.map(b => b.content).join("\n")}`;
+    return `${channelPublic(c)}\n${visibility}`;
   }))).join("\n");
   const data = await generateYtb(channel,
     `返回 {"title":"按主播语言拟定的标题","titleTranslated":"中文标题翻译，中文标题则留空","durationMinutes":30,"segments":[{"kind":"speech或action","speakerId":"频道ID","original":"原话或中文动作","translated":"中文翻译","replyTo":["实际回答的已有评论ID，不回答则空数组"]}],"comments":[{"name":"观众账号","original":"原话","translated":"中文翻译","tipAmount":0,"tipCurrency":"USD"}],"visitorModes":[{"channelId":"候选频道ID","mode":"watch或comment或call","accepted":false,"original":"可空的评论","translated":"中文翻译"}],"fanCall":{"name":"来电观众ID"},"shouldEnd":false}。
@@ -102,7 +99,9 @@ ${isUser ? "用户是主播，绝不能替用户生成主播话语或动作。se
     if (!allowedSpeakers.has(speakerId) || (isUser && speakerId === channel.id) || (r.kind === "action" && speakerId !== channel.id)) return [];
     return [{ id: ytbId(), speakerId, replyTo: Array.isArray(r.replyTo) ? r.replyTo.map(String).filter(id => (stream?.comments || []).some(c => c.id === id && c.at <= now)) : [], kind: r.kind === "action" ? "action" as const : "speech" as const, original: text(r.original), translated: text(r.translated || r.original), at: base + (index + 1) * 3300 }];
   }).filter(l => l.original);
-  const comments: YtbComment[] = rows(data.comments).slice(0, 15).map((r, index) => ({ id: ytbId(), name: text(r.name, 35) || "viewer", original: text(r.original, 600), translated: text(r.translated || r.original, 600), at: base + 1700 + index * 1700,
+  const audience=await generateYtb(channel,'只生成普通观众评论和候选观众的公开互动，不生成主播台词。你只能看到下方已经播出的内容；不能知道主播私人日历、心理、未披露活动。没有画面线索就不知道地点。返回 {"comments":[{"name":"网名","original":"评论","translated":"中文翻译"}],"visitorModes":[],"fanCall":null}。',`公开频道：${channelPublic(channel)}\n已经播出的内容：${contextLines}\n已展示评论：${contextComments}\n候选观众的公开资料：${visitors.map(channelPublic).join('\n')}`,{publicOnly:true}).catch(()=>({comments:[],visitorModes:[],fanCall:null}));
+  data.visitorModes=audience.visitorModes;data.fanCall=audience.fanCall;
+  const comments: YtbComment[] = rows(audience.comments).slice(0, 15).map((r, index) => ({ id: ytbId(), name: text(r.name, 35) || "viewer", original: text(r.original, 600), translated: text(r.translated || r.original, 600), at: base + 1700 + index * 1700,
     ...(Number(r.tipAmount) > 0 && WALLET_CURRENCIES.includes(text(r.tipCurrency)) ? { tip: { amount: Math.min(Number(r.tipAmount), 10000000), currency: text(r.tipCurrency) } } : {}),
   })).filter(c => c.original);
   const calls: YtbCall[] = [];

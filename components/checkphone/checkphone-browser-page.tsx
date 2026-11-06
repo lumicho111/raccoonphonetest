@@ -1,5 +1,6 @@
 "use client";
 
+import {BrowserApp} from "@/components/browser/browser-app";
 import { useEffect, useState } from "react";
 import { useCheckPhoneRefresh } from "@/lib/checkphone-refresh-tracker";
 import { ChevronLeft, RefreshCw, Search, Trash2, Clock, Bookmark, Globe } from "lucide-react";
@@ -20,7 +21,7 @@ type CheckPhoneBrowserPageProps = {
   onBack: () => void;
 };
 
-export function CheckPhoneBrowserPage({ character, onBack }: CheckPhoneBrowserPageProps) {
+function OrdinaryBrowserPage({ character, onBack }: CheckPhoneBrowserPageProps) {
   const [snapshot, setSnapshot] = useState<CheckPhoneSnapshot<CheckPhoneBrowserPayload> | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useCheckPhoneRefresh(character.id, "browser", setSnapshot);
@@ -334,3 +335,5 @@ export function CheckPhoneBrowserPage({ character, onBack }: CheckPhoneBrowserPa
     </div>
   );
 }
+
+export function CheckPhoneBrowserPage(props:CheckPhoneBrowserPageProps){return <BrowserApp owner={props.character.id} onClose={props.onBack} ordinary={<OrdinaryBrowserPage {...props}/>}/>;}

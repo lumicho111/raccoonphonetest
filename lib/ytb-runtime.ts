@@ -1,7 +1,7 @@
 import { loadCharacters } from "./character-storage";
 import { formatZonedPromptTimestamp, getSystemTimeZone } from "./character-time";
 import { loadOwnerCalendarPlans } from "./calendar-storage";
-import { loadWeverseState } from "./weverse-storage";
+
 import { exchangeWalletAmount, loadWalletState, recordWalletCredit, walletCurrency } from "./wallet-storage";
 import { loadYtbState, saveYtbState, type YtbChannel, type YtbEarning, type YtbState, type YtbStream } from "./ytb-storage";
 
@@ -19,14 +19,12 @@ export function ytbAvailability(channel: YtbChannel, now = Date.now()): { free: 
     const start = Date.parse(`${item.date}T${item.startTime}:00Z`);
     let end = Date.parse(`${item.date}T${item.endTime}:00Z`);
     if (end <= start) end += 86400000;
-    if (start <= localStamp && localStamp < end) return { free: false, reason: `当前有日程：${item.title}`, freeMinutes: 0, localTime };
+    if (start <= localStamp && localStamp < end) {
+      const exclusive = (item.busyLevel ?? 3) >= 4 || /驾驶|手术|考试|拍摄|录制|演出|会议/.test(item.title);
+      if (exclusive) return { free: false, reason: "当前活动不适合开播", freeMinutes: 0, localTime };
+      freeMinutes = Math.min(freeMinutes, Math.max(1, Math.floor((end-localStamp)/60000)));
+    }
     if (start > localStamp) freeMinutes = Math.min(freeMinutes, Math.floor((start - localStamp) / 60000));
-  }
-  for (const item of loadWeverseState().schedules || []) {
-    if (!item.calendarSync || !item.memberCharacterIds.includes(character.id)) continue;
-    const end = item.endsAt || item.startsAt + 3600000;
-    if (item.startsAt <= now && now < end) return { free: false, reason: `当前有 WVS 日程：${item.title}`, freeMinutes: 0, localTime };
-    if (item.startsAt > now) freeMinutes = Math.min(freeMinutes, Math.floor((item.startsAt - now) / 60000));
   }
   return { free: freeMinutes > 0, reason: "", freeMinutes, localTime };
 }

@@ -1,3 +1,4 @@
+import {dispatchAppBack} from "./back-navigation";
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -50,6 +51,6 @@ export function installAndroidRuntime(){
    const file=await Filesystem.getUri({path:name,directory:Directory.Cache});await Share.share({title:safe,files:[file.uri]});
   })().catch(error=>window.alert(`导出失败：${error instanceof Error?error.message:String(error)}`));
  },true);
- void App.addListener('backButton',({canGoBack})=>{const back=[...document.querySelectorAll<HTMLButtonElement>('button[aria-label="返回"],button[aria-label="Back"]')].reverse().find(b=>b.getClientRects().length&&!b.disabled);if(back)back.click();else if(canGoBack)history.back();else if(window.confirm('退出 float？本地数据会保留。'))void App.exitApp();});
+ void App.addListener('backButton',({canGoBack})=>{if(dispatchAppBack())return;const back=[...document.querySelectorAll<HTMLButtonElement>('button[aria-label="返回"],button[aria-label="Back"]')].reverse().find(b=>b.getClientRects().length&&!b.disabled);if(back)back.click();else if(canGoBack)history.back();else if(window.confirm('退出 float？本地数据会保留。'))void App.exitApp();});
  // No service worker in the APK: every launch must use its bundled version.
 }

@@ -23,7 +23,7 @@ import { loadMapProjectionEntries, loadMapSharedProjectionEntries } from "./map-
 import { loadGameProjectionEntries } from "./game-storage";
 import { loadDiaryEntries } from "./diary-entry-storage";
 import type { DiaryEntry, DiaryEntryBlock } from "./diary-entry-types";
-import { loadNoteWallProjectionEntries } from "./notewall-memory";
+
 import { loadXiaohongshuProjectionEntries } from "./xiaohongshu-memory";
 import { loadYtbProjectionEntries } from "./ytb-memory";
 import { loadWeverseProjectionEntries } from "./weverse-memory";
@@ -701,26 +701,6 @@ export function loadNativeTimeline(
         });
     }
 
-    // ── Note wall projections ──
-    const noteWallEntries = loadNoteWallProjectionEntries(characterId, {
-        afterTimestamp: options?.afterTimestamp,
-    });
-    for (const noteWallEntry of noteWallEntries) {
-        entries.push({
-            id: noteWallEntry.id,
-            sourceApp: "diary",
-            sourceDetail: "notewall",
-            authorType: "character",
-            timestamp: noteWallEntry.timestamp,
-            content: formatStoredPromptEventContent(noteWallEntry.content, {
-                label: "便签墙",
-                timestamp: noteWallEntry.timestamp,
-                timeAware,
-                timestampOptions,
-            }),
-        });
-    }
-
     // ── Xiaohongshu projections ──
     const xiaohongshuEntries = loadXiaohongshuProjectionEntries(characterId, {
         afterTimestamp: options?.afterTimestamp,
@@ -1146,10 +1126,6 @@ export function prepareShortTermContext(
         raw.push({ tag: "recent_diary", order: FEATURE_ORDER.diary_entry, entries: diaryEntries });
     }
 
-    const noteWallEntries = timeline.filter(e => e.sourceApp === "diary" && e.sourceDetail === "notewall");
-    if (noteWallEntries.length > 0) {
-        raw.push({ tag: "recent_notewall", order: FEATURE_ORDER.notewall, entries: noteWallEntries });
-    }
 
     const xiaohongshuEntries = timeline.filter(e => e.sourceApp === "xiaohongshu");
     if (xiaohongshuEntries.length > 0) {
@@ -1433,10 +1409,6 @@ export function prepareGroupShortTermContext(
         raw.push({ tag: "recent_diary", order: FEATURE_ORDER.diary_entry, entries: diaryEntries });
     }
 
-    const noteWallEntries = timeline.filter(e => e.sourceApp === "diary" && e.sourceDetail === "notewall");
-    if (noteWallEntries.length > 0) {
-        raw.push({ tag: "recent_notewall", order: FEATURE_ORDER.notewall, entries: noteWallEntries });
-    }
 
     const xiaohongshuEntries = timeline.filter(e => e.sourceApp === "xiaohongshu");
     if (xiaohongshuEntries.length > 0) {

@@ -62,3 +62,15 @@
 .settings-unified .user-identity-dialog{border-radius:22px;overflow:hidden;min-height:0}
 .settings-unified .user-identity-dialog > .modal-header{flex-shrink:0}
 .settings-unified .user-identity-dialog > .modal-body{min-height:0;overflow-y:auto}
+
+/* Sheets centered by Settings are complete cards, including the scrolling edge. */
+.settings-unified .modal-sheet {
+ border-radius:22px!important;
+ width:100%;max-width:440px;max-height:calc(100% - 24px);min-height:0;
+ background:var(--settings-card);color:var(--settings-ink);
+ overflow:hidden;box-sizing:border-box;
+ box-shadow:0 16px 55px #0002;
+}
+.settings-unified .modal-sheet > .modal-header {flex:none}
+.settings-unified .modal-sheet > .modal-body {min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.settings-unified .modal-sheet {animation:modalFadeIn .18s ease-out}

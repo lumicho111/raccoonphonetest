@@ -21,7 +21,7 @@ export function weverseLiveAvailability(characterId: string, at = Date.now(), cu
     // Hosting the advertised WVS special is the scheduled work itself.
     const ownSpecial=/(?:weverse|wvs|回归|新剧|首集|作品|新歌|发布|宣传|倒计时)/i.test(item.title)&&/(?:直播|陪看|\bLIVE\b)/i.test(item.title)&&!/(?:youtube|油管)/i.test(item.title);
     if(ownSpecial){scheduledTheme=item.title;continue;}
-    if((item.busyLevel??(item.source==="manual"?1:3))>=2)return {free:false,reason:"当前有其他安排，暂时无法开播"};
+    if((item.busyLevel??(item.source==="manual"?1:3))>=4 || /驾驶|手术|考试|拍摄|录制|演出|会议/.test(item.title))return {free:false,reason:"当前有其他安排，暂时无法开播"};
   }
   const wvs=loadWeverseState();
   if(wvs.lives.some(live=>live.id!==currentLiveId&&live.status==="live"&&live.activeCharacterIds.includes(characterId)))return {free:false,reason:"该成员已在另一场 LIVE 中"};

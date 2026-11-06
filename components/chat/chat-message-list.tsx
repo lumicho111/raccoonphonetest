@@ -1,9 +1,13 @@
 "use client";
+import {removedChatEntries,removeChatListEntry} from "@/lib/chat-list-entry";
+import {activeReverse} from "@/lib/reverse-phone-state";
+import {hiddenChats,toggleHiddenChat,reverseCanSeeChat,subscribeReverse} from "@/lib/reverse-phone-state";
+import {ChatSwipeRow} from "./chat-swipe-row";
 import { openChatAppearance } from "@/lib/chat-appearance";
 
-import React, { useState, useEffect, useSyncExternalStore } from "react";
+import React, { useState, useEffect, useSyncExternalStore,useRef } from "react";
 import { Search, MessageCirclePlus, UsersRound, Settings, ListPlus } from "lucide-react";
-import { CHAT_MESSAGE_PUSHED_EVENT, loadChatSessions, loadChatContacts, ChatSession, createOrGetSession, createGroupSession, pushChatMessage, getLastVisibleSessionMessage, getChatMessagePreview } from "@/lib/chat-storage";
+import { CHAT_MESSAGE_PUSHED_EVENT, loadChatSessions, loadChatContacts, ChatSession, createOrGetSession, createGroupSession, pushChatMessage, getLastVisibleSessionMessage, getChatMessagePreview,saveChatSessions } from "@/lib/chat-storage";
 import { loadCharacters } from "@/lib/character-storage";
 import { Character } from "@/lib/character-types";
 import { resolveUserIdentity } from "@/lib/settings-storage";
@@ -87,11 +91,15 @@ type ChatMessageListProps = {
 };
 
 export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, onSelectMascot }: ChatMessageListProps) {
+
+    const [,hiddenRefresh]=useState(0);useEffect(()=>subscribeReverse(()=>hiddenRefresh(n=>n+1)),[]);
+    const [swipeId,setSwipeId]=useState<string|null>(null);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [listFilter, setListFilter] = useState("");
     const [showChatSearch, setShowChatSearch] = useState(false);
     const chatSearchRef = React.useRef<HTMLInputElement>(null);
     const [listTab, setListTab] = useState<"all" | "private" | "group">("all");
+    useEffect(()=>setSwipeId(null),[listFilter,listTab]);
     const [showContactPicker, setShowContactPicker] = useState(false);
     const [showGroupCreate, setShowGroupCreate] = useState(false);
     // 重复会话合并弹窗：进列表时检测一次，用户按组勾选
@@ -128,12 +136,14 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
         window.addEventListener("weixin-messages-updated", refreshSessions);
         window.addEventListener("chat-messages-updated", refreshSessions);
         window.addEventListener(CHAT_MESSAGE_PUSHED_EVENT, refreshSessions);
+        window.addEventListener("chat-list-entries-updated",refreshSessions);
         window.addEventListener("characters-updated", refreshSessions);
         window.addEventListener(CHAT_CHARACTER_PROFILES_UPDATED_EVENT, refreshSessions);
         return () => {
             window.removeEventListener("weixin-messages-updated", refreshSessions);
             window.removeEventListener("chat-messages-updated", refreshSessions);
             window.removeEventListener(CHAT_MESSAGE_PUSHED_EVENT, refreshSessions);
+            window.removeEventListener("chat-list-entries-updated",refreshSessions);
             window.removeEventListener("characters-updated", refreshSessions);
             window.removeEventListener(CHAT_CHARACTER_PROFILES_UPDATED_EVENT, refreshSessions);
         };
@@ -212,7 +222,7 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                             const regularItems = [...sessions]
                             .filter(s => {
                                 if (!(s.isGroup || contactIds.has(s.contactId))) return false;
-                                if (!hasSessionListContent(s.id)) return false;
+                                if (!hasSessionListContent(s.id)||removedChatEntries().includes(s.id)) return false;
                                 if (listTab === "private" && s.isGroup) return false;
                                 if (listTab === "group" && !s.isGroup) return false;
                                 if (!keyword) return true;
@@ -229,8 +239,8 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                 return parseTime(bTime) - parseTime(aTime);
                             })
                             .map(s => (
-                                <div key={s.id}>
-                                    <SessionItem session={s} onSelect={() => onSelectSession(s)} isPinned={!!s.isPinned} />
+                                <div key={s.id} data-reverse-session-id={s.id}>
+                                    <SessionItem session={s} onSelect={() => onSelectSession(s)} isPinned={!!s.isPinned} swipeOpen={swipeId===s.id} onSwipeChange={open=>setSwipeId(open?s.id:null)} />
                                 </div>
                             ));
                             if (!showMascot && regularItems.length === 0) {
@@ -424,7 +434,10 @@ function ContactPicker({ onClose, onSelect }: { onClose: () => void; onSelect: (
     );
 }
 
-function SessionItem({ session, onSelect, isPinned }: { session: ChatSession, onSelect: () => void, isPinned?: boolean }) {
+function SessionItem({ session, onSelect, isPinned,swipeOpen,onSwipeChange }: { session: ChatSession, onSelect: () => void, isPinned?: boolean,swipeOpen:boolean,onSwipeChange:(open:boolean)=>void }) {
+    const [,refresh]=useState(0);useEffect(()=>subscribeReverse(()=>refresh(n=>n+1)),[]);
+    const hidden=hiddenChats().includes(session.id);
+
     const chars = loadCharacters();
     const character = chars.find(c => c.id === session.contactId);
     const chatDisplayName = character ? resolveChatCharacterDisplayName(character) : `User_${session.contactId.slice(-4)}`;
@@ -451,9 +464,12 @@ function SessionItem({ session, onSelect, isPinned }: { session: ChatSession, on
         ].slice(0, 4)
         : [];
 
+    if(!reverseCanSeeChat(session.id))return null;
     return (
+        <ChatSwipeRow open={swipeOpen} onOpenChange={onSwipeChange} hidden={hidden} onToggle={()=>toggleHiddenChat(session.id)} pinned={!!isPinned} onPin={()=>{saveChatSessions(loadChatSessions().map(s=>s.id===session.id?{...s,isPinned:!s.isPinned}:s));window.dispatchEvent(new Event("chat-messages-updated"));}} onRemove={()=>removeChatListEntry(session.id)}>
         <div
-            className={`minimal-list-item${isPinned ? ' chat-pinned' : ''}`}
+            className={`minimal-list-item${isPinned ? ' chat-pinned' : ''}${hidden?' reverse-hidden-chat':''}`}
+            role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'&&!swipeOpen)onSelect();}}
             onClick={onSelect}
         >
             {isGroup && session.groupAvatar ? (
@@ -508,5 +524,6 @@ function SessionItem({ session, onSelect, isPinned }: { session: ChatSession, on
                 </div>
             </div>
         </div>
+        </ChatSwipeRow>
     );
 }

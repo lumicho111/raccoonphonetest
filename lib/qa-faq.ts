@@ -82,9 +82,9 @@ NEXT_PUBLIC_ 开头的变量会打包进浏览器代码、完全公开。Supabas
 ## 云端功能（Supabase）
 
 ### Q: 哪些功能需要自建 Supabase？
-账号、激活码、成年审核、便签墙、游戏大厅、应用市场、黑市剧场等云端共享功能。在 Supabase SQL Editor 按需执行仓库 docs/ 下的建表脚本（account / verify / notewall / game-hall / custom-app-market / black-market / push 等 .sql 文件），然后在部署平台填服务端密钥。
+账号、激活码、成年审核、游戏大厅、应用市场、黑市剧场等云端共享功能。在 Supabase SQL Editor 按需执行仓库 docs/ 下的建表脚本（account / verify / game-hall / custom-app-market / black-market / push 等 .sql 文件），然后在部署平台填服务端密钥。
 
-### Q: 便签墙实时刷新 / 多人联机怎么开？
+### Q: 多人联机怎么开？
 额外配置 NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY（anon key 可公开）；联机需先执行 docs/online-play-supabase.sql。
 
 ## 应用市场与自定义 APP

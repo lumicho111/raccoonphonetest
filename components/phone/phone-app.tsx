@@ -1,9 +1,11 @@
 "use client";
+import {startPhoneAudio,setPhoneSpeaker,finishPhoneAudio,playPhoneAudio,hasNativePhoneAudio} from '@/lib/phone-audio';
+import {takePhoneOpening} from '@/lib/phone-opening';
 import { AudioSourcePicker } from "@/components/audio-source-picker";
 import { isRingtoneSource } from "@/lib/ringtone-source";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Clock3, ContactRound, Delete, Keyboard, MicOff, Phone, PhoneOff, Search, Settings2, Star, Trash2, X } from "lucide-react";
+import { ChevronLeft, Clock3, ContactRound, Delete, Keyboard, MicOff, Volume2, MessageSquare, RotateCw, Send, Phone, PhoneOff, Search, Settings2, Star, Trash2, X } from "lucide-react";
 import { loadCharacters, CHARACTERS_UPDATED_EVENT } from "@/lib/character-storage";
 import { loadSms, smsContactDisplayName, SMS_EVENT } from "@/lib/sms-storage";
 import { resolveUserIdentity } from "@/lib/settings-storage";
@@ -75,6 +77,10 @@ export function PhoneApp({ onClose, onNotice }: { onClose: () => void; onNotice?
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
   const [characterNumberDraft, setCharacterNumberDraft] = useState("");
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  const [speaker,setSpeaker]=useState(false);
+  const [inputOpen,setInputOpen]=useState(false);
+  const openedRef=useRef(new Set<string>());
+  const speechRun=useRef(0);
   const [typed, setTyped] = useState("");
   const [queued, setQueued] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -137,12 +143,12 @@ export function PhoneApp({ onClose, onNotice }: { onClose: () => void; onNotice?
 
   const finishCall = useCallback((status: PhoneCallRecord["status"] = "completed") => {
     const call = activeCallRef.current; if (!call) return;
-    audioAbortRef.current?.(); audioAbortRef.current = null;
+    speechRun.current++;audioAbortRef.current?.(); audioAbortRef.current = null;void finishPhoneAudio().catch(()=>{});
     const endedAt = Date.now();
     const durationSec = call.connectedAt ? Math.max(0, Math.floor((endedAt - call.connectedAt) / 1000)) : 0;
     appendPhoneCall({ id: call.id, characterId: call.characterId, number: call.number, direction: call.direction, status, startedAt: call.startedAt, connectedAt: call.connectedAt, endedAt, durationSec, transcript: call.transcript, source: "phone" });
-    setActiveCall(prev => prev ? { ...prev, phase: "ended", status } : null);
-    setTimeout(() => { setActiveCall(null); setElapsed(0); setTyped(""); setQueued(0); setBusy(false); setUiHidden(false); }, 700);
+    activeCallRef.current={...call,phase:"ended",status};setActiveCall(activeCallRef.current);
+    setTimeout(() => { if(activeCallRef.current?.id!==call.id)return;activeCallRef.current=null;setActiveCall(null); setElapsed(0); setTyped(""); setQueued(0); setBusy(false); setUiHidden(false); }, 700);
   }, []);
 
   const startOutgoing = useCallback(async (characterId: string) => {
@@ -150,7 +156,7 @@ export function PhoneApp({ onClose, onNotice }: { onClose: () => void; onNotice?
     const call: ActiveCall = { id: phoneId(), characterId, number, direction: "outgoing", startedAt: Date.now(), phase: "ringing", transcript: [] };
     activeCallRef.current = call; setActiveCall(call); setElapsed(0); setBusy(true);
     const decision = await decidePhoneAnswer(characterId);
-    if (!activeCallRef.current || activeCallRef.current.id !== call.id) return;
+    if (!activeCallRef.current || activeCallRef.current.id !== call.id || activeCallRef.current.phase!=="ringing") return;
     if (decision === "answer") {
       setActiveCall(prev => prev ? { ...prev, phase: "connected", connectedAt: Date.now() } : prev); setBusy(false); return;
     }
@@ -175,11 +181,13 @@ export function PhoneApp({ onClose, onNotice }: { onClose: () => void; onNotice?
 
   const summon = useCallback(async () => {
     const call = activeCallRef.current; if (!call || call.phase !== "connected" || busy) return;
+    if(call.direction==="outgoing"&&!call.transcript.some(l=>l.role==="user")){onNotice?.("你拨出的电话，由你先说第一句");setInputOpen(true);return;}
+    const generation=++speechRun.current;
     setBusy(true);
     try {
       const result = await generatePhoneReply(call.characterId, call.transcript);
       for (const reply of result.lines) {
-        if (activeCallRef.current?.id !== call.id || activeCallRef.current.phase !== "connected") break;
+        if (generation!==speechRun.current||activeCallRef.current?.id !== call.id || activeCallRef.current.phase !== "connected") break;
         const line: PhoneTranscriptLine = { id: reply.id, role: "assistant", original: reply.original, translated: reply.translated, createdAt: Date.now() };
         // Show original and translation immediately; TTS runs afterward and reads only original.
         const current = activeCallRef.current;
@@ -190,26 +198,62 @@ export function PhoneApp({ onClose, onNotice }: { onClose: () => void; onNotice?
         if (voice) {
           try {
             const blob = await synthesizeSpeech(reply.original, voice);
-            if (blob && activeCallRef.current?.id === call.id && activeCallRef.current.phase === "connected") {
+            if (blob && activeCallRef.current?.id === call.id && activeCallRef.current.phase === "connected"&&generation===speechRun.current) {
               const audioRef = await storeMediaBlob(blob, blob.type || "audio/mpeg", "audio");
               const current = activeCallRef.current;
               if (current?.id === call.id) { const updated = { ...current, transcript: current.transcript.map(item => item.id === line.id ? { ...item, audioRef } : item) }; activeCallRef.current = updated; setActiveCall(updated); }
-              const { promise, abort } = playAudioBlobViaMediaElement(blob); audioAbortRef.current = abort; await promise; audioAbortRef.current = null;
+              const { promise, abort } = playPhoneAudio(blob); audioAbortRef.current = abort; await promise; audioAbortRef.current = null;
             }
           } catch { /* keep displayed text when TTS fails */ }
         }
       }
       setQueued(0);
-      if (result.hangup && activeCallRef.current?.id === call.id) setTimeout(() => finishCall("completed"), 250);
-    } catch (e) { onNotice?.(e instanceof Error ? e.message : "电话回复失败"); if((communicationBusy("phone",call.characterId)?.level||1)>=3)finishCall("completed"); }
-    finally { setBusy(false); }
+      if (generation===speechRun.current&&result.hangup && activeCallRef.current?.id === call.id) setTimeout(() => {if(activeCallRef.current?.id===call.id&&activeCallRef.current.phase==="connected")finishCall("completed");}, 250);
+    } catch (e) { onNotice?.(e instanceof Error ? e.message : "电话回复失败"); if(activeCallRef.current?.id===call.id&&(communicationBusy("phone",call.characterId)?.level||1)>=3)finishCall("completed"); }
+    finally { if(generation===speechRun.current)setBusy(false); }
   }, [busy, onNotice, finishCall]);
   summonRef.current = summon;
+
+  useEffect(()=>{
+    if(activeCall?.phase!=="connected")return;
+    const id=activeCall.id;
+    void startPhoneAudio().then(state=>{if(activeCallRef.current?.id===id)setSpeaker(state.speaker);}).catch(e=>onNotice?.(String(e)));
+    return()=>{audioAbortRef.current?.();void finishPhoneAudio().catch(()=>{});};
+  },[activeCall?.id,activeCall?.phase]);
+  useEffect(()=>{
+    const call=activeCall;if(!call||call.phase!=="connected"||openedRef.current.has(call.id))return;
+    openedRef.current.add(call.id);setInputOpen(call.direction==="outgoing");
+    if(call.direction!=="incoming")return;
+    const token=++speechRun.current;setBusy(true);
+    void (async()=>{
+      try{
+        const session=loadChatSessions().find(s=>!s.isGroup&&s.contactId===call.characterId);
+        const reply=await takePhoneOpening(session?.id||call.characterId,call.characterId);
+        if(speechRun.current!==token||activeCallRef.current?.id!==call.id||activeCallRef.current.phase!=="connected")return;
+        const line:PhoneTranscriptLine={...reply,role:"assistant",createdAt:Date.now()};
+        const next={...activeCallRef.current,transcript:[...activeCallRef.current.transcript,line]};activeCallRef.current=next;setActiveCall(next);
+        const voice=resolveVoiceConfig(call.characterId,"chat");if(voice){const blob=await synthesizeSpeech(reply.original,voice);if(blob&&speechRun.current===token&&activeCallRef.current?.id===call.id&&activeCallRef.current.phase==="connected"){
+          const audioRef=await storeMediaBlob(blob,blob.type||"audio/mpeg","audio");
+          const current=activeCallRef.current;if(current?.id!==call.id||current.phase!=="connected"||speechRun.current!==token)return;
+          const updated={...current,transcript:current.transcript.map(l=>l.id===line.id?{...l,audioRef}:l)};activeCallRef.current=updated;setActiveCall(updated);
+          const played=playPhoneAudio(blob);audioAbortRef.current=played.abort;await played.promise;audioAbortRef.current=null;
+        }}
+      }catch(e){onNotice?.(e instanceof Error?e.message:"开场语音失败，可点击重回重试");}
+      finally{if(speechRun.current===token)setBusy(false);}
+    })();
+  },[activeCall?.id,activeCall?.phase]);
+  function regenerateLast(){
+    const call=activeCallRef.current;if(!call||busy)return;
+    audioAbortRef.current?.();const token=++speechRun.current;const lastUser=call.transcript.map(l=>l.role).lastIndexOf("user");
+    const next={...call,transcript:call.transcript.slice(0,lastUser+1)};activeCallRef.current=next;setActiveCall(next);
+    if(lastUser<0&&call.direction==="incoming"){openedRef.current.add(call.id);setActiveCall({...next});void (async()=>{setBusy(true);try{const reply=await takePhoneOpening(call.characterId,call.characterId);if(speechRun.current!==token||activeCallRef.current?.id!==call.id||activeCallRef.current.phase!=="connected")return;const line:PhoneTranscriptLine={...reply,role:"assistant",createdAt:Date.now()};const updated={...activeCallRef.current,transcript:[line]};activeCallRef.current=updated;setActiveCall(updated);const voice=resolveVoiceConfig(call.characterId,"chat");if(voice){const blob=await synthesizeSpeech(reply.original,voice);if(blob&&speechRun.current===token&&activeCallRef.current?.id===call.id&&activeCallRef.current.phase==="connected"){const audioRef=await storeMediaBlob(blob,blob.type||"audio/mpeg","audio");if(speechRun.current!==token||activeCallRef.current?.phase!=="connected"||activeCallRef.current.id!==call.id)return;const updated={...activeCallRef.current,transcript:activeCallRef.current.transcript.map(l=>l.id===line.id?{...l,audioRef}:l)};activeCallRef.current=updated;setActiveCall(updated);const play=playPhoneAudio(blob);audioAbortRef.current=play.abort;await play.promise;audioAbortRef.current=null;}}}catch(e){onNotice?.(String(e));}finally{if(token===speechRun.current)setBusy(false);}})();return;}
+    void summonRef.current();
+  }
 
   const replayLine = useCallback(async (line: PhoneTranscriptLine) => {
     if (!line.audioRef) return;
     const media = await loadMediaBlob(line.audioRef); if (!media) return;
-    const { promise } = playAudioBlobViaMediaElement(media.blob); await promise;
+    const { promise } = playPhoneAudio(media.blob); await promise;
   }, []);
 
   if (activeCall) {
@@ -221,31 +265,26 @@ export function PhoneApp({ onClose, onNotice }: { onClose: () => void; onNotice?
       <div className={styles.callBackdrop} style={{ backgroundImage: `url(${DEFAULT_CONTACT_AVATAR})` }} />
       <div className={styles.callTint} />
       <div className={styles.callTop}>
-        <img className={styles.callAvatar} src={avatar} alt=""/>
-        <div className={styles.callName}>{name}</div>
         <div className={styles.callStatus}>{activeCall.phase === "incoming" ? "来电" : activeCall.phase === "ringing" ? "正在呼叫…" : activeCall.phase === "ended" ? "通话已结束" : fmtDuration(elapsed)}</div>
+        <div className={styles.callName}>{name}</div>
+        <div className={styles.callSubtitle}>{resolveVoiceConfig(activeCall.characterId,"chat")?"语音已接入":"文字通话 · 未接入语音"}</div>
       </div>
-      {!uiHidden && connected && <div className={styles.glassPanel}>
-        <div ref={transcriptRef} className={styles.transcript}>
-          {activeCall.transcript.map(line => <div key={line.id} className={`${styles.line} ${line.role === "user" ? styles.userLine : styles.charLine}`} onClick={() => { if (line.role === "assistant") void replayLine(line); }}>
-            <div className={styles.original}>{line.original}</div>
-            {line.role === "assistant" && line.translated && <div className={styles.translation}>{line.translated}</div>}
-          </div>)}
-          {busy && <div className={`${styles.line} ${styles.charLine}`}><div className={styles.translation}>对方正在回应…</div></div>}
-        </div>
-        <div className={styles.inputRow}>
-          <input value={typed} onChange={e => setTyped(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTyped(); } }} placeholder="输入通话内容" />
-          <button onClick={summon} disabled={busy} aria-label={queued ? `召唤回复，已发送 ${queued} 条` : "召唤回复"}>↑</button>
-        </div>
+      {connected&&<div className={styles.callConversation}>
+        {!uiHidden&&<div ref={transcriptRef} className={styles.transcript}>
+          {activeCall.transcript.map(line=><div key={line.id} className={`${styles.line} ${line.role==="user"?styles.userLine:styles.charLine}`} onClick={()=>{if(line.role==="assistant")void replayLine(line);}}><div className={styles.original}>{line.original}</div>{line.role==="assistant"&&line.translated&&<div className={styles.translation}>{line.translated}</div>}</div>)}
+          {busy&&<div className={styles.callWait}>对方正在回应…</div>}
+        </div>}
+        {inputOpen&&<div className={styles.inputRow}><input autoFocus aria-label="通话输入" value={typed} onChange={e=>setTyped(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendTyped();}}} placeholder="输入你想说的话"/><button aria-label="发送我的话" disabled={busy||!typed.trim()} onClick={sendTyped}><Send size={17}/></button><button onClick={summon} disabled={busy} aria-label="让角色回复">↑</button></div>}
       </div>}
       <div className={styles.callControls}>
-        {activeCall.phase === "incoming" ? <>
-          <button className={`${styles.roundBtn} ${styles.decline}`} onClick={() => finishCall("declined")}><PhoneOff /></button>
-          <button className={`${styles.roundBtn} ${styles.accept}`} onClick={acceptIncoming}><Phone /></button>
-        </> : <>
-          {connected && <button className={styles.roundBtn} data-active={uiHidden ? "1" : "0"} onClick={() => setUiHidden(v => !v)} title="隐藏/显示台词"><MicOff /></button>}
-          <button className={`${styles.roundBtn} ${styles.decline}`} onClick={() => finishCall(activeCall.phase === "ringing" ? "canceled" : "completed")}><PhoneOff /></button>
-        </>}
+        {activeCall.phase==="incoming"?<><button className={`${styles.roundBtn} ${styles.decline}`} aria-label="拒接" onClick={()=>finishCall("declined")}><PhoneOff/></button><button className={`${styles.roundBtn} ${styles.accept}`} aria-label="接听" onClick={acceptIncoming}><Phone/></button></>:connected?<div className={styles.sixControls}>
+          <div><button className={styles.roundBtn} data-active={speaker?"1":"0"} aria-label="免提" aria-pressed={speaker} disabled={!hasNativePhoneAudio()} onClick={()=>{void setPhoneSpeaker(!speaker).then(v=>setSpeaker(v.speaker)).catch(e=>onNotice?.(e instanceof Error?e.message:String(e)));}}><Volume2/></button><span>免提</span></div>
+          <div><button className={styles.roundBtn} disabled aria-label="静音（暂未接入麦克风）"><MicOff/></button><span>静音</span></div>
+          <div><button className={styles.roundBtn} aria-label="重回" disabled={busy||!activeCall.transcript.length} onClick={regenerateLast}><RotateCw/></button><span>重回</span></div>
+          <div><button className={styles.roundBtn} data-active={!uiHidden?"1":"0"} aria-label="台词" aria-pressed={!uiHidden} onClick={()=>setUiHidden(v=>!v)}><MessageSquare/></button><span>台词</span></div>
+          <div><button className={`${styles.roundBtn} ${styles.decline}`} aria-label="结束" onClick={()=>finishCall("completed")}><PhoneOff/></button><span>结束</span></div>
+          <div><button className={styles.roundBtn} data-active={inputOpen?"1":"0"} aria-label="输入" aria-pressed={inputOpen} onClick={()=>setInputOpen(v=>!v)}><Keyboard/></button><span>输入</span></div>
+        </div>:<button className={`${styles.roundBtn} ${styles.decline}`} aria-label="取消呼叫" onClick={()=>finishCall(activeCall.phase==="ringing"?"canceled":"completed")}><PhoneOff/></button>}
       </div>
     </div>;
   }

@@ -3914,3 +3914,5 @@
 .diary-entry-app.has-custom-font .diary-entry-detail-paper * {
   font-family: var(--diary-entry-font-family) !important;
 }
+
+.city-draft-photo .city-edit-photo-description{position:static!important;width:auto!important;height:auto!important;border-radius:8px!important;font-size:11px;padding:6px;background:#f1f3f5;color:#555}.city-draft-photo .city-text-photo{cursor:pointer}

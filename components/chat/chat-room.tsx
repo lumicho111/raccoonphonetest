@@ -1,5 +1,14 @@
 "use client";
+import {markMediaSent, prepareSocialMedia} from '@/lib/social-media';
+
+import {ReversePhoneRecord,ReconciliationRecord,ReverseComposerStatus,useReverseVisit} from "./reverse-phone-overlay";
+import {captureSelectedChat} from "@/lib/chat-screenshot";
+import {ChatScreenshotPreview} from "./chat-screenshot-preview";
+import {Share2,ScanLine,PhoneCall} from "lucide-react";
+import {startReversePhone,REVERSE_TYPE,grabReversePhone} from "@/lib/reverse-phone-runtime";
+import {useAppBack} from "@/lib/back-navigation";
 import { LivePhotoInput } from "./live-photo";
+import {activeReverse,isReverseActive,noteReverseUserMessage} from "@/lib/reverse-phone-state";
 import {callSafeWindowStart} from "@/lib/call-record-window";
 import {finishOpenCall} from "./use-call-end-record";
 import { loadManualCallGroups, saveManualCallGroup, removeManualCallGroup } from "@/lib/manual-call-groups";
@@ -30,6 +39,8 @@ import { EmojiPanel, StickerPanel } from "./emoji-panel";
 import { StickerSearchSuggest } from "./sticker-search-suggest";
 import { StateValuesPanel } from "./state-values-panel";
 import { generateChatCompletion, generateOfflineChatCompletion, flattenCompletionResult, ChatEngineError } from "@/lib/chat-engine";
+import { offlineSpeakerMap } from "@/lib/offline-speakers";
+import { RotateCcw, Volume2 } from "lucide-react";
 import { OfflineDialogueText } from "./offline-dialogue-text";
 import { OfflineIcon } from "./offline-icons";
 import { offlineTextCount } from "@/lib/offline-dialogue";
@@ -665,7 +676,7 @@ function MemoryWriteRequestCard({
 function SystemInstructionCard({ content }: { content: string }) {
     return (
         <>
-            <div className="chat-system-instruction-head">
+            <div className="chat-system-instruction-head" data-offstage={content.startsWith("【幕后演绎指导") ? "1" : undefined}>
                 <span className="chat-system-instruction-title">系统指令</span>
             </div>
             <div className="chat-system-instruction-body">{content}</div>
@@ -764,6 +775,7 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
     onTriggerAIResponse,
     onSendSticker,
 }, ref) {
+    const reverseControl=useReverseVisit();
     const [inputText, setInputText] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     // 表情包搜索联想：ESC/失焦置 true 隐藏，输入变化重新开启
@@ -828,9 +840,10 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
     );
     const suggestEnabled = !memberInputLocked && !panelOpen && !suggestClosed && inputText.trim().length > 0;
     const plusMenuItems = [
+        ...(!isGroup&&characterId?[{icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg>,label:"让TA查手机",onClick:()=>window.dispatchEvent(new CustomEvent('reverse-invite',{detail:{owner:characterId}}))}]:[]),
         { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>, label: "照片墙", onClick: () => onOpenRichModal("photo") },
         { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="7" y1="8" x2="17" y2="8" /><line x1="7" y1="12" x2="14" y2="12" /><line x1="7" y1="16" x2="11" y2="16" /></svg>, label: "文字图片", onClick: () => onOpenRichModal("text_photo") },
-        { icon: <span style={{fontSize:22}}>◉</span>, label:"实况", onClick:()=>onOpenRichModal("live_photo") },
+        { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10" strokeDasharray="1 2.2"/><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.5" fill="var(--c-text)" stroke="none"/></svg>, label:"实况", onClick:()=>onOpenRichModal("live_photo") },
         { icon: <AlertCircle size={22} strokeWidth={1.5} color="var(--c-text)" />, label: "系统指令", onClick: () => onOpenRichModal("system_instruction") },
         { icon: <Clapperboard size={22} strokeWidth={1.5} color={theaterMode ? "var(--c-icon-active)" : "var(--c-text)"} />, label: "番外指令模式", active: theaterMode, onClick: onToggleTheaterMode },
         { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>, label: "视频通话", onClick: onStartVideoCall },
@@ -850,7 +863,8 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
     ];
 
     return (
-        <div className="chat-input-bar chat-room-main-pane flex flex-col" data-ui="input">
+        <div className="chat-input-bar chat-room-main-pane flex flex-col" data-ui="input" data-reverse-control={reverseControl?.paused?"true":undefined}>
+            <ReverseComposerStatus/>
             {theaterMode && (
                 <div className="chat-theater-mode-strip" role="status">
                     <span className="chat-theater-mode-icon" aria-hidden="true">
@@ -929,7 +943,8 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
                 enterKeyHint={enterToSendEnabled ? "send" : "enter"}
                 className="chat-input-textarea"
                 disabled={textInputDisabled}
-                placeholder={isSpectator
+                readOnly={!!reverseControl&&!reverseControl.paused}
+                placeholder={reverseControl&&!reverseControl.paused ? "TA正在看 不准动哦…" : isSpectator
                     ? "写下希望他们下一轮怎么聊……"
                     : (textInputDisabled
                         ? `禁言中，剩余${Math.ceil(muteRemainingMs / 60000)}分钟`
@@ -1212,29 +1227,36 @@ const OfflineTextInputBar = memo(forwardRef<OfflineTextInputHandle, React.Compon
     const resize = () => { const el = textarea.current; if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 150) + "px"; } };
     const update = (value: string) => { current.current = value; setText(value); requestAnimationFrame(resize); };
     useImperativeHandle(ref, () => ({ clear: () => { update(""); setDialogue(false); }, setText: update, restoreIfEmpty: value => { if (!current.current.trim()) update(value); } }));
-    const syncSelection = () => { const el = textarea.current; if (!el) return; const before = current.current.slice(0, el.selectionStart); setDialogue(before.lastIndexOf("「") > before.lastIndexOf("」")); };
+    const syncSelection = () => { const el = textarea.current; if (!el) return; const before = current.current.slice(0, el.selectionStart); setDialogue(before.lastIndexOf('<speech speaker="user">') > before.lastIndexOf("</speech>")); };
     function toggleDialogue() {
         const el = textarea.current; if (!el) return;
         const start = el.selectionStart, end = el.selectionEnd, value = current.current;
         const before = value.slice(0, start);
-        const inside = before.lastIndexOf("「") > before.lastIndexOf("」");
+        const inside = before.lastIndexOf('<speech speaker="user">') > before.lastIndexOf("</speech>");
         let next = value, caret = start;
-        if (inside) { const close = value.indexOf("」", end); if (close >= 0) caret = close + 1; else { next = value.slice(0,end) + "」" + value.slice(end); caret = end+1; } }
-        else { next = value.slice(0,start) + "「" + value.slice(start,end) + "」" + value.slice(end); caret = end > start ? end + 2 : start + 1; }
+        if (inside) { const close = value.indexOf("</speech>", end); if (close >= 0) caret = close + 9; else { next = value.slice(0,end) + "</speech>" + value.slice(end); caret = end+9; } }
+        else { const opening = '<speech speaker="user">'; next = value.slice(0,start) + opening + value.slice(start,end) + "</speech>" + value.slice(end); caret = end > start ? end + opening.length + 9 : start + opening.length; }
         if (next === value) { el.focus(); el.setSelectionRange(caret, caret); syncSelection(); }
         else { pendingCaret.current = caret; update(next); }
     }
-    function send() { if (props.sceneBusy) return; if (props.isOfflineGenerating) { props.onStopGeneration(); return; } const value = current.current.trim(); if (value && props.onSendText(value)) { update(""); setDialogue(false); } }
+    function send() { if (props.sceneBusy) return; if (props.isOfflineGenerating) { props.onStopGeneration(); return; } const value = current.current.trim(); if ((value || props.isSpectator) && props.onSendText(value)) { update(""); setDialogue(false); } }
     return <div className="chat-input-bar chat-room-main-pane offline-composer" data-ui="input" data-offline-composer="true">
         <button type="button" aria-label="返回线上模式" title="返回线上模式" disabled={props.isOfflineGenerating || props.sceneBusy} onClick={props.onToggleOfflineMode}><OfflineIcon kind="online" /></button>
-        <textarea ref={textarea} className="chat-input-textarea" rows={1} value={text} enterKeyHint="enter" disabled={props.sceneBusy} placeholder={dialogue ? "写下说出口的话…" : "写下此刻…"} onChange={e => { update(e.target.value); }} onSelect={syncSelection} />
-        <button type="button" aria-label="加入对白" title="加入对白" aria-pressed={dialogue} disabled={props.sceneBusy} onPointerDown={e => e.preventDefault()} onClick={toggleDialogue}><OfflineIcon kind="dialogue" /></button>
-        <button type="button" aria-label={props.isOfflineGenerating ? "停止线下生成" : "发送"} title={props.isOfflineGenerating ? "停止线下生成" : "发送"} disabled={props.sceneBusy || (!props.isOfflineGenerating && !text.trim())} onClick={send}>{props.isOfflineGenerating ? <X size={23} /> : <OfflineIcon kind="send" />}</button>
+        <textarea ref={textarea} className="chat-input-textarea" rows={1} value={text} enterKeyHint="enter" disabled={props.sceneBusy || props.isSpectator} placeholder={dialogue ? "写下说出口的话…" : "写下此刻…"} onChange={e => { update(e.target.value); }} onSelect={syncSelection} />
+        <button type="button" aria-label="快捷添加语音台词" title="快捷添加语音台词" aria-pressed={dialogue} disabled={props.sceneBusy || props.isSpectator} onPointerDown={e => e.preventDefault()} onClick={toggleDialogue}><Volume2 size={23} /></button>
+        <button type="button" aria-label={props.isOfflineGenerating ? "停止线下生成" : "发送"} title={props.isOfflineGenerating ? "停止线下生成" : "发送"} disabled={props.sceneBusy || (!props.isOfflineGenerating && !props.isSpectator && !text.trim())} onClick={send}>{props.isOfflineGenerating ? <X size={23} /> : <OfflineIcon kind="send" />}</button>
     </div>;
 }));
 
 
 export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
+    const reverseControl=useReverseVisit();
+    const reverseWindow=reverseControl?.messageWindows?.[session.id]?.join("|");
+    useEffect(()=>{if(!reverseControl)return;const all=loadChatMessages(session.id);const ids=activeReverse()?.messageWindows?.[session.id];setMessages(ids?all.filter(m=>ids.includes(m.id)):all.slice(-50));},[session.id,reverseControl?.id,reverseWindow]);
+    const [screenshot,setScreenshot]=useState<Blob|null>(null),[screenshotBusy,setScreenshotBusy]=useState(false);
+    useAppBack(()=>{if(showPlusMenu)setShowPlusMenu(false);else if(showEmojiPanel)setShowEmojiPanel(false);else if(showStickerPanel)setShowStickerPanel(false);else if(richModal)setRichModal(null);else if(showLivePhoto)setShowLivePhoto(false);else if(screenshot)setScreenshot(null);else if(forwardDraft)setForwardDraft(null);else if(isMultiSelectMode){setIsMultiSelectMode(false);setSelectedMessageIds(new Set());}else if(showSettings)setShowSettings(false);else onBack();},()=>!!wrapperRef.current?.getClientRects().length,18);
+    useEffect(()=>{const invite=(event:Event)=>{if(session.isGroup||!wrapperRef.current?.getClientRects().length||(event as CustomEvent).detail?.owner!==session.contactId)return;setShowPlusMenu(false);void startReversePhone(session.contactId,session.id).catch(e=>showChatToast(String(e)));};const type=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.sessionId===session.id&&(!activeReverse()?.paused||d?.clear)){chatTextInputRef.current?.clear();if(d.text)chatTextInputRef.current?.appendText(d.text,{focus:false});}};window.addEventListener('reverse-invite',invite);window.addEventListener(REVERSE_TYPE,type);return()=>{window.removeEventListener('reverse-invite',invite);window.removeEventListener(REVERSE_TYPE,type);};},[session.id]);
+
     const [liveCSS, setLiveCSS] = useState(session.customCSS || "");
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [unreadKktBatches, setUnreadKktBatches] = useState<Set<string>>(() => new Set());
@@ -1288,6 +1310,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const [showVideoCall, setShowVideoCall] = useState(false);
     const [callAcceptedOnIsland, setCallAcceptedOnIsland] = useState(false);
     const [callMinimized, setCallMinimized] = useState(false);
+    useEffect(()=>{const fn=(event:Event)=>{if((showVoiceCall||showVideoCall)&&(event as CustomEvent).detail!=="chat")setCallMinimized(true);};window.addEventListener("rabbit-app-visibility",fn);return()=>window.removeEventListener("rabbit-app-visibility",fn);},[showVoiceCall,showVideoCall]);
+    const restoreFloatingCall=()=>{window.dispatchEvent(new CustomEvent("rabbit-restore-call",{detail:{sessionId:session.id}}));setCallMinimized(false);};
     const [callInitiator, setCallInitiator] = useState<"user" | "character">("user");
     const [callInitiatorName, setCallInitiatorName] = useState<string>("");
     const [userIdentity, setUserIdentity] = useState<UserIdentity | null>(null);
@@ -1298,7 +1322,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         || loadChatContacts().find(contact => contact.characterId === session.contactId)?.nickname?.trim()
         || chatDisplayName;
     const quoteUserName = getSavedMomentsScreenName() || userIdentity?.name || "你";
-    const chatAvatar = character ? resolveChatCharacterAvatar(character) : null;
+    const chatAvatar = session.isGroup ? session.groupAvatar || null : character ? resolveChatCharacterAvatar(character) : null;
+    const offlineSpeakers = offlineSpeakerMap(session);
     void chatProfileRevision;
 
     // Rich media input modals
@@ -1675,7 +1700,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 syncMessagesFromStorage();
             }
         };
-        const onCallBoundary=(event:Event)=>{const m=(event as CustomEvent).detail?.message as ChatMessage|undefined;if(m?.sessionId===session.id&&(isCallSysMsg(m)||m.mediaData?.callEvent))syncMessagesFromStorage();};
+        const onCallBoundary=(event:Event)=>{const m=(event as CustomEvent).detail?.message as ChatMessage|undefined;if(m?.sessionId===session.id&&(isCallSysMsg(m)||m.mediaData?.callEvent||m.mediaType==="chat_record"||m.mediaData?.appName==="phone_reconcile"||m.mediaData?.appName==="reverse_phone"))syncMessagesFromStorage();};
         window.addEventListener("chat-message-pushed",onCallBoundary);
         window.addEventListener("chat-messages-updated", onExternalMessageUpdate);
         return () => {window.removeEventListener("chat-messages-updated", onExternalMessageUpdate);window.removeEventListener("chat-message-pushed",onCallBoundary);};
@@ -1942,13 +1967,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         setShowConfirmMultiDelete(false);
         setEditingOfflineTarget(null);
         setEditingOfflineContent("");
-        if (!session.isGroup && kvGet(CHAT_OFFLINE_MODE_PREFIX + session.id) === "1") ensureChatOfflineScene(session.id, session.contactId);
+        if (kvGet(CHAT_OFFLINE_MODE_PREFIX + session.id) === "1") ensureChatOfflineScene(session.id, session.contactId);
         setOfflineTurns(loadChatOfflineTurns(session.id));
         setOfflineSceneBusy(false);
 
         // Prewarm sticker cache for all relevant characters, then load messages
         const allMsgs = loadChatMessages(session.id);
-        const initialStart=callSafeWindowStart(allMsgs,Math.max(0,allMsgs.length-INITIAL_LOAD));
+        const initialStart=isReverseActive()?Math.max(0,allMsgs.length-50):callSafeWindowStart(allMsgs,Math.max(0,allMsgs.length-INITIAL_LOAD));
         const msgs=allMsgs.slice(initialStart);
         const nextHasMore=initialStart>0;
         hasMoreRef.current = nextHasMore;
@@ -1959,7 +1984,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         let initialCancelled=false;
         Promise.all(charIds.map(id => prewarmStickerCache(id))).then(() => {
             if(initialCancelled)return;
-            const fresh=loadChatMessages(session.id),freshStart=callSafeWindowStart(fresh,Math.max(0,fresh.length-INITIAL_LOAD)),msgs=fresh.slice(freshStart);
+            const fresh=loadChatMessages(session.id),freshStart=isReverseActive()?Math.max(0,fresh.length-50):callSafeWindowStart(fresh,Math.max(0,fresh.length-INITIAL_LOAD)),msgs=fresh.slice(freshStart);
             hasMoreRef.current=freshStart>0;setHasMore(freshStart>0);
             setStickerReady(true);
             needsInitialScrollRef.current = true;
@@ -2167,7 +2192,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     }, [restoreScrollAnchor, stopLoadMoreAnchorTracking]);
 
     const loadMore = useCallback(() => {
-        if (!hasMore || loadingMoreRef.current) return;
+        if (isReverseActive() || !hasMore || loadingMoreRef.current) return;
         stopLoadMoreAnchorTracking();
         loadingMoreRef.current = true;
         initialScrollVersionRef.current += 1;
@@ -3784,6 +3809,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     const sendRichMessage = (mediaType: ChatMessage["mediaType"], mediaData: ChatMessage["mediaData"], content: string = "", mediaUrl?: string): boolean => {
+        if (isReverseActive()&&!activeReverse()?.paused) { showChatToast("先点抢回来，再编辑或发送"); return false; }
         if (!ensureGroupSpeakPermission()) return false;
         if (isGenerating) {
             showChatToast("请先等待对方回复");
@@ -3817,6 +3843,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             mediaData: walletDebit.mediaData,
             ...(mediaUrl ? { mediaUrl } : {}),
         });
+        if (mediaType === "image") markMediaSent(newMsg.id);
         setMessages(prev => [...prev, newMsg]);
         setPendingGenerate(true);
         return true;
@@ -4428,6 +4455,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 mediaData: diceOnly ? { diceFace } : isQuoting ? quoteData : undefined,
             });
 
+            noteReverseUserMessage(newMsg);
             setMessages(prev => [...prev, newMsg]);
             if (diceOnly) {
                 const diceAside = pushChatMessage({
@@ -4615,7 +4643,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     const toggleOfflineMode = () => {
         if (offlineSceneBusy) return;
-        if (!offlineMode && !session.isGroup) ensureChatOfflineScene(session.id, session.contactId);
+        if (!offlineMode) ensureChatOfflineScene(session.id, session.contactId);
         if (!offlineMode && isGenerating) {
             showChatToast("请先等待对方回复");
             return;
@@ -4659,7 +4687,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     const handleOfflineSend = (inputText: string): boolean => {
         if (offlineSceneBusy) return false;
-        if (!session.isGroup) ensureChatOfflineScene(session.id, session.contactId);
+        ensureChatOfflineScene(session.id, session.contactId);
         if (isOfflineGenerating) {
             showChatToast("线下回复生成中");
             return false;
@@ -4712,7 +4740,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 if (!isCurrentOfflineRun()) return;
                 const assistantContent = result.content.trim() || result.rawText.trim();
                 if (!assistantContent) throw new Error("AI 没有返回线下正文");
-                if (session.isGroup && !result.summary.trim()) showChatToast(`未提取到 <${result.summaryTag}> 摘要`);
+                
                 const saved = appendChatOfflineTurn({
                     sessionId: session.id,
                     userContent: currentText,
@@ -4771,7 +4799,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             showChatToast("没有解析到线下正文");
             return;
         }
-        if (session.isGroup && !parsed.summary.trim()) showChatToast(`未提取到 <${parsed.summaryTag}> 摘要`);
+        
         // 思维链：parseOfflineResponse 已回归官方两参数（不再提取 thinking）。
         // 若该条原本带标签思维链（预设开启线下标签解析），按原标签从编辑后的正文重新提取，否则保持无。
         const editedThinking = turn.thinkingText !== undefined
@@ -4801,92 +4829,27 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     const handleOfflineRetryFrom = async (turnId: string) => {
-        if (isOfflineGenerating) {
-            showChatToast("线下回复生成中");
-            return;
-        }
-        const idx = offlineTurns.findIndex(turn => turn.id === turnId);
-        if (idx < 0) return;
-        const targetTurn = offlineTurns[idx];
-        const baseTurns = offlineTurns.slice(0, idx);
-        const retryInput = targetTurn.userContent.trim();
-        if (!retryInput) {
-            showChatToast("这一轮没有可重试的用户输入");
-            return;
-        }
-
-        cancelFollowUp(session.id);
-        setActiveOfflineTarget(null);
-        setShowPlusMenu(false);
-        setShowEmojiPanel(false);
-        setShowStickerPanel(false);
-        setRichModal(null);
-        saveChatOfflineTurns(session.id, baseTurns);
-        setOfflineTurns(baseTurns);
-        setPendingOfflineUserText(retryInput);
-        offlineGenerationInputRef.current = retryInput;
-        setIsOfflineGenerating(true);
-        offlineStreamAccumRef.current = "";
-        setOfflineStreamPreview(null);
-        const offlineRun = createOfflineGenerationRun(session.id);
-        const offlineRunId = offlineRun.runId;
-        const isCurrentOfflineRun = () => isOfflineGenerationRunActive(session.id, offlineRunId);
-
+        if (isOfflineGenerating || offlineSceneBusy) return;
+        const turns = loadChatOfflineTurns(session.id);
+        const index = turns.findIndex(turn => turn.id === turnId);
+        if (index < 0) return;
+        const target = turns[index];
+        if (!target.userContent.trim() && !session.isSpectator && index === 0) { showChatToast("本轮没有输入或前文可供重回"); return; }
+        ensureChatOfflineScene(session.id, session.contactId);
+        const fingerprint = JSON.stringify(turns);
+        cancelFollowUp(session.id); setActiveOfflineTarget(null); setIsOfflineGenerating(true);
+        const run = createOfflineGenerationRun(session.id);
         try {
-            const history = buildOfflinePromptHistory(baseTurns, retryInput);
-            const onOfflineDelta = (delta: string) => {
-                if (!isCurrentOfflineRun()) return;
-                offlineStreamAccumRef.current += delta;
-                // 线下预览解析合并到 rAF 下一帧：每帧最多一次全文解析+setState（与首次发送路径对齐）
-                if (offlineStreamFrameRef.current) return;
-                offlineStreamFrameRef.current = window.requestAnimationFrame(() => {
-                    offlineStreamFrameRef.current = 0;
-                    if (!isCurrentOfflineRun()) return;
-                    // 与引擎顺序一致：先按预设 strip_texts 清洗原文，再解析（避免剔除文本影响 XML 结构时预览与最终结果不一致）
-                    const previewRaw = stripLiteralTexts(offlineStreamAccumRef.current, streamPreviewTagConfig.stripTexts);
-                    const parsed = parseOfflineResponse(previewRaw, streamPreviewTagConfig.summaryTag);
-                    // 流式碎片阶段 XML 标签可能未闭合：content 提取不到时，剥掉开标签残片直接显示原文；
-                    // 思维链/自定义摘要标签按当前预设整块隐藏，避免生成过程中闪现（与引擎最终清洗同源）
-                    const previewContent = (parsed.content
-                        ? stripXmlTagBlocks(parsed.content, [streamPreviewTagConfig.summaryTag, ...streamPreviewTagConfig.offlineThinking])
-                        : stripXmlTagBlocks(previewRaw, [streamPreviewTagConfig.summaryTag, ...streamPreviewTagConfig.offlineThinking])
-                            .replace(/<\/?(?:content|summary|thinking|thought|think)>/gi, "")
-                            .replace(/<[^>]+>/g, "")
-                    ).trim();
-                    setOfflineStreamPreview({ content: previewContent, summary: parsed.summary });
-                });
-            };
-            const result = session.isGroup
-                ? await generateGroupOfflineChatCompletion(session, history, { signal: offlineRun.controller.signal, onStreamDelta: onOfflineDelta })
-                : await generateOfflineChatCompletion(session, history, { signal: offlineRun.controller.signal, onStreamDelta: onOfflineDelta });
-            if (!isCurrentOfflineRun()) return;
-            const assistantContent = result.content.trim() || result.rawText.trim();
-            if (!assistantContent) throw new Error("AI 没有返回线下正文");
-            if (session.isGroup && !result.summary.trim()) showChatToast(`未提取到 <${result.summaryTag}> 摘要`);
-            const saved = appendChatOfflineTurn({
-                sessionId: session.id,
-                userContent: retryInput,
-                assistantContent,
-                summary: result.summary.trim(),
-                summaryTag: result.summaryTag,
-                rawText: result.rawText,
-                reasoningText: result.reasoning,
-                thinkingText: result.thinking,
-                thinkingTag: result.thinkingTag,
-            });
-            setOfflineTurns([...baseTurns, saved]);
-        } catch (error: any) {
-            if (!isCurrentOfflineRun() || isAbortLikeError(error)) return;
-            offlineTextInputRef.current?.setText(retryInput);
-            showChatToast(`线下重试失败: ${error?.message || String(error)}`, 3000);
-        } finally {
-            if (!finishOfflineGenerationRun(session.id, offlineRunId)) return;
-            setPendingOfflineUserText("");
-            offlineGenerationInputRef.current = "";
-            setIsOfflineGenerating(false);
-            offlineStreamAccumRef.current = "";
-            setOfflineStreamPreview(null);
-        }
+            const history = buildOfflinePromptHistory(turns.slice(0,index), target.userContent);
+            if (turns.length > index + 1) history.push({id: 'offline_retry_fixed',sessionId:session.id,role:'system',status:'sent',createdAt:target.createdAt,content:'只重写指定的当前轮。后续已保留内容仅用于保持动作和结果衔接，不能泄露其他角色心理或秘密：'+JSON.stringify(turns.slice(index+1).map(t=>({user:t.userContent,assistant:t.assistantContent})))});
+            const result = session.isGroup ? await generateGroupOfflineChatCompletion(session,history,{signal:run.controller.signal}) : await generateOfflineChatCompletion(session,history,{signal:run.controller.signal});
+            if (!isOfflineGenerationRunActive(session.id,run.runId)) return;
+            if (JSON.stringify(loadChatOfflineTurns(session.id)) !== fingerprint) throw new Error("记录已变化，未覆盖已有内容，请重试");
+            const content = result.content.trim(); if (!content) throw new Error("未生成正文，原记录保留");
+            updateChatOfflineTurn(session.id,turnId,{assistantContent:content,rawText:result.rawText,summary:'',summaryTag:result.summaryTag,reasoningText:result.reasoning,thinkingText:result.thinking,thinkingTag:result.thinkingTag});
+            setOfflineTurns(loadChatOfflineTurns(session.id));
+        } catch(error) { if (isOfflineGenerationRunActive(session.id,run.runId) && !isAbortLikeError(error)) showChatToast(`重回失败，原记录保留：${error instanceof Error ? error.message : String(error)}`,3000); }
+        finally { if (finishOfflineGenerationRun(session.id,run.runId)) { setIsOfflineGenerating(false); setPendingOfflineUserText(''); setOfflineStreamPreview(null); offlineGenerationInputRef.current=''; } }
     };
 
     const handleRetry = async (msgId: string) => {
@@ -5356,7 +5319,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 <div className="flex">
                     <button onClick={() => { copyTextToClipboard(getOfflineCopyText(turn, role)); setActiveOfflineTarget(null); }} className="ctx-menu-btn">复制</button>
                     <button onClick={() => handleOfflineEditStart(turn, role)} className="ctx-menu-btn">编辑</button>
-                    <button onClick={() => void handleOfflineRetryFrom(turn.id)} className="ctx-menu-btn ctx-menu-btn-danger">重试以下</button>
+                    <button onClick={() => void handleOfflineRetryFrom(turn.id)} className="ctx-menu-btn">重回本段</button>
                 </div>
                 <div className="flex">
                     <button onClick={() => handleOfflineDeleteTurn(turn.id)} className="ctx-menu-btn ctx-menu-btn-danger">删除</button>
@@ -5413,7 +5376,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         <button onClick={() => handleRetractMessage(storedMessageId)} className="ctx-menu-btn">撤回消息</button>
                     )}
                     {m.role === "assistant" && (
-                        <button onClick={() => handleRetry(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">重试以下</button>
+                        <button onClick={() => handleRetry(storedMessageId)} className="ctx-menu-btn">重回本段</button>
                     )}
                 </div>
                 <div className="flex">
@@ -5785,10 +5748,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     const stickerUrl=custom?.externalUrl||custom?.assetId||findStickerByName(label)?.stickerUrl;
                     return {...msg,content:getMessageDisplayContent(msg),mediaData:{...msg.mediaData,stickerUrl}};
                 });
-            const record=createForwardedChatRecord(rows, session.isGroup ? session.groupName || "群聊" : chatContactDisplayName(session.contactId,session) || quoteCharacterName, msg=>{
+            const record=createForwardedChatRecord(rows, session.isGroup ? session.groupName || "群聊" : character?resolveChatCharacterDisplayName(character):quoteCharacterName, msg=>{
                 const user=msg.role==="user";
                 const char=msg.senderCharacterId ? groupCharMap.get(msg.senderCharacterId) : character;
-                const name=session.isGroup ? groupMemberName(session,user?GROUP_SELF_KEY:msg.senderCharacterId||"",char||null,user?userIdentity?.name||"我":msg.senderName||"群成员") : user?quoteUserName:quoteCharacterName;
+                const name=user?getSavedMomentsScreenName()||userIdentity?.name||"我":char?resolveChatCharacterDisplayName(char):msg.senderName||"群成员";
                 return {name,avatar:user?effectiveUserAvatar:char?resolveChatCharacterAvatar(char):chatAvatar};
             });
             setForwardSearch("");setForwardDraft(record);
@@ -5950,17 +5913,18 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     // 单聊语音/视频通话改为在下方主返回内联渲染（而非提前 return），
     // 这样缩小为悬浮窗时聊天页与通话组件可以同时挂载，通话状态（计时/字幕）不会丢失。
 
-    const OfflineComposer = session.isGroup ? LegacyOfflineTextInputBar : OfflineTextInputBar;
-    const offlineFooter = (turn: ChatOfflineTurn, role: "user" | "assistant", index: number) => !session.isGroup ? <div className="offline-card-footer" onPointerDown={e => e.stopPropagation()}>
+    const OfflineComposer = OfflineTextInputBar;
+    const offlineFooter = (turn: ChatOfflineTurn, role: "user" | "assistant", index: number) => <div className="offline-card-footer" onPointerDown={e => e.stopPropagation()}>
         <span title="记录时间；故事时间可通过时钟单独调整">#{index} · {offlineTextCount(role === "user" ? turn.userContent : turn.assistantContent)}字 · {formatChatUiTime(turn.createdAt)}</span>
         <div>{role === "assistant" ? <OfflineSceneClock sessionId={session.id} disabled={isOfflineGenerating || offlineSceneBusy} /> : null}
         <button type="button" aria-label={role === "user" ? "编辑我的线下内容" : "编辑角色线下内容"} disabled={isOfflineGenerating || offlineSceneBusy} onClick={() => handleOfflineEditStart(turn, role)}><Pencil size={15} /></button>
+        {(role === "assistant" || !turn.assistantContent.trim()) ? <button type="button" aria-label="重回线下回复" title="重回整段回复" disabled={isOfflineGenerating || offlineSceneBusy} onClick={() => void handleOfflineRetryFrom(turn.id)}><RotateCcw size={15}/></button> : null}
         <button type="button" aria-label={role === "user" ? "删除我的线下内容" : "删除角色线下内容"} disabled={isOfflineGenerating || offlineSceneBusy} onClick={() => {
             if (!window.confirm("删除这条线下内容？")) return;
             const next = offlineTurns.map(item => item.id === turn.id ? { ...item, ...(role === "user" ? { userContent: "" } : { assistantContent: "", rawText: "", reasoningText: "", thinkingText: "" }), summary: "" } : item).filter(item => item.userContent.trim() || item.assistantContent.trim());
             saveChatOfflineTurns(session.id, next); setOfflineTurns(next);
         }}><Trash2 size={15} /></button></div>
-    </div> : null;
+    </div>;
 
     const chatRoomBackgroundStyle = bgImageResolved ? {
         backgroundColor: "#fff",
@@ -5971,7 +5935,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     } : undefined;
 
     return (
-        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} data-offline-mode={offlineMode ? "true" : "false"} data-offline-notes={offlineMode && !session.isGroup ? "true" : undefined} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
+        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} data-offline-mode={offlineMode ? "true" : "false"} data-offline-notes={offlineMode ? "true" : undefined} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
             {/* CSS priority: session > global chat info > homepage appearance CSS. */}
             {globalChatCSS && (
                 <SessionCustomCSS css={globalChatCSS} scope={`.session-${session.id}`} />
@@ -6001,7 +5965,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         )}
                     </span>
                     <span className="page-header-right">
-                        {offlineMode && !session.isGroup ? <>
+                        {offlineMode ? <>
                             <button className="page-back-btn" type="button" aria-label="归档本次" disabled={isOfflineGenerating || offlineSceneBusy} onClick={e => requestOfflineSceneAction(e.currentTarget, "archive")}><Share size={21} /></button>
                             <button className="page-back-btn" type="button" aria-label="往期归档" disabled={isOfflineGenerating || offlineSceneBusy} onClick={e => requestOfflineSceneAction(e.currentTarget, "history")}><List size={21} /></button>
                         </> : null}
@@ -6033,9 +5997,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             >
                 {offlineMode && (
                     <div className="chat-offline-body">
-                        {!session.isGroup ? <OfflineSceneControls key={session.id} session={session} turnCount={offlineTurns.length} generating={isOfflineGenerating}
-                            getContainer={() => wrapperRef.current} onBusyChange={setOfflineSceneBusy} userName={userIdentity?.name || "我"} characterName={chatContactDisplayName(session.contactId, session) || chatDisplayName}
-                            onArchived={() => { setOfflineTurns(loadChatOfflineTurns(session.id)); setOfflineVisibleCount(OFFLINE_INITIAL_LOAD); offlineTextInputRef.current?.clear(); setOfflineMode(false); kvSet(CHAT_OFFLINE_MODE_PREFIX + session.id, "0"); showChatToast("已归档并加入短期记忆，可在记忆中提炼为长期；下次线下开启新一场。"); }} /> : null}
+                        {<OfflineSceneControls key={session.id} session={session} turnCount={offlineTurns.length} generating={isOfflineGenerating}
+                            getContainer={() => wrapperRef.current} onBusyChange={setOfflineSceneBusy} userName={quoteUserName} characterName={session.isGroup ? session.groupName || "群聊" : chatContactDisplayName(session.contactId, session) || chatDisplayName}
+                            onArchived={() => { setOfflineTurns(loadChatOfflineTurns(session.id)); setOfflineVisibleCount(OFFLINE_INITIAL_LOAD); offlineTextInputRef.current?.clear(); setOfflineMode(false); kvSet(CHAT_OFFLINE_MODE_PREFIX + session.id, "0"); showChatToast("已归档并加入短期记忆，可在记忆中提炼为长期；下次线下开启新一场。"); }} />}
                         {offlineTurns.length === 0 && !pendingOfflineUserText ? (
                             <div className="chat-offline-empty">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0Z" /><circle cx="12" cy="10" r="3" /></svg>
@@ -6062,14 +6026,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 || new Date(turn.createdAt).getTime() - new Date(prevTime).getTime() > 60_000;
                             return (
                             <Fragment key={turn.id}>
-                            {session.isGroup && showTime && <div className="chat-offline-time">{formatChatUiTime(turn.createdAt)}</div>}
+                            
                             <div className="chat-offline-turn">
                                 <div className="chat-offline-entry" data-role="user" style={offlineDisplay.userContent.trim() ? undefined : { display: "none" }}>
                                     {/* 头像占位：默认 display:none（见 chat.css），供自定义 CSS 显示 */}
                                     <div className="chat-offline-avatar" aria-hidden="true">
                                         {effectiveUserAvatar ? <img src={effectiveUserAvatar} alt="" /> : <User size={18} color="var(--c-text)" />}
                                     </div>
-                                    <div className="chat-offline-label">{userIdentity?.name || "我"}</div>
+                                    <div className="chat-offline-label">{quoteUserName}</div>
                                     <div
                                         className="chat-offline-text"
                                         onPointerDown={(e) => { e.stopPropagation(); handleOfflinePointerDown(e, { turnId: turn.id, role: "user" }); }}
@@ -6087,15 +6051,11 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                         {...(activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "user" ? { "data-active": "" } : {})}
                                     >
                                         {activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "user" && renderOfflineContextMenu(turn, "user")}
-                                        {!session.isGroup ? <OfflineDialogueText text={offlineDisplay.userContent} role="user" characterId={session.contactId} /> : <BilingualTextBlock
-                                            text={offlineDisplay.userContent}
-                                            mode="markdown"
-                                            defaultExpanded={session.collapseBilingualTranslation !== false ? false : true}
-                                        />}
+                                        <OfflineDialogueText text={offlineDisplay.userContent} role="user" characterId={session.contactId} speakers={offlineSpeakers} defaultExpanded={session.collapseBilingualTranslation === false} />
                                     </div>
                                     {offlineFooter(turn, "user", (offlineTurns.indexOf(turn) * 2) + 1)}
                                 </div>
-                                <div className="chat-offline-entry" data-role="assistant" style={turn.assistantContent.trim() ? undefined : { display: "none" }}>
+                                <div className="chat-offline-entry" data-role="assistant" style={offlineDisplay.assistantContent.trim() ? undefined : { display: "none" }}>
                                     {/* 头像占位：默认 display:none（见 chat.css），供自定义 CSS 显示 */}
                                     <div className="chat-offline-avatar" aria-hidden="true">
                                         {chatAvatar ? <img src={chatAvatar} alt="" /> : <ChatFallbackAvatar />}
@@ -6156,23 +6116,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                         {...(activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "assistant" ? { "data-active": "" } : {})}
                                     >
                                         {activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "assistant" && renderOfflineContextMenu(turn, "assistant")}
-                                        {!session.isGroup ? <OfflineDialogueText text={offlineDisplay.assistantContent} role="assistant" characterId={session.contactId} /> : <OfflineAssistantTextBlock
-                                            text={offlineDisplay.assistantContent}
-                                            defaultExpanded={session.collapseBilingualTranslation !== false ? false : true}
-                                        />}
+                                        <OfflineDialogueText text={offlineDisplay.assistantContent} role="assistant" characterId={session.contactId} speakers={offlineSpeakers} defaultExpanded={session.collapseBilingualTranslation === false} />
                                     </div>
-                                    {session.isGroup && turn.summary.trim() && (
-                                        <details className="chat-offline-summary-fold">
-                                            <summary>摘要（{turn.summaryTag || "summary"}）</summary>
-                                            <div className="chat-offline-summary-content">
-                                                <BilingualTextBlock
-                                                    text={offlineDisplay.summary}
-                                                    mode="markdown"
-                                                    defaultExpanded={session.collapseBilingualTranslation !== false ? false : true}
-                                                />
-                                            </div>
-                                        </details>
-                                    )}
                                     {offlineFooter(turn, "assistant", (offlineTurns.indexOf(turn) * 2) + 2)}
                                 </div>
                             </div>
@@ -6186,7 +6131,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                     <div className="chat-offline-avatar" aria-hidden="true">
                                         {effectiveUserAvatar ? <img src={effectiveUserAvatar} alt="" /> : <User size={18} color="var(--c-text)" />}
                                     </div>
-                                    <div className="chat-offline-label">{userIdentity?.name || "我"}</div>
+                                    <div className="chat-offline-label">{quoteUserName}</div>
                                     <div className="chat-offline-text">
                                         <BilingualTextBlock
                                             text={renderDisplayText(pendingOfflineUserText, 1, true)}
@@ -6219,7 +6164,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         )}
                     </div>
                 )}
-                {!offlineMode && hasMore && (
+                {!offlineMode && hasMore && !reverseControl && (
                     <button
                         type="button"
                         className="chat-sys-msg chat-load-more-button"
@@ -6489,7 +6434,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                             }`}
                                         {...(activeMessageId === msg.id ? { "data-active": "" } : {})}
                                     >
-                                        {isSystemInstruction ? (
+                                        {msg.mediaData?.appName==="phone_reconcile" ? <ReconciliationRecord id={msg.mediaData.label||""}/> : msg.mediaData?.appName==="reverse_phone" ? <ReversePhoneRecord id={msg.mediaData.label||""}/> : isSystemInstruction ? (
                                             <SystemInstructionCard content={msg.content} />
                                         ) : msg.mediaType === "memory_write_request" ? (
                                             <MemoryWriteRequestCard
@@ -6869,19 +6814,20 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 : `实际删除 ${multiDeleteTargetIds.length} 条`}
                         </span>
                     </div>
-                    <button type="button" className="chat-multi-select-forward-btn" disabled={!selectedMessageIds.size} onClick={openForwardPicker}>合并转发</button>
-                    <button type="button" className="chat-multi-select-forward-btn" disabled={!selectedMessageIds.size} onClick={()=>setManualDialog(true)}>整理通话</button>
+                    <button type="button" className="chat-multi-select-forward-btn" disabled={!selectedMessageIds.size} onClick={openForwardPicker} aria-label="合并转发" title="合并转发"><Share2 size={22} strokeWidth={1.8}/></button>
+                    <button type="button" className="chat-multi-select-forward-btn" disabled={!selectedMessageIds.size} onClick={()=>setManualDialog(true)} aria-label="整理成通话" title="整理成通话"><PhoneCall size={22} strokeWidth={1.8}/></button>
+                    <button type="button" className="chat-multi-select-icon-btn" aria-label="多选截图" title="多选截图" disabled={screenshotBusy||!selectedMessageIds.size} onClick={async()=>{setScreenshotBusy(true);try{if(!wrapperRef.current)throw Error('聊天尚未打开');setScreenshot(await captureSelectedChat(wrapperRef.current,selectedMessageIds));}catch(e){showChatToast(String(e));}finally{setScreenshotBusy(false);}}}><ScanLine size={22} strokeWidth={1.8}/></button>
                     <button
                         type="button"
-                        className="chat-multi-select-delete-btn"
+                        className="chat-multi-select-delete-btn" aria-label="删除所选消息" title="删除"
                         disabled={selectedMessageIds.size === 0 || multiDeleteTargetIds.length === 0}
                         onClick={confirmMultiDelete}
                     >
                         <Trash2 size={18} strokeWidth={1.8} />
-                        删除
                     </button>
                 </div>
             )}
+            {screenshot&&<ChatScreenshotPreview blob={screenshot} onClose={()=>setScreenshot(null)}/>}
             {favoriteVoice && <VoiceFavoriteDialog key={favoriteVoice.sourceKey} draft={favoriteVoice} onClose={()=>setFavoriteVoice(null)} onSaved={()=>showChatToast("已保存到设置 → 语音收藏")}/>}
             {manualDialog && <ManualCallDialog count={selectedMessageIds.size} onClose={()=>setManualDialog(false)} onSave={(callType,duration)=>{
                 const ids=Array.from(selectedMessageIds);saveManualCallGroup({id:`manual_call_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,sessionId:session.id,messageIds:ids,callType,duration});setManualGroups(loadManualCallGroups());setManualDialog(false);setIsMultiSelectMode(false);setSelectedMessageIds(new Set());
@@ -7079,10 +7025,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             {showLivePhoto && <LivePhotoInput onClose={() => setShowLivePhoto(false)} onSend={live => {if(sendRichMessage("image",{label:`实况视频（${live.duration.toFixed(1)}秒），图片是按时间顺序排列的8帧，请按左到右、上到下查看。`,liveVideoId:live.videoId,liveCover:live.cover,liveDuration:live.duration,liveAudio:live.audio,liveMuted:!live.audio},"",live.sheet))setShowLivePhoto(false)}} />}
             {richModal === "photo" && (
                 <PhotoInputModal
-                    onSend={(desc, imageDataUrls) => {
+                    onSend={async (desc, imageDataUrls) => {
                         setRichModal(null);
                         const photoBatchId = imageDataUrls.length > 1 ? `photo-${Date.now()}-${Math.random().toString(36).slice(2)}` : undefined;
-                        imageDataUrls.forEach(imageDataUrl => sendRichMessage("image", { label: desc, photoBatchId }, "", imageDataUrl));
+                        for(const imageDataUrl of imageDataUrls){
+ if(imageDataUrl.startsWith('data:image/gif')){try{const blob=await(await fetch(imageDataUrl)).blob();const media=await prepareSocialMedia(new File([blob],'image.gif',{type:'image/gif'}));sendRichMessage('image',{label:desc||'GIF：按时间顺序的8帧',socialMedia:media,photoBatchId},'',media.sheet);}catch(e){showChatToast(e instanceof Error?e.message:'GIF处理失败');}}
+ else sendRichMessage("image", { label: desc, photoBatchId }, "", imageDataUrl);
+}
                     }}
                     onClose={() => setRichModal(null)}
                 />
@@ -7263,7 +7212,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 <span className="menu-desc !mt-0">
                                     {editingOfflineTarget.role === "user"
                                         ? "保存后会更新这一轮线下历史"
-                                        : session.isGroup ? "保存后会重新解析 content 和摘要，并更新短期记忆事件流" : "保存后更新本次线下正文；结束并归档时再统一总结"}
+                                        : "保存后更新本次线下正文；结束并归档时再统一总结"}
                                 </span>
                             </div>
                             <button
@@ -7405,7 +7354,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             {(showVoiceCall || showVideoCall) && session.isGroup && groupCharacters.length > 0 && <GroupCallScreen
                 type={showVideoCall ? "video" : "voice"} session={session} characters={groupCharacters}
                 initiator={callInitiator} initiatorName={callInitiatorName} answered={callAcceptedOnIsland}
-                minimized={callMinimized} onMinimize={() => setCallMinimized(true)} onRestore={() => setCallMinimized(false)}
+                minimized={callMinimized} onMinimize={() => setCallMinimized(true)} onRestore={restoreFloatingCall}
                 onEnd={completed => { if(completed === false){setShowVoiceCall(false);setShowVideoCall(false);setCallMinimized(false);}else returnFromCall(() => {setShowVoiceCall(false);setShowVideoCall(false);});}} />}
             {showVoiceCall && !session.isGroup && character && (
                 <VoiceCallScreen
@@ -7415,7 +7364,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     answered={callAcceptedOnIsland}
                     minimized={callMinimized}
                     onMinimize={() => setCallMinimized(true)}
-                    onRestore={() => setCallMinimized(false)}
+                    onRestore={restoreFloatingCall}
                     onEnd={() => returnFromCall(() => setShowVoiceCall(false))}
                 />
             )}
@@ -7427,7 +7376,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     answered={callAcceptedOnIsland}
                     minimized={callMinimized}
                     onMinimize={() => setCallMinimized(true)}
-                    onRestore={() => setCallMinimized(false)}
+                    onRestore={restoreFloatingCall}
                     onEnd={() => returnFromCall(() => setShowVideoCall(false))}
                 />
             )}

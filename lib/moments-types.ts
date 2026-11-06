@@ -1,8 +1,10 @@
+import type { SocialMedia } from './social-media';
 import type { PhotoStorySnapshot } from "./photo-story-data";
 // lib/moments-types.ts
 // Type definitions for the Moments (朋友圈) feature.
 
 export type MomentPost = {
+    media?: SocialMedia;
     id: string;                     // "moment_timestamp_random"
     authorType: "user" | "character";
     authorId: string;               // characterId or "user"
