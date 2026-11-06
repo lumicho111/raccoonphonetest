@@ -1,3 +1,4 @@
+import {loadCity,cityEntries} from './icity-store';
 import { forwardedChatPrompt } from "./chat-forward";
 import {worldlineTimeLabel} from "./worldline-event-time";
 import { canHearCallMessage } from "./call-participation";
@@ -29,7 +30,6 @@ import { loadYtbProjectionEntries } from "./ytb-memory";
 import { loadWeverseProjectionEntries } from "./weverse-memory";
 import { getTwitterPrivateAccountContext, loadTwitterProjectionEntries } from "./twitter-storage";
 import { formatXiaohongshuShareForPrompt } from "./chat-share";
-import { loadBlackMarketTheaterProjectionEntries } from "./black-market-storage";
 import { loadInterviewMagazineProjectionEntries } from "./interview-magazine-memory";
 import { loadCoCreateProjectionEntries } from "./cocreate-memory";
 import { stripStateAndInnerForPrompt } from "./prompt-sanitizer";
@@ -631,9 +631,7 @@ export function loadNativeTimeline(
     }
 
     // ── Black market theater projections ──
-    const theaterEntries = loadBlackMarketTheaterProjectionEntries(characterId, {
-        afterTimestamp: options?.afterTimestamp,
-    });
+    const theaterEntries: Array<{id:string;timestamp:string;content:string}> = [];
     for (const theaterEntry of theaterEntries) {
         entries.push({
             id: theaterEntry.id,
@@ -695,10 +693,17 @@ export function loadNativeTimeline(
             id: diaryEntry.id,
             sourceApp: "diary",
             sourceDetail: "diary_entry",
+            sourceKeys:[`diary:${diaryEntry.id}`],
             authorType: "character",
             timestamp: diaryEntry.createdAt,
             content: formatDiaryEntryForTimeline(diaryEntry, timeAware, timestampOptions),
         });
+    }
+
+    // Native iCity entries include historical backfill and exchange replies from user.
+    const city=loadCity();
+    for(const e of cityEntries(city).filter(e=>!e.legacy&&(e.author===characterId||city.books.some(b=>b.id===e.book&&b.kind==='exchange'&&b.members.includes(characterId)))&&(!options?.afterTimestamp||e.createdAt>options.afterTimestamp))){
+      entries.push({id:e.id,sourceApp:'diary',sourceDetail:'diary_entry',sourceKeys:[`diary:${e.id}`],authorType:e.author==='user'?'user':'character',timestamp:e.createdAt,content:`[iCity日记 · ${e.createdAt}] ${city.accounts.find(a=>a.id===e.author)?.name||'作者'}：${e.title}\n${e.text}`});
     }
 
     // ── Xiaohongshu projections ──

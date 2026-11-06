@@ -42,7 +42,7 @@ export function projectMemoryEntry(entry: MemoryEntry): MemoryEntry | null {
 }
 export function memoryHasRevocableSources(entry: MemoryEntry): boolean {
     const segments = entry.metadata?.summarySegments as SummarySegment[] | undefined;
-    return Boolean(segments?.some(s => s.sourceKeys.some(k => /^(interview:|wvs:|ytb:)/.test(k))));
+    return Boolean(segments?.some(s => s.sourceKeys.some(k => /^(interview:|wvs:|ytb:|diary:)/.test(k))));
 }
 
 export function memoryOccurredDay(timestamp: string): string {

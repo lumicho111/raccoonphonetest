@@ -105,7 +105,7 @@ export async function runSummarizationPipeline(
     // Separate archive sources and months so deleting one archive cannot revoke unrelated facts.
     const buckets = new Map<string, NativeTimelineEntry[]>();
     for (const entry of allEntries) {
-        const scope = (entry.sourceKeys || []).filter(k => /^(interview:|wvs:|ytb:)/.test(k)).sort().join("|") || "ordinary";
+        const scope = (entry.sourceKeys || []).filter(k => /^(interview:|wvs:|ytb:|diary:)/.test(k)).sort().join("|") || "ordinary";
         const base = `${scope}:${memoryOccurredDay(entry.timestamp).slice(0,7)}`;
         let index = 0;
         while ((buckets.get(`${base}:${index}`)?.length || 0) >= 20) index++;

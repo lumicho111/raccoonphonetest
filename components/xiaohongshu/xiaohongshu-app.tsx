@@ -957,7 +957,7 @@ export function XiaohongshuApp({ onClose, onNotice: externalNotice, visible = tr
   function resolveAuthorAvatar(source: XiaohongshuAuthorType, authorId: string, authorName: string, seed: string): string {
     if (source === "user") return userAvatar;
     if (source === "character") return characterAvatarMap.get(authorId) || pickDefaultAvatar(`character:${authorId || authorName}`);
-    return pickDefaultAvatar(`npc:${authorName || authorId || seed}`);
+    return "/npc-default-avatar.png";
   }
 
   function getNoteAvatar(note: XiaohongshuNote): string {
@@ -974,7 +974,7 @@ export function XiaohongshuApp({ onClose, onNotice: externalNotice, visible = tr
     );
     if (character?.avatar) return character.avatar;
     if (actorName === state.profile.nickname || actorName === userIdentity?.name) return userAvatar;
-    return pickDefaultAvatar(`notice:${actorName || seed}`);
+    return "/npc-default-avatar.png";
   }
 
   function getNotificationNote(notice: XiaohongshuNotification): XiaohongshuNote | null {

@@ -1,4 +1,5 @@
 "use client";
+import {syncBilingualEdit} from "@/lib/bilingual-edit";
 import { useGenerationFeedback } from "@/components/generation-feedback";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -82,6 +83,7 @@ export function TheqooApp({ onClose, onNotice: externalNotice, visible = true, o
   const [postTranslation, setPostTranslation] = useState<"none" | TheqooForumLanguage>("ko");
   const [shareOpen, setShareOpen] = useState(false);
   const [openTranslations, setOpenTranslations] = useState<Record<string, boolean>>({});
+  const [originalDraft,setOriginalDraft]=useState({title:"",body:""});
   const [draft, setDraft] = useState({ category: "잡담", title: "", body: "" });
   const scrollRef = useRef<HTMLElement | null>(null);
   const characters = useMemo(() => loadCharacters(), []);
@@ -230,12 +232,13 @@ export function TheqooApp({ onClose, onNotice: externalNotice, visible = true, o
   };
 
   const openEditor = (p?: TheqooPost) => {
+    setOriginalDraft({title:p?.titleOriginal||"",body:p?.bodyOriginal||""});
     setPostTranslation(p ? theqooPostLanguage(p) === "zh" ? "none" : theqooPostLanguage(p) as TheqooForumLanguage : state.translationEnabled ? state.forumLanguage : "none");
     setPostId(p?.id || null);
     setDraft({
       category: LEGACY_CAT[p?.category || ""] || p?.category || "잡담",
-      title: p ? (zh ? p.titleTranslated : p.titleOriginal) : "",
-      body: p ? (zh ? p.bodyTranslated : p.bodyOriginal) : "",
+      title: p ? p.titleTranslated : "",
+      body: p ? p.bodyTranslated : "",
     });
     setPage("editor");
   };
@@ -246,7 +249,10 @@ export function TheqooApp({ onClose, onNotice: externalNotice, visible = true, o
     setPublishing(true);
     try {
       let patch: Pick<TheqooPost, "category" | "titleOriginal" | "titleTranslated" | "bodyOriginal" | "bodyTranslated">;
-      if (postTranslation !== "none") {
+      if(selected){
+        const pair=await syncBilingualEdit({appId:'theqoo',beforeOriginal:[selected.titleOriginal,selected.bodyOriginal],beforeChinese:[selected.titleTranslated,selected.bodyTranslated],original:postTranslation==='none'?[draft.title,draft.body]:[originalDraft.title,originalDraft.body],chinese:[draft.title,draft.body],bilingual:postTranslation!=='none'});
+        patch={category:draft.category,titleOriginal:pair.original[0],bodyOriginal:pair.original[1],titleTranslated:pair.chinese[0],bodyTranslated:pair.chinese[1]};
+      }else if (postTranslation !== "none") {
         const result = await translateTheqooTexts({ title: draft.title, body: draft.body }, postTranslation);
         patch = {
           category: draft.category,
@@ -579,8 +585,9 @@ export function TheqooApp({ onClose, onNotice: externalNotice, visible = true, o
       <label className={styles.languageRow}><span>发布语言</span><select aria-label="发布语言" value={postTranslation} onChange={e => setPostTranslation(e.target.value as "none" | TheqooForumLanguage)}><option value="ko">翻译为韩语</option><option value="ja">翻译为日语</option><option value="none">不翻译</option></select></label>
       <label>{t("게시판", "分类")}<select value={draft.category} onChange={e => setDraft(s => ({ ...s, category: e.target.value }))}>{CATEGORIES.slice(2).map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}</select></label>
       <label>标题<input value={draft.title} onChange={e => setDraft(s => ({ ...s, title: e.target.value }))} /></label>
-      <label>正文<textarea value={draft.body} onChange={e => setDraft(s => ({ ...s, body: e.target.value }))} /></label>
+      <label>{selected&&postTranslation!=="none"?"正文 · 中文译文":"正文"}<textarea value={draft.body} onChange={e => setDraft(s => ({ ...s, body: e.target.value }))} /></label>
       <p className={styles.hint}>{postTranslation === "none" ? "按输入原样发布，不调用翻译 API。" : "仅翻译你输入的内容，使用已绑定的翻译 API。"}</p>
+      {selected&&postTranslation!=="none"&&<><label>标题 · 原文<input value={originalDraft.title} onChange={e=>setOriginalDraft(d=>({...d,title:e.target.value}))}/></label><label>正文 · 原文<textarea value={originalDraft.body} onChange={e=>setOriginalDraft(d=>({...d,body:e.target.value}))}/></label></>}
       <button className={styles.primary} disabled={publishing} onClick={() => void saveDraft()}>{publishing ? t("처리 중…", "处理中…") : t("게시하기", "保存帖子")}</button>
     </div></main>}
 

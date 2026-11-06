@@ -28,7 +28,7 @@ export type YtbFanNote = YtbMessage & { channelId: string };
 export type YtbEarning = { id: string; channelId: string; kind: "tip" | "business"; amount: number; currency: string; originalAmount: number; originalCurrency: string; rate: number; at: number; withdrawnAt?: number; streamId?: string };
 export type YtbState = { channels: YtbChannel[]; streams: YtbStream[]; deals: YtbDeal[]; threads: YtbThread[]; groups: YtbGroup[]; notes: YtbFanNote[]; earnings: YtbEarning[]; fanAvatarUrls: string[]; backgroundId: string | null };
 
-export const YTB_STRANGER_AVATAR = "https://imgbed.heliar.top/i/1b9e462_zSPp67lH_%E9%9F%A9%E5%A5%B3%E9%83%BD%E5%9C%A8%E7%94%A8%E7%9A%84%E6%B3%A8%E9%94%80%E7%B3%BB%E5%A4%B4%E5%83%8F_4_Miseu97_%E6%9D%A5%E8%87%AA%E5%B0%8F%E7%BA%A2%E4%B9%A6%E7%BD%91%E9%A1%B5%E7%89%88.jpg";
+export const YTB_STRANGER_AVATAR = "/npc-default-avatar.png";
 
 const KEY = "ai_phone_ytb_v1";
 registerKvMigration(KEY);
@@ -48,11 +48,11 @@ export function loadYtbState(): YtbState {
       next.channels.push(peer);
       next.threads.push({ id: dm.id, userChannelId: dm.channelId, peerChannelId: peer.id, messages: [{ id: dm.id, senderId: peer.id, name: peer.name, avatar: "", original: dm.body, translated: dm.body, at: dm.at }] });
     }
-    next.channels = next.channels.map(c => c.ownerType === "npc" && !c.avatar ? { ...c, avatar: YTB_STRANGER_AVATAR } : c);
-    next.threads = next.threads.map(t => ({ ...t, messages: t.messages.map(m => !m.avatar && next.channels.some(c => c.id === m.senderId && c.ownerType === "npc") ? { ...m, avatar: YTB_STRANGER_AVATAR } : m) }));
-    next.notes = next.notes.map(n => !n.avatar ? { ...n, avatar: YTB_STRANGER_AVATAR } : n);
-    next.groups = next.groups.map(g => ({ ...g, messages: g.messages.map(m => !m.avatar && !next.channels.some(c => c.id === m.senderId) ? { ...m, avatar: YTB_STRANGER_AVATAR } : m) }));
-    next.streams = next.streams.map(s => ({ ...s, calls: s.calls.map(c => !c.avatar && !c.channelId ? { ...c, avatar: YTB_STRANGER_AVATAR } : c) }));
+    next.channels = next.channels.map(c => c.ownerType === "npc" ? { ...c, avatar: YTB_STRANGER_AVATAR } : c);
+    next.threads = next.threads.map(t => ({ ...t, messages: t.messages.map(m => next.channels.some(c => c.id === m.senderId && c.ownerType === "npc") ? { ...m, avatar: YTB_STRANGER_AVATAR } : m) }));
+    next.notes = next.notes.map(n => true ? { ...n, avatar: YTB_STRANGER_AVATAR } : n);
+    next.groups = next.groups.map(g => ({ ...g, messages: g.messages.map(m => !next.channels.some(c => c.id === m.senderId) ? { ...m, avatar: YTB_STRANGER_AVATAR } : m) }));
+    next.streams = next.streams.map(s => ({ ...s, calls: s.calls.map(c => !c.channelId ? { ...c, avatar: YTB_STRANGER_AVATAR } : c) }));
     next.deals = next.deals.filter(d => d.status !== "declined");
     return next;
   } catch { return emptyYtbState(); }

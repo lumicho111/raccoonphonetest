@@ -15,7 +15,6 @@ import { mdiHammerWrench } from "@mdi/js";
 import { CustomAppRunner } from "@/components/app-market/custom-app-runner";
 import { CustomAppForegroundBoundary } from "@/components/app-market/custom-app-failure";
 import { GameHubApp } from "@/components/game/game-hub-app";
-import { BlackMarketApp } from "@/components/shopping/black-market-app";
 import { getInstalledCustomApp } from "@/lib/custom-app-storage";
 import type { QaCreatedContent } from "@/lib/qa-agent-tools";
 import {
@@ -1586,7 +1585,7 @@ export function PhoneQaApp({ onClose, onNotice }: PhoneQaAppProps) {
           ) : previewItem.type === "game" ? (
             <GameHubApp onClose={() => setPreviewItem(null)} autoOpenLocalId={previewItem.refId} />
           ) : (
-            <BlackMarketApp onClose={() => setPreviewItem(null)} autoOpenLocalId={previewItem.refId} />
+            <p>该功能已移除</p>
           )}
         </div>
       )}

@@ -67,7 +67,7 @@ const translatedBody = (original: string, translated?: string) => {
   return { body: body.replace(/#[\p{L}\p{N}_]+/gu, "").trim(), tags };
 };
 const hasTranslatedVersion = (original: string, translated?: string) => !!translated && translated !== original && (!/[\u3400-\u9fff]/.test(original.replace(/#[\p{L}\p{N}_]+/gu, "")) || !!sourceLanguage(original));
-const STRANGER_AVATAR = "https://imgbed.heliar.top/i/Q3w-VKasJ0oD-MB1_%E2%9A%AB%EF%B8%8F_1_see3lvy__%E6%9D%A5%E8%87%AA%E5%B0%8F%E7%BA%A2%E4%B9%A6%E7%BD%91%E9%A1%B5%E7%89%88.jpg";
+const STRANGER_AVATAR = "/npc-default-avatar.png";
 
 function StoredImage({ imageRef, className = "" }: { imageRef?: string; className?: string }) {
   const [url, setUrl] = useState("");
@@ -245,9 +245,9 @@ export function TwitterApp({ onClose, onNotice: externalNotice }: Props) {
     if (id === "user") return user;
     if (state.communityCharacters[id]) {
       const item = state.communityCharacters[id]; const override = state.accounts[id];
-      return { name: override?.name || item.name, handle: override?.handle || item.handle, bio: override?.bio || item.bio, avatarUrl: override?.avatarUrl || item.avatarUrl, bannerUrl: override?.bannerUrl, visibility: override?.visibility || "public", followers: override?.followers, followingCount: override?.followingCount };
+      return { name: override?.name || item.name, handle: override?.handle || item.handle, bio: override?.bio || item.bio, avatarUrl: STRANGER_AVATAR, bannerUrl: override?.bannerUrl, visibility: override?.visibility || "public", followers: override?.followers, followingCount: override?.followingCount };
     }
-    if (state.accounts[id]) return state.accounts[id];
+    if (state.accounts[id]) return id.startsWith("npc:") ? {...state.accounts[id],avatarUrl:STRANGER_AVATAR} : state.accounts[id];
     const char = characters.find(c => c.id === id);
     const own = state.characterProfiles[id];
     return { ...own, name: own?.name || char?.name || "已移除角色", handle: own?.handle || (char?.name || "character").replace(/\s+/g, "_").toLowerCase(), avatarUrl: own?.avatarUrl || char?.avatar || "", bannerUrl: own?.bannerUrl || "", bio: own?.bio || "" };

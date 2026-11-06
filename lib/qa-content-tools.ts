@@ -175,26 +175,27 @@ const contentGuideTool: QaContentTool = {
         "读取三类本机内容的官方制作说明（自定义APP / 小游戏 / 黑市剧场）。动手写内容前必读：包含运行时协议、可用 API、字段含义与限制。",
     schemaLines: [
         "  参数：",
-        "    · type (必填) — app / game / theater",
+        "    · type (必填) — app / game",
         "    · page (可选) — 指南较长时分页返回，默认第 1 页",
         '  调用：[执行动作:创作指南({"type":"game"})]',
     ],
     parameters: {
         type: "object",
         properties: {
-            type: { type: "string", enum: ["app", "game", "theater"], description: "内容类型" },
+            type: { type: "string", enum: ["app", "game"], description: "内容类型" },
             page: { type: "number", description: "页码，默认 1" },
         },
         required: ["type"],
     },
     async run(args) {
         const type = text(args.type, 20);
+        if(type === "theater")return "小剧场功能已移除。";
         const guide =
             type === "app" ? CUSTOM_APP_CREATOR_GUIDE_MD
             : type === "game" ? GAME_CREATOR_GUIDE_MD
             : type === "theater" ? THEATER_GUIDE_MD
             : null;
-        if (!guide) return "type 需为 app / game / theater 之一。";
+        if (!guide) return "type 需为 app / game 之一。";
         const pageSize = getQaPageChars();
         const pages = Math.max(1, Math.ceil(guide.length / pageSize));
         const page = Math.min(pages, Math.max(1, typeof args.page === "number" ? Math.floor(args.page) : 1));
@@ -806,7 +807,7 @@ const readContentTool: QaContentTool = {
     parameters: {
         type: "object",
         properties: {
-            type: { type: "string", enum: ["app", "game", "theater"], description: "内容类型" },
+            type: { type: "string", enum: ["app", "game"], description: "内容类型" },
             name: { type: "string", description: "APP 名 / 游戏标题 / 剧场档案名（先用「清单」查有什么）" },
             page: { type: "number", description: "内容较长时分页返回，默认第 1 页" },
         },
@@ -816,13 +817,14 @@ const readContentTool: QaContentTool = {
         "读取一条本机内容的完整源码与字段：自定义 APP（含 HTML）、游戏（草稿箱优先，其次本机测试）、剧场（草稿箱优先，其次本机测试）。修改前先读，改完用对应的保存/安装工具写回。",
     schemaLines: [
         "  参数：",
-        "    · type (必填) — app / game / theater",
+        "    · type (必填) — app / game",
         "    · name (必填) — APP 名 / 游戏标题 / 剧场档案名",
         "    · page (可选) — 内容较长时分页，默认第 1 页",
         '  调用：[执行动作:读取本机内容({"type":"game","name":"五子棋"})]',
     ],
     async run(args) {
         const type = text(args.type, 20);
+        if(type === "theater")return "小剧场功能已移除。";
         const name = text(args.name, 80);
         if (!name) return "缺少 name。先用「清单」看看本机有什么。";
 
@@ -915,7 +917,7 @@ const readContentTool: QaContentTool = {
             return paginate(doc, args.page, `本机测试剧场「${t.title}」`);
         }
 
-        return "type 需为 app / game / theater 之一。";
+        return "type 需为 app / game 之一。";
     },
 };
 
@@ -1151,29 +1153,6 @@ const listContentTool: QaContentTool = {
         total += gameHits.length;
         lines.push(`本机测试游戏（${keyword ? `命中 ${gameHits.length}/${games.length} 个` : `${games.length} 个`}）：${gameHits.length ? gameHits.map((r) => `${r.item}${hitMark(r.hits)}`).join("、") : "无"}`);
 
-        const bmDrafts = loadBmDrafts();
-        const bmDraftHits = bmDrafts
-            .map((d) => ({
-                item: `${d.title}${draftMark(Boolean(d.sourceTemplateId), d.hasUnpublishedChanges)}`,
-                hits: keywordHits([["标题", d.title], ["subtitle", text(d.draft.subtitle, 300) || ""], ["synopsis", text(d.draft.synopsis, 1000) || ""], ["storyText", text(d.draft.storyText, 3000) || ""], ["标签", text(d.draft.tagsText, 200) || ""], ["aiInstruction", String(d.draft.aiInstruction ?? "")], ["openingHtml", String(d.draft.openingHtml ?? "")]], keyword),
-            }))
-            .filter((r) => !r.hits || r.hits.length > 0);
-        total += bmDraftHits.length;
-        lines.push(`剧场草稿箱（${keyword ? `命中 ${bmDraftHits.length}/${bmDrafts.length} 个` : `${bmDrafts.length} 个`}）：${bmDraftHits.length ? bmDraftHits.map((r) => `${r.item}${hitMark(r.hits)}`).join("、") : "无"}`);
-
-        const theaters = loadBlackMarketState().ownedTheaters.filter((t) => isLocalTestTheaterId(t.localId));
-        const theaterHits = theaters
-            .map((t) => {
-                const tmpl = t.templateSnapshot;
-                return {
-                    item: tmpl.title,
-                    hits: keywordHits([["标题", tmpl.title], ["subtitle", tmpl.subtitle || ""], ["synopsis", tmpl.synopsis || ""], ["storyText", tmpl.storyText || ""], ["标签", (tmpl.tags || []).join("、")], ["aiInstruction", tmpl.aiInstruction || ""], ["openingHtml", tmpl.openingHtml || ""]], keyword),
-                };
-            })
-            .filter((r) => !r.hits || r.hits.length > 0);
-        total += theaterHits.length;
-        lines.push(`本机测试剧场（${keyword ? `命中 ${theaterHits.length}/${theaters.length} 个` : `${theaters.length} 个`}）：${theaterHits.length ? theaterHits.map((r) => `${r.item}${hitMark(r.hits)}`).join("、") : "无"}`);
-
         if (keyword) {
             lines.unshift(`【关键词「${keyword}」命中 ${total} 条】`);
         }
@@ -1190,7 +1169,7 @@ const exportContentTool: QaContentTool = {
     parameters: {
         type: "object",
         properties: {
-            type: { type: "string", enum: ["app", "game", "theater"], description: "内容类型" },
+            type: { type: "string", enum: ["app", "game"], description: "内容类型" },
             name: { type: "string", description: "APP 名 / 游戏草稿标题 / 剧场草稿标题" },
         },
         required: ["type", "name"],
@@ -1199,12 +1178,13 @@ const exportContentTool: QaContentTool = {
         "把一条本机内容导出为文件下载（blob 下载，不刷新页面），用户可发给别人导入：APP 导出市场同款 zip 安装包（对方从应用市场上传导入）；游戏/剧场导出草稿 JSON（对方从草稿箱「从文件导入」）。游戏/剧场只支持草稿——本机测试内容先用对应的存草稿工具转成草稿再导出。",
     schemaLines: [
         "  参数：",
-        "    · type (必填) — app / game / theater",
+        "    · type (必填) — app / game",
         "    · name (必填) — APP 名 / 游戏草稿标题 / 剧场草稿标题",
         '  调用：[执行动作:导出文件({"type":"app","name":"番茄钟"})]',
     ],
     async run(args) {
         const type = text(args.type, 20);
+        if(type === "theater")return "小剧场功能已移除。";
         const name = text(args.name, 80);
         if (!name) return "缺少 name。先用「清单」看看本机有什么。";
         try {
@@ -1233,7 +1213,7 @@ const exportContentTool: QaContentTool = {
                 await downloadFile(blob, `${draft.title.trim() || "剧场草稿"}.json`);
                 return `已导出剧场草稿「${draft.title}」。对方在 黑市 → 工作室 → 创建发布 →「导入草稿文件」选择该文件即可导入。`;
             }
-            return "type 需为 app / game / theater 之一。";
+            return "type 需为 app / game 之一。";
         } catch (error) {
             return `导出失败：${error instanceof Error ? error.message : String(error)}`;
         }
@@ -1371,6 +1351,7 @@ function saveBmDraftRecord(record: BmStudioDraftRecord, draft: Record<string, un
 /** 统一「写入」的 game/theater 半边：按字段写草稿，允许逐字段建稿、append 分段追加 */
 export async function workbenchWriteLocal(args: Record<string, unknown>): Promise<string> {
     const type = text(args.type, 20);
+        if(type === "theater")return "小剧场功能已移除。";
     const name = text(args.name, 80);
     const content = typeof args.content === "string" ? args.content : "";
     const append = args.append === true;
@@ -1421,6 +1402,7 @@ export async function workbenchWriteLocal(args: Record<string, unknown>): Promis
 /** 统一「编辑」的本机半边：find/replace 改草稿字段 / 应用暂存文件 / 已装 APP */
 export async function workbenchEditLocal(args: Record<string, unknown>, context?: WbContext): Promise<string> {
     const type = text(args.type, 20);
+        if(type === "theater")return "小剧场功能已移除。";
     const name = text(args.name, 80);
     const find = typeof args.find === "string" ? args.find : "";
     const replace = typeof args.replace === "string" ? args.replace : "";
@@ -1487,12 +1469,13 @@ export async function workbenchEditLocal(args: Record<string, unknown>, context?
         return `✓ 已替换剧场草稿「${name}」${key} 的 ${result.count} 处${note}。改完用「发布」type=theater 重新上架生效。`;
     }
 
-    return "type 需为 app / game / theater（repo 编辑由仓库路由处理）。";
+    return "type 需为 app / game（repo 编辑由仓库路由处理）。";
 }
 
 /** 统一「发布」的本机半边：暂存组包 / 单文件安装 / 草稿安装上架 */
 export async function workbenchPublishLocal(args: Record<string, unknown>, context?: WbContext): Promise<string> {
     const type = text(args.type, 20);
+        if(type === "theater")return "小剧场功能已移除。";
     const name = text(args.name, 80);
     const findTool = (native: string) => QA_CONTENT_TOOLS.find((tool) => tool.nativeName === native)!;
 
@@ -1524,7 +1507,7 @@ export async function workbenchPublishLocal(args: Record<string, unknown>, conte
         if (!name) return "缺少 name（草稿标题）。";
         return findTool("install_local_theater").run({ title: name, fromDraft: true }, context);
     }
-    return "type 需为 app / game / theater（repo 由仓库路由处理）。";
+    return "type 需为 app / game（repo 由仓库路由处理）。";
 }
 
 /** 应用暂存区状态（统一「清单」附加显示用） */
@@ -1736,9 +1719,7 @@ export const QA_CONTENT_TOOLS = [
     stageAppFileTool,
     installStagedAppTool,
     installGameTool,
-    installTheaterTool,
     saveGameDraftTool,
-    saveTheaterDraftTool,
     exportContentTool,
     contribCompareTool,
     contribDiffTool,

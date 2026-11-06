@@ -30,7 +30,6 @@ import {
 
 import { CheckPhoneBilingualText, normalizeCheckPhoneText } from "@/components/checkphone/checkphone-bilingual-text";
 import { CheckPhoneDebugErrorCard } from "@/components/checkphone/checkphone-debug-error-card";
-import { BlackMarketApp } from "@/components/shopping/black-market-app";
 import { ConfirmDialog } from "@/components/ui";
 import { splitBilingualText } from "@/lib/bilingual-text";
 import { loadCharacters } from "@/lib/character-storage";
@@ -190,9 +189,7 @@ function normalizeShoppingSearchValue(value: string): string {
   return normalizeCheckPhoneText(value).trim().toLowerCase();
 }
 
-function isBlackMarketSearchTrigger(value: string): boolean {
-  return normalizeShoppingSearchValue(value).replace(/\s+/g, " ") === "black market";
-}
+
 
 function shoppingFieldsMatchSearch(fields: Array<string | undefined>, normalizedQuery: string): boolean {
   if (!normalizedQuery) return true;
@@ -504,11 +501,8 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
   const [addressOwnerId, setAddressOwnerId] = useState("");
   const [addressDraft, setAddressDraft] = useState({ name: "", phone: "", country: "", city: "", street: "" });
   const [shipGift, setShipGift] = useState<ShoppingGiftCandidate | null>(null);
-  const [blackMarketOpen, setBlackMarketOpen] = useState(false);
-  const [blackMarketTransition, setBlackMarketTransition] = useState(false);
   const cartFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const blackMarketTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shoppingScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollRestoreFrameRef = useRef<number | null>(null);
   const wasVisibleRef = useRef(visible);
@@ -554,9 +548,6 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     }
     if (cartPulseTimerRef.current) {
       clearTimeout(cartPulseTimerRef.current);
-    }
-    if (blackMarketTransitionTimerRef.current) {
-      clearTimeout(blackMarketTransitionTimerRef.current);
     }
     if (scrollRestoreFrameRef.current !== null) {
       window.cancelAnimationFrame(scrollRestoreFrameRef.current);
@@ -853,35 +844,14 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     setSelectedProduct(null);
   }
 
-  function enterBlackMarketFromSearch() {
-    if (blackMarketTransition) return;
-    if (blackMarketTransitionTimerRef.current) {
-      clearTimeout(blackMarketTransitionTimerRef.current);
-    }
-    setBlackMarketTransition(true);
-    setSelectedCategoryId("all");
-    setSelectedProduct(null);
-    setSelectedOrderId(null);
-    setTranslationPreview(null);
-    setError(null);
-    setDebugRawOutput(null);
-    blackMarketTransitionTimerRef.current = setTimeout(() => {
-      setSearchInput("");
-      setBlackMarketTransition(false);
-      setBlackMarketOpen(true);
-      blackMarketTransitionTimerRef.current = null;
-    }, 920);
-  }
+
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const mode = selectedTab === "food" ? "food" : "shop";
     const query = (mode === "food" ? foodSearchInput : searchInput).trim();
-    if (!query || loading || blackMarketTransition) return;
-    if (mode === "shop" && isBlackMarketSearchTrigger(query)) {
-      enterBlackMarketFromSearch();
-      return;
-    }
+    if (!query || loading) return;
+
     setLoadingTask("search");
     setError(null);
     setDebugRawOutput(null);
@@ -1486,9 +1456,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     );
   }
 
-  if (blackMarketOpen) {
-    return <BlackMarketApp onClose={() => setBlackMarketOpen(false)} />;
-  }
+
 
   return (
     <div className="cp-shopping-module" style={{ background: "#f8f9fa", fontFamily: "sans-serif" }}>
@@ -1519,16 +1487,6 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
         </div>
       ) : null}
 
-      {blackMarketTransition ? (
-        <div className="cp-shopping-black-market-gate" role="status" aria-live="polite">
-          <div className="cp-shopping-black-market-gate-noise" />
-          <div className="cp-shopping-black-market-gate-panel">
-            <span>SEARCH QUERY ACCEPTED</span>
-            <strong data-text="BLACK MARKET">BLACK MARKET</strong>
-            <em>&gt; routing through night channel...</em>
-          </div>
-        </div>
-      ) : null}
 
       <div className="cp-shopping-body">
         {!loaded && <div className="cp-shopping-status">Syncing storefront...</div>}
@@ -1553,10 +1511,10 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                       } }
                     }}
                     placeholder={selectedTab === "food" ? "搜索外卖" : "搜索商品"}
-                    disabled={loading || blackMarketTransition}
+                    disabled={loading}
                     style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#222", fontSize: "calc(13px*var(--app-text-scale,1))", height: "38px" }}
                   />
-                  <button type="submit" disabled={!(selectedTab === "food" ? foodSearchInput : searchInput).trim() || loading || blackMarketTransition} style={{ border: "none", background: (selectedTab === "food" ? foodSearchInput : searchInput).trim() && !loading && !blackMarketTransition ? "#ff6b00" : "#eee", color: (selectedTab === "food" ? foodSearchInput : searchInput).trim() && !loading && !blackMarketTransition ? "#fff" : "#aaa", borderRadius: "16px", height: "30px", padding: "0 12px", minWidth: "88px", fontSize: "calc(12px*var(--app-text-scale,1))", fontWeight: 700, whiteSpace: "nowrap" }}>
+                  <button type="submit" disabled={!(selectedTab === "food" ? foodSearchInput : searchInput).trim() || loading} style={{ border: "none", background: (selectedTab === "food" ? foodSearchInput : searchInput).trim() && !loading ? "#ff6b00" : "#eee", color: (selectedTab === "food" ? foodSearchInput : searchInput).trim() && !loading ? "#fff" : "#aaa", borderRadius: "16px", height: "30px", padding: "0 12px", minWidth: "88px", fontSize: "calc(12px*var(--app-text-scale,1))", fontWeight: 700, whiteSpace: "nowrap" }}>
                     搜索新物品
                   </button>
                 </form>}
