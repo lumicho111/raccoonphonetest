@@ -65,6 +65,6 @@ export async function generateCityHistory(mode:'world'|'friends'|'private',selec
  }
  const next=loadCity();if(ids.some(id=>!next.enrolled?.includes(id)))throw Error('角色已移出，本批未保存');
  next.accounts.push(...npcAccounts);for(const a of npcAccounts)next.books.push({id:personalBook(a.id),kind:'personal',name:'日记本',owner:a.id,members:[a.id],invited:[]});
- next.entries.push(...pending);saveCity(next);return pending.length;
+ next.entries.push(...pending);saveCity(next);if(mode!=='private')void import('./icity-runtime').then(m=>m.reactCityWorldLikes(pending.map(e=>e.id))).catch(e=>console.warn('[iCity] browse skipped',e));return pending.length;
  }finally{historyBusy=false;}
 }
