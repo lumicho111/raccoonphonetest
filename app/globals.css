@@ -124,3 +124,7 @@
 .phone-shell:has(.hb-browser[data-browser-page="site"])>.phone-status-bar{color:#f2f2f4}
 .phone-shell:has(.hb-browser[data-browser-page="ordinary"])>.phone-status-bar{color:var(--c-text-title,#25262a)}
 .phone-shell:has(.hb-browser[data-browser-page="ordinary"]:not([data-browser-owner="user"]))>.phone-status-bar{color:#1a1a1a}
+
+/* resource023: disclosure typography follows the surrounding app controls. */
+.social-disclosure.social-disclosure>strong{display:block;font-family:inherit;font-size:calc(12px * var(--app-text-scale,1));font-weight:600;line-height:1.65;margin:0 0 5px}
+.social-disclosure.social-disclosure>p{font-family:inherit;font-size:calc(11px * var(--app-text-scale,1));font-weight:400;line-height:1.7;margin:0 0 10px;color:inherit;opacity:.58}

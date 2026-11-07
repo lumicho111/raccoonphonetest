@@ -1,7 +1,7 @@
 {
-  "apk":"1.0.7",
-  "nativeBuild":9,
-  "resource":"rabbit-resource-022",
-  "sequence":22,
-  "includes":"cumulative from 1.0.7 native baseline; X account identity, frozen shares, YouTube inspection bridge and opt-in in-phone interaction alerts"
+  "apk": "1.0.7",
+  "nativeBuild": 9,
+  "resource": "rabbit-resource-025",
+  "sequence": 25,
+  "includes": "cumulative native build9 resources; user-supplied browser file replacement, explicit NovelNow draft resume and compact default desktop placement"
 }

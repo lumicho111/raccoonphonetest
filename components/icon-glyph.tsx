@@ -69,6 +69,7 @@ const MDI_PATHS: Record<IconId, string> = {
   mapmode: mdiMapMarker,
   qa: mdiHammerWrench,
   offstage: mdiMessageProcessing,
+  novel: mdiBookOpenVariant,
   moments: mdiCamera,
   group_chat: mdiAccountGroup,
   theme: mdiPalette,

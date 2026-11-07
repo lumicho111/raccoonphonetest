@@ -34,7 +34,8 @@ export type IconId =
   | "resource_hub"
   | "characters"
   | "qa"
-  | "offstage";
+  | "offstage"
+  | "novel";
 
 // 桌面文件夹：以 folder: 前缀的 id 伪装成图标占一个格子参与拖拽/换页，
 // 内容（名字 + 成员图标）另存 DesktopFolderMap。文件夹不允许进 dock。
@@ -82,6 +83,7 @@ export const DOCK_DEFAULT: IconId[] = ["settings", "theme", "resources", "charac
 
 export const ICONS: Record<IconId, IconMeta> = {
   browser:{id:"browser",label:"浏览器",tone:"#348ce7",placeholder:false},
+  novel: {id:"novel",label:"NovelNow",tone:"#333333",placeholder:false},
   offstage: {id:"offstage",label:"幕后",tone:"#343434",placeholder:false},
   chat: { id: "chat", label: "\u804a\u5929", tone: "var(--c-icon-green)", placeholder: false },
   photos: { id: "photos", label: "照片", tone: "var(--c-icon-rose)", placeholder: false },

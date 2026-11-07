@@ -95,27 +95,18 @@ function flowIconsToPositions(icons: DesktopIconId[], occupied?: boolean[][]): I
   return result;
 }
 
-export function createDefaultDesktopIconLayout(_widgets: WidgetInstance[] = []): DesktopIconLayout {
-  return {
-    page1: PAGE_1_DEFAULT.map((id, i) => ({
-      id,
-      row: 5 + Math.floor(i / GRID_COLS),
-      col: (i % GRID_COLS) + 1,
-    })),
-    // 第二页：第 4 行留给 iOS 操作菜单组件，图标从第 5 行开始
-    page2: PAGE_2_DEFAULT.map((id, i) => ({
-      id,
-      row: 5 + Math.floor(i / GRID_COLS),
-      col: (i % GRID_COLS) + 1,
-    })),
-    // 第三页：右半边 2×2（第 4~5 行、第 3~4 列），左半边留给日历组件
-    page3: PAGE_3_DEFAULT.filter(id => id !== "question_box").map((id, i) => ({
-      id,
-      row: 4 + Math.floor(i / 2),
-      col: 3 + (i % 2),
-    })),
-    page4: [{ id: "question_box", row: 1, col: 1 }, { id: "worldline", row: 1, col: 2 }, {id:"offstage",row:1,col:3}],
-  } as DesktopIconLayout;
+export function createDefaultDesktopIconLayout(widgets: WidgetInstance[] = []): DesktopIconLayout {
+  // Only fresh/reset layouts are packed. Existing user positions are never rewritten here.
+  const icons = [...new Set<DesktopIconId>([...PAGE_1_DEFAULT, ...PAGE_2_DEFAULT, ...PAGE_3_DEFAULT, "worldline", "offstage", "novel"])]
+    .filter(id => !DOCK_DEFAULT.includes(id as IconId));
+  const layout = { page1: [], page2: [] } as DesktopIconLayout;
+  let index = 0;
+  for (let page = 1; index < icons.length && page <= 50; page++) {
+    const positions = flowIconsToPositions(icons.slice(index), buildWidgetOccupancy(widgets, page));
+    if (positions.length) layout[getDesktopPageKey(page)] = positions;
+    index += positions.length;
+  }
+  return layout;
 }
 
 function normalizePage(raw: unknown, folderIds?: Set<string>): IconPosition[] {
@@ -355,9 +346,8 @@ export function ensureNativeSmsIcon(
   if (present.has("sms")) return { layout, changed: false };
 
   const next = { ...layout } as DesktopIconLayout;
-  // Prefer page 3 because its right-hand area is the native-app expansion page in
-  // the current default desktop. Fall through to later pages if the cell is occupied.
-  for (let page = 3; page <= 50; page++) {
+  // Missing built-ins use the earliest free cell without moving saved icons.
+  for (let page = 1; page <= 50; page++) {
     const pageKey = getDesktopPageKey(page);
     const icons = next[pageKey] ?? [];
     const occupied = buildWidgetOccupancy(widgets, page);
@@ -366,9 +356,7 @@ export function ensureNativeSmsIcon(
         occupied[icon.row - 1][icon.col - 1] = true;
       }
     }
-    const preferredCells = page === 3
-      ? [[5, 3], [5, 4], [6, 3], [6, 4], [4, 3], [4, 4]]
-      : Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, (i % GRID_COLS) + 1]);
+    const preferredCells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, (i % GRID_COLS) + 1]);
     const cell = preferredCells.find(([row, col]) => !occupied[row - 1]?.[col - 1]);
     if (!cell) continue;
     next[pageKey] = [...icons, { id: "sms", row: cell[0], col: cell[1] }];
@@ -389,13 +377,12 @@ export function ensureNativeTwitterIcon(
   for (const folder of Object.values(folders)) folder.icons.forEach(id => present.add(id));
   if (present.has("twitter")) return { layout, changed: false };
   const next = { ...layout } as DesktopIconLayout;
-  for (let page = 3; page <= 50; page++) {
+  for (let page = 1; page <= 50; page++) {
     const key = getDesktopPageKey(page);
     const icons = next[key] ?? [];
     const occupied = buildWidgetOccupancy(widgets, page);
     for (const icon of icons) if (icon.row >= 1 && icon.row <= GRID_ROWS && icon.col >= 1 && icon.col <= GRID_COLS) occupied[icon.row - 1][icon.col - 1] = true;
-    const cells = page === 3 ? [[5, 4], [6, 4], [6, 3], [5, 3], [4, 4], [4, 3]]
-      : Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
+    const cells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
     const cell = cells.find(([row, col]) => !occupied[row - 1]?.[col - 1]);
     if (!cell) continue;
     next[key] = [...icons, { id: "twitter", row: cell[0], col: cell[1] }];
@@ -413,7 +400,7 @@ export function ensureNativePhoneIcon(
   for (const folder of Object.values(folders)) folder.icons.forEach(id => present.add(id));
   if (present.has("phone")) return { layout, changed: false };
   const next = { ...layout } as DesktopIconLayout;
-  for (let page = 3; page <= 50; page++) {
+  for (let page = 1; page <= 50; page++) {
     const key = getDesktopPageKey(page); const icons = next[key] ?? []; const occupied = buildWidgetOccupancy(widgets, page);
     for (const icon of icons) if (icon.row >= 1 && icon.row <= GRID_ROWS && icon.col >= 1 && icon.col <= GRID_COLS) occupied[icon.row - 1][icon.col - 1] = true;
     const cells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
@@ -432,7 +419,7 @@ export function ensureNativeQuestionBoxIcon(
   for (const folder of Object.values(folders)) folder.icons.forEach(id => present.add(id));
   if (present.has("question_box")) return { layout, changed: false };
   const next = { ...layout } as DesktopIconLayout;
-  for (let page = 3; page <= 50; page++) {
+  for (let page = 1; page <= 50; page++) {
     const key = getDesktopPageKey(page); const icons = next[key] ?? []; const occupied = buildWidgetOccupancy(widgets, page);
     for (const icon of icons) if (icon.row >= 1 && icon.row <= GRID_ROWS && icon.col >= 1 && icon.col <= GRID_COLS) occupied[icon.row - 1][icon.col - 1] = true;
     const cells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
@@ -451,7 +438,7 @@ export function ensureNativeTheqooIcon(
   for (const folder of Object.values(folders)) folder.icons.forEach(id => present.add(id));
   if (present.has("theqoo")) return { layout, changed: false };
   const next = { ...layout } as DesktopIconLayout;
-  for (let page = 3; page <= 50; page++) {
+  for (let page = 1; page <= 50; page++) {
     const key = getDesktopPageKey(page); const icons = next[key] ?? []; const occupied = buildWidgetOccupancy(widgets, page);
     for (const icon of icons) if (icon.row >= 1 && icon.row <= GRID_ROWS && icon.col >= 1 && icon.col <= GRID_COLS) occupied[icon.row - 1][icon.col - 1] = true;
     const cells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
@@ -470,7 +457,7 @@ export function ensureNativeWorldlineIcon(
   for (const folder of Object.values(folders)) folder.icons.forEach(id => present.add(id));
   if (present.has("worldline")) return { layout, changed: false };
   const next = { ...layout } as DesktopIconLayout;
-  for (let page = 4; page <= 50; page++) {
+  for (let page = 1; page <= 50; page++) {
     const key = getDesktopPageKey(page); const icons = next[key] ?? []; const occupied = buildWidgetOccupancy(widgets, page);
     for (const icon of icons) if (icon.row >= 1 && icon.row <= GRID_ROWS && icon.col >= 1 && icon.col <= GRID_COLS) occupied[icon.row - 1][icon.col - 1] = true;
     const cells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
@@ -488,12 +475,30 @@ export function ensureNativeOffstageIcon(
   for (const folder of Object.values(folders)) folder.icons.forEach(id => present.add(id));
   if (present.has("offstage")) return { layout, changed: false };
   const next = { ...layout } as DesktopIconLayout;
-  for (let page = 4; page <= 50; page++) {
+  for (let page = 1; page <= 50; page++) {
     const key = getDesktopPageKey(page); const icons = next[key] ?? []; const occupied = buildWidgetOccupancy(widgets, page);
     for (const icon of icons) if (icon.row >= 1 && icon.row <= GRID_ROWS && icon.col >= 1 && icon.col <= GRID_COLS) occupied[icon.row - 1][icon.col - 1] = true;
     const cells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
     const cell = cells.find(([row,col]) => !occupied[row-1]?.[col-1]); if (!cell) continue;
     next[key] = [...icons, { id: "offstage", row: cell[0], col: cell[1] }]; return { layout: next, changed: true };
+  }
+  return { layout, changed: false };
+}
+
+export function ensureNativeNovelIcon(
+  layout: DesktopIconLayout, widgets: WidgetInstance[] = [], dock: DesktopIconId[] = [], folders: DesktopFolderMap = {},
+): { layout: DesktopIconLayout; changed: boolean } {
+  const present = new Set<string>(dock);
+  for (const item of getDesktopIconLayoutItems(layout)) present.add(item.id);
+  for (const folder of Object.values(folders)) folder.icons.forEach(id => present.add(id));
+  if (present.has("novel")) return { layout, changed: false };
+  const next = { ...layout } as DesktopIconLayout;
+  for (let page = 1; page <= 50; page++) {
+    const key = getDesktopPageKey(page); const icons = next[key] ?? []; const occupied = buildWidgetOccupancy(widgets, page);
+    for (const icon of icons) if (icon.row >= 1 && icon.row <= GRID_ROWS && icon.col >= 1 && icon.col <= GRID_COLS) occupied[icon.row - 1][icon.col - 1] = true;
+    const cells = Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => [Math.floor(i / GRID_COLS) + 1, i % GRID_COLS + 1]);
+    const cell = cells.find(([row,col]) => !occupied[row-1]?.[col-1]); if (!cell) continue;
+    next[key] = [...icons, { id: "novel", row: cell[0], col: cell[1] }]; return { layout: next, changed: true };
   }
   return { layout, changed: false };
 }

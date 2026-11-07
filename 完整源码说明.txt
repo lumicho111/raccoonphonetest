@@ -1,10 +1,2 @@
-兔版 Float build9 资源更新019完整源码备份
-
-原生APK：1.0.7 / build9；资源更新：019。
-本源码包含截至019的累积修改，更新说明见RESOURCE_019_NOTES.txt。
-
-检查：npm ci；npx tsc --noEmit；node scripts/check-resource019.cjs；node scripts/check-resource018.cjs；node scripts/check-resource017.cjs。
-手机资源构建：npm run android:web。原生源码与资源更新构建脚本保留；签名私钥不附在源码包中。
-
-后台通话/直播指小手机内切换App；尚未完成整个APK退到系统后台或锁屏后的原生持续运行改造。
-未使用真实模型、语音/生图服务或真实Android设备完成端到端测试。旧日记找不到问题尚未复现，不在本次已修复声明中。
+资源025完整源码本地备份。APK原生版本1.0.7/build9。浏览器文件按用户上传版本直接替换，无语义检查或内容对比。
+源码仓库与Vercel不更新，只发布既有APK更新资源。

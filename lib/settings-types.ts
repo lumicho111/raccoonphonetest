@@ -266,19 +266,20 @@ export type ImageGenerationSettings = {
 
 // Content apps that can have per-character bindings.
 export type ContentAppId =
-    | "chat" | "diary" | "music" | "reading"
+    | "novel" | "chat" | "diary" | "music" | "reading"
     | "cocreate" | "story" | "game" | "xiaohongshu" | "dwelling"
     | "checkphone" | "shopping" | "calendar" | "interview_magazine"
     | "moments" | "worldline" | "phone" | "group_chat" | "vn" | "adventure" | "weverse" | "ytb" | "lysn" | "sms" | "twitter" | "theqoo";
 
 export const CONTENT_APP_IDS: ContentAppId[] = [
-    "chat", "diary", "music", "reading",
+    "novel", "chat", "diary", "music", "reading",
     "story", "game", "xiaohongshu", "dwelling",
     "checkphone", "shopping", "calendar", "interview_magazine",
     "moments", "group_chat", "adventure", "weverse", "ytb", "lysn", "sms", "twitter", "theqoo"
 ];
 
 export const CONTENT_APP_LABELS: Record<ContentAppId, string> = {
+    novel: "NovelNow",
     chat: "聊天",
     diary: "iCity",
     music: "音乐",

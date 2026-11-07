@@ -8,6 +8,7 @@ import {setReversePageIntent} from "@/lib/reverse-phone-state";
 import {REVERSE_NAV} from "@/lib/reverse-phone-runtime";
 import {useAppBack} from "@/lib/back-navigation";
 import { PhoneLockScreen } from "./phone-lock-screen";
+import { NovelApp } from "./novel/novel-app";
 import { OffstageApp } from "./offstage-app";
 import { isRingtoneSource } from "@/lib/ringtone-source";
 import { chatContactDisplayName, chatPokeDisplayName } from "@/lib/communication-display-name";
@@ -149,6 +150,7 @@ import {
   ensureNativeQuestionBoxIcon,
   ensureNativeWorldlineIcon,
   ensureNativeOffstageIcon,
+  ensureNativeNovelIcon,
 } from "@/lib/desktop-layout-storage";
 import { WidgetRenderer } from "@/components/widgets/widget-renderer";
 import type { DIYWidgetTemplate } from "@/lib/widget-types";
@@ -545,12 +547,11 @@ function normalizeLayout(raw: unknown, widgets: WidgetInstance[], dockIds: Set<D
 
   for (const id of allDefaults) {
     if (allPlaced.has(id) || dockIds.has(id)) continue;
-    const primaryPage = PAGE_1_DEFAULT.includes(id) ? 1 : PAGE_2_DEFAULT.includes(id) ? 2 : PAGE_3_DEFAULT.includes(id) ? 3 : 1;
     // placeIconOnAvailablePage 页满会顺延到下一页乃至新开一页——
     // 曾经这里只在现有页里找空格，页面被图标和组件占满时就静默放弃，
     // 图标（如外观）从此永久丢失且每次重启都救不回
     const preferred = id === "photos" ? { row: 6, col: 3 } : { row: 1, col: 1 };
-    placeIconOnAvailablePage(layout, widgets, { id, ...preferred }, primaryPage);
+    placeIconOnAvailablePage(layout, widgets, { id, ...preferred }, 1);
     allPlaced.add(id);
   }
 
@@ -1698,7 +1699,8 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
           setFolders(sane.folders);
           const withWorldlineBase = ensureNativeWorldlineIcon(withQuestionBox.layout, hydratedWidgets, hydratedDock, sane.folders);
           const withOffstage = ensureNativeOffstageIcon(withWorldlineBase.layout, hydratedWidgets, hydratedDock, sane.folders);
-          const withWorldline = {layout:withOffstage.layout,changed:withWorldlineBase.changed||withOffstage.changed};
+          const withNovel = ensureNativeNovelIcon(withOffstage.layout, hydratedWidgets, hydratedDock, sane.folders);
+          const withWorldline = {layout:withNovel.layout,changed:withWorldlineBase.changed||withOffstage.changed||withNovel.changed};
           setLayout(withWorldline.layout);
           if (sane.changed || withSms.changed || withTwitter.changed || withPhone.changed || withTheqoo.changed || withQuestionBox.changed || withWorldline.changed) {
             writeDesktopFolders(sane.folders);
@@ -1725,7 +1727,8 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
           const withQuestionBox = ensureNativeQuestionBoxIcon(withTheqoo.layout, hydratedWidgets, hydratedDock, hydratedFolders);
           const withWorldlineBase = ensureNativeWorldlineIcon(withQuestionBox.layout, hydratedWidgets, hydratedDock, hydratedFolders);
           const withOffstage = ensureNativeOffstageIcon(withWorldlineBase.layout, hydratedWidgets, hydratedDock, hydratedFolders);
-          const withWorldline = {layout:withOffstage.layout,changed:withWorldlineBase.changed||withOffstage.changed};
+          const withNovel = ensureNativeNovelIcon(withOffstage.layout, hydratedWidgets, hydratedDock, hydratedFolders);
+          const withWorldline = {layout:withNovel.layout,changed:withWorldlineBase.changed||withOffstage.changed||withNovel.changed};
           setLayout(withWorldline.layout);
           kvSet(ICON_LAYOUT_STORAGE_KEY, JSON.stringify(withWorldline.layout));
           kvRemove(ICON_LAYOUT_STORAGE_KEY_V1);
@@ -4191,6 +4194,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     if (activeApp === "calendar") {
       return <PhoneCalendarApp onClose={() => setActiveApp(null)} onNotice={setNotice} />;
     }
+    if (activeApp === "novel") return <NovelApp onClose={() => setActiveApp(null)} onNotice={setNotice}/>;
     if (activeApp === "offstage") return <OffstageApp onClose={() => setActiveApp(null)} />;
     if (activeApp === "qa") {
       return (
