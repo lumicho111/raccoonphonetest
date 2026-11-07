@@ -64,7 +64,7 @@ export async function generateVideoDrafts(channel:YtbChannel,options:VideoGenera
  for(const d of drafts)putVideoDraft(d);
  const completed:VideoDraft[]=[];
  for(const draft of drafts){const translated=await translateVideoDraft(draft,channel.ownerType==='character'?channel.ownerId:undefined);putVideoDraft(translated);
- if(options.historical)translated.comments=await generateVideoComments(translated,channel,state,8+Math.floor(Math.random()*3));
+ if(options.historical)translated.comments=(await generateVideoComments(translated,channel,state,8+Math.floor(Math.random()*3))).map(c=>({...c,at:Math.min(Date.now()-180000,translated.publishedAt+Math.floor(Math.random()*86400000))}));
  putVideoDraft(translated);completed.push(translated);}
  return completed;
 }

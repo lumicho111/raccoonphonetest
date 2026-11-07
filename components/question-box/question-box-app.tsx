@@ -1,4 +1,5 @@
 "use client";
+import {AppNotificationBell,AppNotificationSetting} from "@/components/social/app-notifications";
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock3, Plus, RefreshCw, Send, Settings2, Trash2, X } from "lucide-react";
@@ -32,6 +33,7 @@ async function imageData(file: File, cover: boolean): Promise<string> {
 
 export function QuestionBoxApp({ onClose, onNotice }: { onClose: () => void; onNotice?: (text: string) => void }) {
   const [state, setState] = useState<BoxState>(() => loadBoxState());
+  useEffect(()=>{const fn=(e:Event)=>{const n=(e as CustomEvent).detail;if(n.app==='question_box'){setBoxId(n.targetId);setPage('box');}};window.addEventListener('social-notification-open',fn);return()=>window.removeEventListener('social-notification-open',fn);},[]);
   const [page, setPage] = useState<Page>("home");
   const [modal, setModal] = useState<Modal>(null);
   const [drawer, setDrawer] = useState(false);
@@ -189,7 +191,7 @@ export function QuestionBoxApp({ onClose, onNotice }: { onClose: () => void; onN
   const pageTitle = page === "home" ? "提问箱" : page === "archive" ? "往期" : box ? display(box.ownerId, !boxOpen, box) + "的提问箱" : "提问箱";
 
   return <div className={styles.app}>
-    <header className={styles.header}><button aria-label="返回" onClick={back}><ArrowLeft size={21}/></button><strong>{pageTitle}</strong><div className={styles.headerActions}>{page === "home" && <button aria-label="刷新 C 的提问箱" title="为 C 开启提问箱" onClick={() => { setSelectedCharacters([]); setTopic(""); setTopicMode("persona"); setDuration(-1); setModal("characters"); }}><RefreshCw size={19}/></button>}<button aria-label="提问箱设置" onClick={() => setDrawer(true)}><Settings2 size={20}/></button></div></header>
+    <header className={styles.header}><button aria-label="返回" onClick={back}><ArrowLeft size={21}/></button><strong>{pageTitle}</strong><div className={styles.headerActions}><AppNotificationBell app="question_box"/>{page === "home" && <button aria-label="刷新 C 的提问箱" title="为 C 开启提问箱" onClick={() => { setSelectedCharacters([]); setTopic(""); setTopicMode("persona"); setDuration(-1); setModal("characters"); }}><RefreshCw size={19}/></button>}<button aria-label="提问箱设置" onClick={() => setDrawer(true)}><Settings2 size={20}/></button></div></header>
     <main className={styles.main}>
       {page === "home" && <><div className={styles.pageLead}><span>OPEN NOW</span><h1>正在开箱</h1><p>想回答的时候再回答。</p></div>{activeBoxes.map(row => sessionCard(row))}{!activeBoxes.length && <p className={styles.empty}>现在没有开放的提问箱。点底部 ＋ 开启自己的新一期，或点右上角刷新为 C 开箱。</p>}</>}
       {page === "archive" && <><div className={styles.pageLead}><span>PAST BOXES</span><h1>往期</h1><p>已经关闭的问题和回答都留在这里。</p></div>{closedBoxes.map(row => sessionCard(row))}{!closedBoxes.length && <p className={styles.empty}>还没有往期提问箱。</p>}</>}
@@ -209,7 +211,7 @@ export function QuestionBoxApp({ onClose, onNotice }: { onClose: () => void; onN
       {modal === "participants" && <><p className={styles.hint}>默认每次从引入的 C 中随机抽一部分提问，也可能有陌生人。指定后只有勾选的 C 和陌生人参与。</p><button className={styles.choiceRow} onClick={() => setParticipants(undefined)}><span>随机抽取 C</span>{!participants && <Check size={16}/>}</button><div className={styles.characterGrid}>{characters.map(c => <button key={c.id} className={participants?.includes(c.id) ? styles.characterSelected : ""} onClick={() => setParticipants(prev => prev?.includes(c.id) ? prev.filter(id => id !== c.id) : [...(prev || []), c.id])}>{state.profiles[c.id]?.nickname || c.name}{participants?.includes(c.id) && <Check size={13}/>}</button>)}</div><button className={styles.primary} onClick={updateParticipants}>保存本期设置</button></>}
     </section></div>}
 
-    {drawer && <div className={styles.drawerScrim} onClick={() => setDrawer(false)}><aside className={styles.drawer} onClick={e => e.stopPropagation()}><div className={styles.drawerHead}><strong>提问箱设置</strong><button aria-label="关闭设置" onClick={() => setDrawer(false)}><X size={19}/></button></div><div className={styles.drawerBody}>
+    {drawer && <div className={styles.drawerScrim} onClick={() => setDrawer(false)}><aside className={styles.drawer} onClick={e => e.stopPropagation()}><div className={styles.drawerHead}><strong>提问箱设置</strong><button aria-label="关闭设置" onClick={() => setDrawer(false)}><X size={19}/></button></div><div className={styles.drawerBody}><AppNotificationSetting app="question_box"/>
       <button className={styles.accordionHead} onClick={() => setEditOwner(editOwner === "user" ? null : "user")}>我的资料 <ChevronDown size={16} className={editOwner === "user" ? styles.chevronOpen : ""}/></button>
       {editOwner === "user" && profileEditor("user")}
       <button className={styles.accordionHead} onClick={() => { setCharactersExpanded(!charactersExpanded); setEditOwner(null); }}>角色资料 <ChevronDown size={16} className={charactersExpanded ? styles.chevronOpen : ""}/></button>

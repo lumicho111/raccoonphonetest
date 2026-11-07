@@ -1,3 +1,4 @@
+import {twitterDmExtraContext} from './twitter-storage';
 import { publicIdentityBoundary } from "./social-identity";
 import { twitterRecognizes } from "./twitter-storage";
 import { photoStoryReplyContext } from "./photo-story-data";
@@ -98,10 +99,11 @@ export async function generateTwitterText(input: {
     if (!input.targetPost) throw new Error("找不到要回复的帖子。");
     instruction = `${publicRule}\n${stateRule}\n${sourceRule}\n你正在回复一条 X 帖子，内容：“${input.targetPost.original.slice(0, 900)}”。直接回应具体内容，自然简短，不要离题。${shared}\nJSON 格式：{"original":"回复原文","translated":"中文译文"}`;
   } else {
-    const history = (input.conversation || []).slice(-20).map(m => `${m.role === "user" ? anonymous ? "匿名用户" : input.senderName || input.state.profile.name : input.accountKind === "alternate" ? input.accountProfile?.name || "小号" : character.name}：${m.original}`).join("\n");
+    const resetAt=input.state.accounts[input.senderAccountId||"user"]?.identityResetAt?.[character.id]||0;
+    const history = (input.conversation || []).filter(m=>m.createdAt>resetAt).slice(-20).map(m => `${m.role === "user" ? anonymous ? "匿名用户" : input.senderName || input.state.profile.name : input.accountKind === "alternate" ? input.accountProfile?.name || "小号" : character.name}：${(m.postSnapshot?JSON.stringify(m.postSnapshot):m.original)}`).join("\n");
     const quoted = input.replyToMessage ? `\n本次特别引用回复${input.replyToMessage.role === "user" ? "对方" : "你自己"}的这条私信：“${input.replyToMessage.original.slice(0, 500)}”。` : "";
     const dmIdentity = input.accountKind === "alternate" ? `你正使用自己的小号“${input.accountProfile?.name || "小号"}”回复私信；对外身份是“${input.accountProfile?.identity || "未设定"}”。不要凭空向陌生人揭穿与大号的关系。` : "";
-    instruction = `${stateRule}\n你正在 X 私信中回复。${dmIdentity}${anonymous ? "发送者是陌生的匿名用户；不可根据其他 App 的用户身份或共同历史揭穿身份，除非本次匿名对话明确提供证据。保持角色本人的边界与性格。" : "与公开发帖不同，这里是一对一私信，可以参考真实关系。"}\n本次会话：\n${history || "暂无消息"}${quoted}\n自然回应最近的消息；可拆成 1 至 3 条独立短信。${shared}\nJSON 格式：{"lines":[{"original":"第一条原文","translated":"第一条中文译文"}]}`;
+    instruction = `${stateRule}\n你正在 X 私信中回复。${dmIdentity}${anonymous ? "发送者是陌生的匿名用户；不可根据其他 App 的用户身份或共同历史揭穿身份，除非本次匿名对话明确提供证据。保持角色本人的边界与性格。" : "与公开发帖不同，这里是一对一私信，可以参考真实关系。"}\n同一发送账号与本人实际发生的其他站内会话（不能把未披露的小号当user）：${JSON.stringify(twitterDmExtraContext(input.state,character.id,input.senderAccountId||"user",selfAccount))}\n本次会话：\n${history || "暂无消息"}${quoted}\n自然回应最近的消息；可拆成 1 至 3 条独立短信。${shared}\nJSON 格式：{"lines":[{"original":"第一条原文","translated":"第一条中文译文"}]}`;
   }
   if (input.kind === "reply" && input.targetPost) {
     let parent = input.targetPost;

@@ -1,4 +1,5 @@
 "use client";
+import {TwitterFrozenCard,TwitterSnapshotWindow} from "@/components/twitter/twitter-sharing";
 import {YtbVideoSnapshotWindow} from "@/components/ytb/ytb-video-snapshot";
 import { LivePhotoBubble } from "./live-photo";
 import {ReversePhoneRecord} from "./reverse-phone-overlay";
@@ -902,7 +903,7 @@ function AppCardBubble({ msg, characterId, characterName }: { msg: ChatMessage; 
     } as React.CSSProperties;
     const openApp = () => {
         if (cardOpenDisabled) return;
-        if (d?.theqooSnapshot || d?.cityDiarySnapshot || d?.ytbVideoSnapshot) { setSnapshotOpen(true); return; }
+        if (d?.theqooSnapshot || d?.cityDiarySnapshot || d?.ytbVideoSnapshot || d?.twitterPostSnapshot) { setSnapshotOpen(true); return; }
         if (!d?.appId || typeof window === "undefined") return;
         window.dispatchEvent(new CustomEvent("open-app", {
             detail: {
@@ -1004,6 +1005,7 @@ function AppCardBubble({ msg, characterId, characterName }: { msg: ChatMessage; 
             ) : null}
         </div>
         {snapshotOpen && d?.cityDiarySnapshot && <div className="icity-share-backdrop" role="presentation" onClick={()=>setSnapshotOpen(false)}><section role="dialog" aria-modal="true" aria-label="分享的iCity日记" className="icity-share-dialog" onClick={e=>e.stopPropagation()}><header><span>iCity · @{d.cityDiarySnapshot.handle}</span><button type="button" aria-label="关闭分享日记" onClick={()=>setSnapshotOpen(false)}>×</button></header><h3>{d.cityDiarySnapshot.title}</h3><p>{d.cityDiarySnapshot.text}</p>{d.cityDiarySnapshot.photos?.map((photo,i)=>photo.startsWith('text://')?<p key={i}>{decodeURIComponent(photo.slice(7))}</p>:<CitySharePhoto key={i} reference={photo}/>)}</section></div>}
+        {snapshotOpen&&d?.twitterPostSnapshot&&<TwitterSnapshotWindow snapshot={d.twitterPostSnapshot} onClose={()=>setSnapshotOpen(false)}/>}
         {snapshotOpen && d?.ytbVideoSnapshot && <YtbVideoSnapshotWindow snapshot={d.ytbVideoSnapshot} onClose={()=>setSnapshotOpen(false)}/>}
         {snapshotOpen && d?.theqooSnapshot && <TheqooSnapshotWindow snapshot={d.theqooSnapshot} onClose={() => setSnapshotOpen(false)} />}
         </>

@@ -1,3 +1,4 @@
+import {youtubeNativePrompt,projectYoutubeNativeRefs} from './ytb-checkphone-videos';
 import {loadYtbState,type YtbState} from "./ytb-storage";
 import {ytbFingerprint} from "./ytb-memory";
 import type {CheckPhoneYoutubePayload,CheckPhoneYoutubeHistoryVideo} from "./checkphone-config";
@@ -28,8 +29,8 @@ export function recentYtbLiveRecords(characterId:string,state:YtbState=loadYtbSt
 }
 export function ytbCheckPhonePrompt(characterId:string){
  const rows=recentYtbLiveRecords(characterId);
- if(!rows.length)return "YouTube普通视频仍按人设兴趣生成。没有已确认看过的直播，禁止编造与用户的直播互动。";
- return `普通观看记录、稍后观看、喜欢的视频沿用原格式生成。下列是实际看过的直播，不得当作普通虚构视频重写，也不得新增直播或扩充未看到的内容。这里只提供该角色实际观看范围的少量片段，不代表完整直播；不得认出片段中未公开的真实身份。对每条写简短的当时状态和私人感想，不自动发言或写回记忆。必须在原三个分区之后另附：\n#直播感想\n##视频1\n[直播ID]实际id\n[指纹]原样指纹\n[当时状态]一两句\n[感受]一两句，贴合角色，不能只是复述内容\n实际记录：${JSON.stringify(rows.map(r=>({id:r.id,fingerprint:r.fingerprint,title:r.row.title,host:r.row.channelName,tag:r.row.liveTag,duration:r.row.durationLabel,watched:r.row.progressLabel,brief:r.brief})))}`;
+ if(!rows.length)return youtubeNativePrompt(characterId)+"\nYouTube普通视频仍按人设兴趣生成。没有已确认看过的直播，禁止编造与用户的直播互动。";
+ return youtubeNativePrompt(characterId)+`\n普通观看记录、稍后观看、喜欢的视频沿用原格式生成。下列是实际看过的直播，不得当作普通虚构视频重写，也不得新增直播或扩充未看到的内容。这里只提供该角色实际观看范围的少量片段，不代表完整直播；不得认出片段中未公开的真实身份。对每条写简短的当时状态和私人感想，不自动发言或写回记忆。必须在原三个分区之后另附：\n#直播感想\n##视频1\n[直播ID]实际id\n[指纹]原样指纹\n[当时状态]一两句\n[感受]一两句，贴合角色，不能只是复述内容\n实际记录：${JSON.stringify(rows.map(r=>({id:r.id,fingerprint:r.fingerprint,title:r.row.title,host:r.row.channelName,tag:r.row.liveTag,duration:r.row.durationLabel,watched:r.row.progressLabel,brief:r.brief})))}`;
 }
 export function parseLiveFeelings(text:string):Record<string,LiveFeeling>{
  const section=text.split(/^#\s*直播感想\s*$/m)[1]||"",result:Record<string,LiveFeeling>={};
@@ -43,5 +44,5 @@ export function projectCheckPhoneYoutube(characterId:string,payload:CheckPhoneYo
  if(!payload&&!channel)return null;
  const records=recentYtbLiveRecords(characterId,state);
  const liveRows=records.map(r=>{const f=payload?.liveFeelings?.[r.id];return f?.fingerprint===r.fingerprint?{...r.row,stateNote:`${r.row.liveTag}。${f.stateNote}`,feeling:f.feeling}:r.row;});
- return {...payload,headerTitle:"YouTube",headerSubtitle:payload?.headerSubtitle||"History, Watch later, Liked videos",profile:channel?{name:channel.name,handle:channel.handle,bio:channel.description,lastActiveAt:records[0]?.row.createdAt||"",avatar:channel.avatar}:payload?.profile,watchHistory:[...liveRows,...(payload?.watchHistory||[]).filter(v=>!v.id.startsWith("native-live:"))].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)),watchLater:payload?.watchLater||[],likedVideos:payload?.likedVideos||[]};
+ return projectYoutubeNativeRefs(characterId,{...payload,headerTitle:"YouTube",headerSubtitle:payload?.headerSubtitle||"History, Watch later, Liked videos",profile:channel?{name:channel.name,handle:channel.handle,bio:channel.description,lastActiveAt:records[0]?.row.createdAt||"",avatar:channel.avatar}:payload?.profile,watchHistory:[...liveRows,...(payload?.watchHistory||[]).filter(v=>!v.id.startsWith("native-live:"))].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)),watchLater:payload?.watchLater||[],likedVideos:payload?.likedVideos||[]},state);
 }

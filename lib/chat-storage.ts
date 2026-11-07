@@ -307,6 +307,7 @@ export type ChatMessage = {
         appId?: string;
         appName?: string;
         appCardTitle?: string;
+        twitterPostSnapshot?:import("./twitter-storage").TwitterSnapshot;
         ytbVideoId?:string;
         ytbVideoSnapshot?:import("./ytb-video-storage").VideoSnapshot;
         cityDiarySnapshot?: {title:string;text:string;handle:string;photos?:string[]};

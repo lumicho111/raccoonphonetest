@@ -1,7 +1,7 @@
 {
-  "apk": "1.0.7",
-  "nativeBuild": 9,
-  "resource": "rabbit-resource-021",
-  "sequence": 21,
-  "includes": "cumulative from 1.0.7 native baseline; YouTube videos, drafts, collaborations, bilingual editing and local retrieval experiments"
+  "apk":"1.0.7",
+  "nativeBuild":9,
+  "resource":"rabbit-resource-022",
+  "sequence":22,
+  "includes":"cumulative from 1.0.7 native baseline; X account identity, frozen shares, YouTube inspection bridge and opt-in in-phone interaction alerts"
 }

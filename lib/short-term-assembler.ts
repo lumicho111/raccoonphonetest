@@ -398,7 +398,7 @@ export function loadNativeTimeline(
                     itemsText: msg.mediaData?.paymentRequestItemsText,
                 });
                 else if (msg.mediaType === "app_card") {
-                    if (["theqoo", "ytb"].includes(msg.mediaData?.appId || "") && msg.mediaData?.appHistoryText) {
+                    if (["theqoo", "ytb", "twitter"].includes(msg.mediaData?.appId || "") && msg.mediaData?.appHistoryText) {
                         content = msg.mediaData.appHistoryText;
                     } else {
                     const appName = msg.mediaData?.appName || "APP";
@@ -758,6 +758,7 @@ export function loadNativeTimeline(
         entries.push({
             id: twitterEntry.id,
             shared: twitterEntry.shared,
+            sourceKeys:twitterEntry.sourceKeys,
             sourceApp: "twitter",
             sourceDetail: "twitter",
             authorType: "character",

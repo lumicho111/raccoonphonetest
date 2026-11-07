@@ -1,3 +1,4 @@
+import {attachYoutubeNativeRefs} from './ytb-checkphone-videos';
 import {projectReconciliations} from './phone-reconcile';
 import {projectPlayChats} from "./checkphone-play";
 import { withdrawYtbIncome } from "./ytb-runtime";
@@ -2777,7 +2778,7 @@ function parseYoutubeSectionEntries(sectionBody: string) {
 
 function parseYoutubeBlockPayload(text: string): YoutubeBlockParseResult {
   const liveFeelings=parseLiveFeelings(text);
-  const source = stripJsonWrapperNoise(text).replace(/\r/g, "").split(/^#\s*直播感想\s*$/m)[0].trim();
+  const source = stripJsonWrapperNoise(text).replace(/\r/g, "").split(/^#\s*(?:直播感想|关联作品)\s*$/m)[0].trim();
   if (!source) return { parsed: null, sanitizedCandidate: "", parseMode: "failed", parseError: "LLM 返回为空" };
 
   const sections = [...source.matchAll(/^#\s*(观看记录|稍后观看|赞过的视频|赞过视频|订阅)\s*$/gm)];
@@ -4358,7 +4359,8 @@ export async function generateCheckPhoneYoutube(
 
     if (!rawOutput?.trim()) return { payload: null, summary: "", error: "LLM 返回为空", debugRawOutput: rawOutput ?? "", debugParseMode: "failed" };
     const { parsed, sanitizedCandidate, parseMode, parseError } = parseYoutubeBlockPayload(rawOutput);
-    const payload = normalizeYoutubePayload(parsed);
+    const normalized = normalizeYoutubePayload(parsed);
+    const payload=normalized?attachYoutubeNativeRefs(rawOutput,characterId,normalized):null;
     if (!payload) {
       return {
         payload: null,
@@ -8184,7 +8186,7 @@ function parseCheckPhoneBatchAppOutput(
       break;
     case "youtube":
       parsed = parseYoutubeBlockPayload(rawOutput).parsed;
-      payload = normalizeYoutubePayload(parsed);
+      {const base=normalizeYoutubePayload(parsed);payload=base?attachYoutubeNativeRefs(rawOutput,characterId,base):null;}
       break;
     case "bilibili":
       parsed = parseBilibiliBlockPayload(rawOutput).parsed;

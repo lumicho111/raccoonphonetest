@@ -73,6 +73,7 @@ export function sendBrowserNotification(
     title: string,
     options?: { body?: string; icon?: string; url?: string; independent?: boolean },
 ): void {
+    if(options?.independent)return; // Only Chat retains real-system notifications in resource022.
     if (!(options?.independent && isAndroidApp() ? nativeNotificationGranted() : isNotificationEnabled())) return;
     if (!document.hidden) return;
 

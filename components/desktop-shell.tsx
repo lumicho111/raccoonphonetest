@@ -1,4 +1,5 @@
 "use client";
+import {SocialNotificationRuntime} from "@/components/social/app-notifications";
 import {preparePhoneOpening,discardPhoneOpening} from '@/lib/phone-opening';
 import {BrowserApp} from "@/components/browser/browser-app";
 import {PhoneInspectionManager} from "@/components/chat/phone-inspection-manager";
@@ -2631,7 +2632,8 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   useEffect(()=>{const fn=(e:Event)=>{const url=(e as CustomEvent<string>).detail;if(url.startsWith('/#sms=')){setSmsOpenThreadId(decodeURIComponent(url.slice(7)));setActiveApp('sms');}else if(url.startsWith('/#phone'))setActiveApp('phone');else setActiveApp('chat');};window.addEventListener('rabbit-notification-open',fn);return()=>window.removeEventListener('rabbit-notification-open',fn);},[]);
   const handleNoticeClick = useCallback(() => {
     if (noticeDragRef.current.far) { noticeDragRef.current.far = false; return; }
-    if (chatMessageNotice?.sessionId.startsWith("lysn:")) {
+    if(chatMessageNotice?.sessionId.startsWith('social:')){const notice=JSON.parse(chatMessageNotice.sessionId.slice(7));dismissIslandNotice();setActiveApp(notice.app);window.setTimeout(()=>window.dispatchEvent(new CustomEvent('social-notification-open',{detail:notice})),150);
+    } else if (chatMessageNotice?.sessionId.startsWith("lysn:")) {
       const characterId = chatMessageNotice.sessionId.slice(5);
       dismissIslandNotice();
       setActiveApp("lysn");
@@ -2645,6 +2647,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       dismissIslandNotice();
     } else if (chatMessageNotice) openChatSessionFromNotice(chatMessageNotice.sessionId);
   }, [chatMessageNotice, openChatSessionFromNotice, dismissIslandNotice]);
+  useEffect(()=>{const fn=(e:Event)=>{const n=(e as CustomEvent).detail;if(!n?.app)return;enqueueIslandNotice({sessionId:'social:'+JSON.stringify(n),title:n.title,body:'点击查看',avatar:null});};window.addEventListener('social-message-notice',fn);return()=>window.removeEventListener('social-message-notice',fn);},[enqueueIslandNotice]);
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ characterId: string; title: string; body: string }>).detail;
@@ -4277,7 +4280,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       >
         {/* User's global custom CSS is injected via useEffect into document.head */}
         <div className="phone-case">
-          <div className="phone-frame"><PhoneInspectionManager/><ReversePhoneOverlay islandEnabled={!draftTheme.hideTopBar&&draftTheme.cssOverrides["--status-island-visibility"]!=="hidden"}/>
+          <div className="phone-frame"><PhoneInspectionManager/><SocialNotificationRuntime/><ReversePhoneOverlay islandEnabled={!draftTheme.hideTopBar&&draftTheme.cssOverrides["--status-island-visibility"]!=="hidden"}/>
             <div
               ref={shellRef}
               className={activeApp ? "phone-shell app-open-shell" : "phone-shell"}

@@ -1,4 +1,7 @@
 "use client";
+import {YtbVideoShelf,YtbVideoHub,useYtbVideos} from '@/components/ytb/ytb-videos';
+import {saveYtbState} from '@/lib/ytb-storage';
+import {resolveUserIdentity} from '@/lib/settings-storage';
 
 import {loadYtbState,YTB_UPDATED} from "@/lib/ytb-storage";
 import {projectCheckPhoneYoutube} from "@/lib/ytb-checkphone-bridge";
@@ -39,7 +42,7 @@ type CheckPhoneYoutubePageProps = {
   onBack: () => void;
 };
 
-type YoutubeView = "home" | "history" | "playlists" | "watchLater" | "likedVideos";
+type YoutubeView = "home" | "history" | "playlists" | "watchLater" | "likedVideos" | "works";
 type YoutubeVideo =
   | (CheckPhoneYoutubeHistoryVideo & { section: "history" })
   | (CheckPhoneYoutubeWatchLaterVideo & { section: "watchLater" })
@@ -155,6 +158,7 @@ function groupVideosByDate(videos: YoutubeVideo[]) {
 
 function getViewTitle(view: YoutubeView): string {
   switch (view) {
+    case "works":return "我的作品";
     case "history":
       return "History";
     case "playlists":
@@ -194,11 +198,12 @@ function VideoCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const openVideo=()=>{if(video.videoId)window.dispatchEvent(new CustomEvent('youtube-open-video',{detail:{id:video.videoId}}));else onToggle();};
   const progressPercent = "progressLabel" in video ? getYoutubeProgressPercent(video) : null;
 
   return (
     <article className="cp-youtube-video-wrap">
-      <button type="button" className="cp-youtube-video-card" onClick={onToggle}>
+      <button type="button" className="cp-youtube-video-card" onClick={openVideo}>
         <div className="cp-youtube-thumb" aria-hidden="true">
           {"cover" in video&&video.cover?<img src={video.cover} alt="" style={{width:"100%",height:"100%",objectFit:"cover",position:"absolute",inset:0}}/>:<span>{getThumbnailLabel(video)}</span>}
           <b>{video.durationLabel}</b>
@@ -227,6 +232,7 @@ function VideoCard({
 }
 
 export function CheckPhoneYoutubePage({ character, onBack }: CheckPhoneYoutubePageProps) {
+  const videoState=useYtbVideos();
   const [snapshot, setSnapshot] = useState<CheckPhoneSnapshot<CheckPhoneYoutubePayload> | null>(null);
   const [view, setView] = useState<YoutubeView>("home");
   const [expandedEntryKeys, setExpandedEntryKeys] = useState<string[]>([]);
@@ -279,7 +285,7 @@ export function CheckPhoneYoutubePage({ character, onBack }: CheckPhoneYoutubePa
       navigate("playlists");
       return;
     }
-    if (view === "history" || view === "playlists") {
+    if (view === "history" || view === "playlists" || view === "works") {
       navigate("home");
       return;
     }
@@ -349,14 +355,15 @@ export function CheckPhoneYoutubePage({ character, onBack }: CheckPhoneYoutubePa
 
   const [nativeState,setNativeState]=useState(loadYtbState);
   useEffect(()=>{const sync=()=>setNativeState(loadYtbState());window.addEventListener(YTB_UPDATED,sync);return()=>window.removeEventListener(YTB_UPDATED,sync);},[]);
-  const payload = useMemo(()=>projectCheckPhoneYoutube(character.id,snapshot?.payload??null,nativeState),[character.id,snapshot?.payload,nativeState]);
+  const [worksChannel,setWorksChannel]=useState('');const ownChannel=nativeState.channels.find(c=>c.ownerType==='character'&&c.ownerId===character.id);const viewingChannel=nativeState.channels.find(c=>c.id===(worksChannel||ownChannel?.id));
+  const payload = useMemo(()=>projectCheckPhoneYoutube(character.id,snapshot?.payload??null,nativeState),[character.id,snapshot?.payload,nativeState,videoState]);
   const { watchHistory, watchLater, likedVideos } = useMemo(() => getYoutubeVideos(payload), [payload]);
   const listVideos = view === "history" ? watchHistory : view === "watchLater" ? watchLater : view === "likedVideos" ? likedVideos : [];
   const groupedHistory = useMemo(() => groupVideosByDate(watchHistory), [watchHistory]);
   const avatarInitial = useMemo(() => getYoutubeAvatarInitial(payload?.profile?.name ?? character.name), [character.name, payload?.profile?.name]);
 
   return (
-    <div className="cp-youtube-module">
+    <div className="cp-youtube-module" data-checkphone-youtube-active="true" style={{position:"relative"}}>
       <header className={`cp-youtube-appbar${view === "home" ? " is-home" : ""}`}>
         <button type="button" className="cp-youtube-icon-button" onClick={handleBack} aria-label="Back">
           <ChevronLeft size={22} strokeWidth={2.2} />
@@ -466,10 +473,7 @@ export function CheckPhoneYoutubePage({ character, onBack }: CheckPhoneYoutubePa
             </section>
 
             <section className="cp-youtube-decor-list" aria-label="YouTube library shortcuts">
-              <div className="cp-youtube-decor-row">
-                <PlaySquare size={23} strokeWidth={1.9} />
-                <strong>Your videos</strong>
-              </div>
+              <button type="button" className="cp-youtube-decor-row" style={{gridTemplateColumns:"30px minmax(0,1fr) 20px",textAlign:"left",width:"100%",border:0,background:"none"}} onClick={()=>navigate("works")}><PlaySquare size={23} strokeWidth={1.9}/><strong>我的作品</strong><ChevronRight size={19}/></button>
               <div className="cp-youtube-decor-row">
                 <Clapperboard size={24} strokeWidth={1.9} />
                 <strong>Movies & TV</strong>
@@ -511,6 +515,7 @@ export function CheckPhoneYoutubePage({ character, onBack }: CheckPhoneYoutubePa
           </section>
         ) : null}
 
+        {view==='works'&&(viewingChannel?<YtbVideoShelf channel={viewingChannel}/>:<p className="cp-youtube-status">还没有引入此角色的频道，请先在自己的 YouTube 中引入频道。</p>)}
         {payload && (view === "history" || view === "watchLater" || view === "likedVideos") ? (
           <section className="cp-youtube-video-list">
             {view === "history"
@@ -555,6 +560,7 @@ export function CheckPhoneYoutubePage({ character, onBack }: CheckPhoneYoutubePa
         </nav>
       ) : null}
 
+      <YtbVideoHub getState={()=>loadYtbState()} commit={fn=>saveYtbState(fn(loadYtbState()))} myId={'user:'+(resolveUserIdentity()?.id||'default')} onNotice={text=>setError(text)} onChannel={id=>{setWorksChannel(id);setView('works');}} onPublished={()=>setView('works')}/>
       {confirmClearOpen && (
         <ConfirmDialog
           title="清空 YouTube 内容？"

@@ -493,7 +493,7 @@ export type CheckPhoneYoutubeProfile = {
 };
 
 export type CheckPhoneYoutubeHistoryVideo = {
-  cover?: string; liveId?: string; liveTag?: string;
+  cover?: string; liveId?: string; liveTag?: string; videoId?:string;
   id: string;
   title: string;
   channelName: string;
@@ -507,6 +507,7 @@ export type CheckPhoneYoutubeHistoryVideo = {
 };
 
 export type CheckPhoneYoutubeWatchLaterVideo = {
+  cover?:string;videoId?:string;liveId?:string;
   id: string;
   title: string;
   channelName: string;
@@ -519,6 +520,7 @@ export type CheckPhoneYoutubeWatchLaterVideo = {
 };
 
 export type CheckPhoneYoutubeLikedVideo = {
+  cover?:string;videoId?:string;liveId?:string;
   id: string;
   title: string;
   channelName: string;
@@ -531,6 +533,7 @@ export type CheckPhoneYoutubeLikedVideo = {
 };
 
 export type CheckPhoneYoutubePayload = {
+  nativeRefs?:import("./ytb-checkphone-videos").YoutubeNativeRef[];
   liveFeelings?: Record<string,{fingerprint:string;stateNote:string;feeling:string}>;
   headerTitle: string;
   headerSubtitle: string;

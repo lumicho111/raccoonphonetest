@@ -1,4 +1,5 @@
 "use client";
+import {AppNotificationBell,AppNotificationSetting} from "@/components/social/app-notifications";
 import { useGenerationFeedback } from "@/components/generation-feedback";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type TouchEvent, type UIEvent, type WheelEvent } from "react";
@@ -733,6 +734,7 @@ export function XiaohongshuApp({ onClose, onNotice: externalNotice, visible = tr
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedTab, setSelectedTab] = useState<XiaohongshuTabId>("home");
   const [homeFeedTab, setHomeFeedTab] = useState<XiaohongshuHomeFeedTab>("discover");
+  useEffect(()=>{const fn=(e:Event)=>{const n=(e as CustomEvent).detail;if(n.app!=='xiaohongshu')return;if(n.targetType==='dm'){setSelectedTab('messages');setSelectedDmThreadId(n.targetId);}else setSelectedNoteId(n.targetId);};window.addEventListener('social-notification-open',fn);return()=>window.removeEventListener('social-notification-open',fn);},[]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -2494,7 +2496,7 @@ export function XiaohongshuApp({ onClose, onNotice: externalNotice, visible = tr
           >
             <ChevronLeft size={24} strokeWidth={2} />
           </button>
-          <div className="cp-xhs-header-stack">
+          <AppNotificationBell app="xiaohongshu"/><div className="cp-xhs-header-stack">
             {isMessageSubpage ? (
               <div className="cp-xhs-header-title is-active">{selectedMessagePanelTitle}</div>
             ) : selectedTab === "home" ? (
@@ -3228,7 +3230,7 @@ export function XiaohongshuApp({ onClose, onNotice: externalNotice, visible = tr
             <header className="xhs-profile-edit-header">
               <strong>小红书设置</strong>
               <button type="button" className="xhs-sheet-close-btn" onClick={() => setSettingsOpen(false)} aria-label="关闭">×</button>
-            </header>
+            </header><AppNotificationSetting app="xiaohongshu"/>
 
             <div className="xhs-profile-edit-body">
               <div className="xhs-profile-edit-field">

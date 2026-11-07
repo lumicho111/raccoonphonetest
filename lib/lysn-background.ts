@@ -4,7 +4,6 @@ import { loadCharacters } from "./character-storage";
 import { generateLysn } from "./lysn-engine";
 import { prepareLysnMessages } from "./lysn-message";
 import { appendLysn, loadLysn, saveLysn } from "./lysn-storage";
-import { sendBrowserNotification } from "./browser-notification";
 import { maybeCelebrateLysn } from "./lysn-celebrations";
 import { applyLysnProfileAction } from "./lysn-profile-autonomy";
 import { noteLysnFanMessage } from "./lysn-identity";
