@@ -1,3 +1,4 @@
+import {ytbVideoProjectionEntries} from './ytb-video-context';
 import { loadCharacters } from "./character-storage";
 import { resolveUserIdentity } from "./settings-storage";
 import { loadYtbState, type YtbState, type YtbMemorySummary, type YtbMessage } from "./ytb-storage";
@@ -78,9 +79,9 @@ export function ytbMemorySources(state: YtbState, characterId: string, userId?: 
 /** Never inject raw chat or stale summaries. Deleting source content revokes the projection. */
 export function projectYtbMemory(state: YtbState, characterId: string, userId?: string) {
   return ytbMemorySources(state, characterId, userId).flatMap(source => source.cached?.fingerprint === source.fingerprint && source.cached.content.trim()
-    ? [{ shared: source.shared, sourceKeys: source.kind === "stream" ? [`ytb:${source.id}`] : [], id: `youtube:${source.kind === "stream" ? "replay" : source.kind === "thread" ? "dm" : "group"}:${source.id}:${source.cacheKey || source.channelId}`, timestamp: new Date(source.at).toISOString(), content: source.cached.content }]
+    ? [{ shared: source.shared, sourceKeys: [`ytb:${source.id}`,...(source.kind==="thread"?state.threads.find(t=>t.id===source.id)?.messages||[]:source.kind==="group"?state.groups.find(g=>g.id===source.id)?.messages||[]:[]).filter(m=>m.videoId).map(m=>`ytb:video:${m.videoId}`)], id: `youtube:${source.kind === "stream" ? "replay" : source.kind === "thread" ? "dm" : "group"}:${source.id}:${source.cacheKey || source.channelId}`, timestamp: new Date(source.at).toISOString(), content: source.cached.content }]
     : []);
 }
 export function loadYtbProjectionEntries(characterId: string, afterTimestamp?: string) {
-  return projectYtbMemory(loadYtbState(), characterId, resolveUserIdentity(characterId, "ytb")?.id).filter(e => !afterTimestamp || e.timestamp > afterTimestamp);
+  return [...projectYtbMemory(loadYtbState(), characterId, resolveUserIdentity(characterId, "ytb")?.id),...ytbVideoProjectionEntries(characterId)].filter(e => !afterTimestamp || e.timestamp > afterTimestamp);
 }

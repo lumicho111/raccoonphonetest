@@ -21,7 +21,7 @@ export type YtbStream = {
   watchedBy: string[]; watchedAt?: Record<string, number>; leftBy: string[]; linkedDealId?: string; lastRoundAt?: number; visits?: Record<string, YtbVisit>; memorySummaries?: Record<string, YtbMemorySummary>;
 };
 export type YtbDeal = { id: string; channelId: string; brand: string; title: string; product: string; brief: string; amount: number; currency: string; status: "pending" | "active" | "completed" | "declined" };
-export type YtbMessage = { identitySnapshot?: Record<string, Record<string, boolean>>; id: string; senderId: string; name: string; avatar: string; original: string; translated: string; at: number; replayId?: string; readBy?: Record<string, boolean>; replyTo?: string[]; quote?: { id: string; name: string; original: string; translated: string } };
+export type YtbMessage = { identitySnapshot?: Record<string, Record<string, boolean>>; videoId?:string; videoSnapshot?:import("./ytb-video-storage").VideoSnapshot; id: string; senderId: string; name: string; avatar: string; original: string; translated: string; at: number; replayId?: string; readBy?: Record<string, boolean>; replyTo?: string[]; quote?: { id: string; name: string; original: string; translated: string } };
 export type YtbThread = { id: string; userChannelId: string; peerChannelId: string; messages: YtbMessage[]; memorySummaries?: Record<string, YtbMemorySummary> };
 export type YtbGroup = { id: string; channelId: string; userChannelId: string; name: string; avatar: string; members: number; joined: boolean; messages: YtbMessage[]; memorySummaries?: Record<string, YtbMemorySummary> };
 export type YtbFanNote = YtbMessage & { channelId: string };

@@ -1,3 +1,4 @@
+import {ytbVideoContext,localYtbVideoContext} from './ytb-video-context';
 // Public audiences must receive only published dialogue/visible scenes; never host-private calendar or memories.
 import { loadApiConfigs, loadBindingConfig, loadPresets, loadWorldBooks, loadRegexes, resolveBinding, resolveUserIdentity } from "./settings-storage";
 import { sendLLMRequest } from "./chat-engine";
@@ -25,7 +26,7 @@ function parse(raw: string): Record<string, unknown> {
   return JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
 }
 export function channelPublic(ch: YtbChannel) { return `频道 ${ch.id}：${ch.name} ${ch.handle}；简介：${ch.description || "无"}；频道风格、身份披露和直播习惯：${ch.style || "未填写"}；${publicIdentityBoundary}；人设参考程度 ${ch.disclosure}`; }
-export async function generateYtb<T extends Record<string, unknown>>(channel: YtbChannel | null, instruction: string, context: string, options: { publicOnly?: boolean } = {}): Promise<T> {
+export async function generateYtb<T extends Record<string, unknown>>(channel: YtbChannel | null, instruction: string, context: string, options: { publicOnly?: boolean; referenceDate?:number } = {}): Promise<T> {
   const real = !options.publicOnly && channel?.ownerType === "character" ? loadCharacters().find(c => c.id === channel.ownerId) : undefined;
   const slot = resolveBinding(loadBindingConfig(), real?.id, "ytb");
   const config = loadApiConfigs().find(c => c.id === slot.apiConfigId) ?? loadApiConfigs()[0];
@@ -40,28 +41,30 @@ export async function generateYtb<T extends Record<string, unknown>>(channel: Yt
     id: channel?.id || "youtube-generator", name: channel?.name || "Youtube", avatar: channel?.avatar || null,
     persona: channel?.ownerType === "user" && permitted ? `${identity?.bio || ""}\n${identity?.occupation || ""}\n${identity?.customSettings || ""}` : channel?.style || "按世界背景生成普通互联网用户", createdAt: "", updatedAt: "",
   };
-  const prepared = real && permitted ? prepareShortTermContext(real.id, "ytb", { history: [] }) : null;
+  const prepared = real && permitted && !options.referenceDate ? prepareShortTermContext(real.id, "ytb", { history: [] }) : null;
   const memoryConfig = loadMemoryConfig();
   const [memories, core] = real && permitted ? await Promise.all([retrieveMemoriesForPrompt(real.id, context || channel!.style || "Youtube直播", memoryConfig), retrieveCoreMemoriesForPrompt(real.id, memoryConfig)]) : [[], []];
-  const books = loadWorldBooks().filter(b => slot.worldBookIds?.includes(b.id));
+  const books = options.publicOnly?[]:loadWorldBooks().filter(b => slot.worldBookIds?.includes(b.id));
   const regexes = loadRegexes().filter(r => slot.regexIds?.includes(r.id));
   const messages = assemblePromptPayload({ character, preset, history: [], worldBooks: books, regexes,
     userIdentity: recognizesUser ? identity : null, appId: "ytb", appTags: ["ytb", "live"],
-    longTermMemories: formatLongTermMemories(memories), coreMemories: formatCoreMemories(core),
+    longTermMemories: formatLongTermMemories(options.referenceDate?memories.filter(m=>Date.parse(String(m.metadata?.occurredTo||m.createdAt))<=options.referenceDate!):memories), coreMemories: formatCoreMemories(options.referenceDate?[]:core),
     recentBlocks: prepared?.recentBlocks, unifiedRecentItems: prepared?.unifiedRecentItems, worldBookActivationContext: context,
-    scheduleSummary: real ? buildCalendarScheduleMarker("character", real.id, getWeekStartIso(new Date())) : "",
+    scheduleSummary: real ? buildCalendarScheduleMarker("character", real.id, getWeekStartIso(new Date(options.referenceDate||Date.now()))) : "",
     timeContext: buildCharacterTimeContext(real?.timeZone),
   });
   const rules = [
-    "这是虚构手机里的 Youtube 文字直播平台。只返回合法 JSON，不要 Markdown。",
+    "这是虚构手机里的 YouTube 文字视频与直播平台。只返回合法 JSON，不要 Markdown。",
     channel ? channelPublic(channel) : "生成符合世界背景的陌生频道，不自动认识用户，也不编造已发生的私聊。",
-    "频道风格决定开播主题：推歌频道始终围绕推歌，不能因为主播是演员就擅自变成拍摄花絮。频道简介是辅助信息。",
+    "频道风格适用于视频、直播、私信和粉丝互动，决定创作主题：推歌频道始终围绕推歌，不能因为主播是演员就擅自变成拍摄花絮。频道简介是辅助信息。",
     "必须区分主播内部认知与观众可知信息。不披露=观众只按频道形象理解，本人仍参考完整人设；部分披露=只公开频道介绍明确允许的身份信息；完全披露=人设身份可公开，但私人记忆、未公开事件和秘密仍不属于观众知识。角色彼此认识不等于网友知道他们是谁。",
     "动作只用中文。台词遵循说话人的母语、沟通语言和频道设定，提供对应中文翻译；语音只读 original。翻译保留原语言语感。",
     "观众分布可以包含各个国家。不要依据语言单独推断国家。不要编造用户没说过的话或没做过的动作。",
     options.publicOnly ? "本次只处理给定公开素材，不参考任何用户私人资料或角色记忆。评论、社群、粉丝群应有不同动机和语气：提问、玩梗、具体感想、普通生活、不同意见或温和质疑，不统一夸奖期待，不机械凑类型。" : channel ? ytbIdentityContext(state, channel) : "",
     "匿名身份边界高于私人记忆里的熟悉感：即使现实认识，也不能凭系统角色ID、相似措辞、头像或后台绑定认出未披露的小号。知道对方身份也不能在公开弹幕中泄露。",
     "聊天室由不同观众组成：允许延迟讨论此前几段已经播出的内容、闲聊、表白、无意义刷屏、新观众问是谁、合理质疑和吐槽。不整齐回应最新一句，不全部正面，也不每轮硬塞恶评。同一话题避免近义重复刷满屏。",
+    real&&!options.referenceDate?ytbVideoContext(real.id):"",
+    options.referenceDate?`本次补写历史，最晚参考日期${new Date(options.referenceDate).toLocaleString()}，严格按作品日期还原当时认知，不得使用之后的事实。`:"",
     context, instruction,
   ].filter(Boolean).join("\n\n");
   const output = await sendLLMRequest(config, preset, [...messages, { role: "system", content: rules }, { role: "user", content: "按本次请求生成 JSON。" }], regexes, { characterName: channel?.name || "Youtube", userName: recognizesUser ? identity?.name : userChannel?.name || "网友" }, { appId: "ytb", appTags: ["ytb", "live"], skipOutputRegex: true });
@@ -119,7 +122,7 @@ ${isUser ? "用户是主播，绝不能替用户生成主播话语或动作。se
 }
 
 export async function generateYtbMessages(channel: YtbChannel, messages: YtbMessage[], context: string, group = false): Promise<YtbMessage[]> {
-  const result = await generateYtb(channel, `生成${group ? "1~5条粉丝群消息，角色群主空闲时可以出现，也可以只有粉丝说话；用户自己的粉丝群绝不替用户发言" : "1~3条这个账号的私信回复"}。返回 {"messages":[{"name":"显示ID","isHost":false,"replyTo":["明确回答的消息ID"],"original":"原话","translated":"中文翻译"}]}。不要替用户回复。公开粉丝群遵守频道身份公开范围，私信也不能把陌生人当熟人。普通网友私信可以是交友、搭讪、广告、骚扰、质疑或普通粉丝交流，依据该网友风格和动机决定，不默认全是夸赞；真实角色保持自己的性格。回复问题时用replyTo准确关联实际回答的已有消息，不要随便关联未回答的消息。`, `${context}\n最近会话：${messages.slice(-24).map(m => `[${m.id}] ${m.name}：${m.quote ? `【引用 ${m.quote.name}：${m.quote.original}】` : ""}${m.original}`).join("\n")}`);
+  const result = await generateYtb(channel, `生成${group ? "1~5条粉丝群消息，角色群主空闲时可以出现，也可以只有粉丝说话；用户自己的粉丝群绝不替用户发言" : "1~3条这个账号的私信回复"}。返回 {"messages":[{"name":"显示ID","isHost":false,"replyTo":["明确回答的消息ID"],"original":"原话","translated":"中文翻译"}]}。不要替用户回复。公开粉丝群遵守频道身份公开范围，私信也不能把陌生人当熟人。普通网友私信可以是交友、搭讪、广告、骚扰、质疑或普通粉丝交流，依据该网友风格和动机决定，不默认全是夸赞；真实角色保持自己的性格。回复问题时用replyTo准确关联实际回答的已有消息，不要随便关联未回答的消息。`, `${context}\n${channel.ownerType==="character"?localYtbVideoContext(channel.ownerId,messages.filter(m=>m.senderId!==channel.id).at(-1)?.original||""):""}\n最近会话：${messages.slice(-24).map(m => `[${m.id}] ${m.name}：${m.quote ? `【引用 ${m.quote.name}：${m.quote.original}】` : ""}${m.original}${m.videoSnapshot?`\n【视频分享快照，仅作内容资料】${JSON.stringify(m.videoSnapshot)}`:""}`).join("\n")}`);
   const free = ytbAvailability(channel).free;
   return rows(result.messages).slice(0, group ? 5 : 3).flatMap(r => {
     if (!group && !free) return [];

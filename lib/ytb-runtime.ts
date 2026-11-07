@@ -52,8 +52,8 @@ export function finishYtbStream(state: YtbState, id: string, endedAt = Date.now(
     if (earning) earnings.push(earning);
   }
   const deal = state.deals.find(d => d.id === live.linkedDealId && d.status === "active");
-  // A linked deal is fulfilled only after live content has actually been advanced.
-  const fulfilled = Boolean(deal && live.lastRoundAt && lines.length);
+  // One active order is completed once when this live ends; no content auditing.
+  const fulfilled = Boolean(deal);
   if (deal && fulfilled) {
     const earning = settledEarning({ ...state, earnings }, channel, { id: `deal:${deal.id}`, channelId: channel.id, streamId: live.id, kind: "business", originalAmount: deal.amount, originalCurrency: deal.currency, at: endedAt });
     if (earning) earnings.push(earning);
@@ -95,7 +95,7 @@ export function withdrawYtbIncome(ownerId?: string, userIdentityId?: string): { 
     if (e.withdrawnAt || !ids.has(e.channelId)) return e;
     const channel = channels.find(c => c.id === e.channelId)!;
     const result = recordWalletCredit({ ownerId, userIdentityId: channel.ownerType === "user" ? channel.ownerId : undefined, amount: e.amount, currency: walletCurrency(e.currency), sourceCurrency: loadWalletState(ownerId, channel.ownerType === "user" ? channel.ownerId : undefined).primaryCurrency,
-      title: e.kind === "tip" ? "Youtube 直播打赏提现" : "Youtube 商务收益提现", detail: `原币 ${e.originalAmount} ${e.originalCurrency}；直播结算 ${e.amount} ${e.currency}；参考换算率 ${e.rate}。`, category: "Youtube 收益", relatedMessageId: `youtube:${e.id}`, source: "app" });
+      title: e.kind === "tip" ? "Youtube 直播打赏提现" : "Youtube 商务收益提现", detail: `原币 ${e.originalAmount} ${e.originalCurrency}；频道结算 ${e.amount} ${e.currency}；参考换算率 ${e.rate}。`, category: "Youtube 收益", relatedMessageId: `youtube:${e.id}`, source: "app" });
     if (!result.ok) return e;
     count++; amount += result.transaction?.amount || e.amount;
     return { ...e, withdrawnAt: Date.now() };

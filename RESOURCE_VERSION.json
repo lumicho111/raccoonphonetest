@@ -1,7 +1,7 @@
 {
   "apk": "1.0.7",
   "nativeBuild": 9,
-  "resource": "rabbit-resource-017",
-  "sequence": 17,
-  "includes": "cumulative from 1.0.7 native baseline; iCity UI, diaries and privacy"
+  "resource": "rabbit-resource-021",
+  "sequence": 21,
+  "includes": "cumulative from 1.0.7 native baseline; YouTube videos, drafts, collaborations, bilingual editing and local retrieval experiments"
 }

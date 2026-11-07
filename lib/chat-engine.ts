@@ -2076,6 +2076,9 @@ export async function buildChatPromptMessages(
     if(resolvedAppId==='chat'&&!session.isGroup){
         const lastUser=historyForPrompt.filter(m=>m.role==='user').at(-1)?.content||'';
         { // Reuse only actual recent browsing; never discover new posts on each chat turn.
+            const {localYtbVideoContext}=await import('./ytb-video-context');
+            const videoContext=localYtbVideoContext(character.id,lastUser);
+            if(videoContext)llmMessages.push({role:'system',content:videoContext});
             const {cityRecallForChat}=await import('./icity-store');
             const recall=cityRecallForChat(character.id,lastUser);
             if(recall)llmMessages.push({role:'system',content:recall});

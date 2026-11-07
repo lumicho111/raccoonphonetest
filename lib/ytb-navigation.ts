@@ -1,7 +1,7 @@
 export type YtbScreen = { type: "channel" | "editor" | "studio" | "stream" | "thread" | "group" | "data"; id: string } | { type: "all" };
 export type YtbRoute = { screen: YtbScreen | null; tab: string; messageTab: string; channelTab: string };
 export type YtbNavigation = { current: YtbRoute; history: YtbRoute[] };
-export const initialYtbNavigation = (): YtbNavigation => ({ current: { screen: null, tab: "home", messageTab: "dm", channelTab: "live" }, history: [] });
+export const initialYtbNavigation = (): YtbNavigation => ({ current: { screen: null, tab: "home", messageTab: "dm", channelTab: "video" }, history: [] });
 function key(route: YtbRoute) { return route.screen ? `${route.screen.type}:${"id" in route.screen ? route.screen.id : ""}` : `root:${route.tab}`; }
 /** Forward navigation records the actual origin. Existing destinations unwind rather than form cycles. */
 export function navigateYtb(nav: YtbNavigation, screen: YtbScreen | null, patch: Partial<Omit<YtbRoute, "screen">> = {}, ownChannelId?: string): YtbNavigation {

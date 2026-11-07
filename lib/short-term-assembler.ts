@@ -398,7 +398,7 @@ export function loadNativeTimeline(
                     itemsText: msg.mediaData?.paymentRequestItemsText,
                 });
                 else if (msg.mediaType === "app_card") {
-                    if (msg.mediaData?.appId === "theqoo" && msg.mediaData.appHistoryText) {
+                    if (["theqoo", "ytb"].includes(msg.mediaData?.appId || "") && msg.mediaData?.appHistoryText) {
                         content = msg.mediaData.appHistoryText;
                     } else {
                     const appName = msg.mediaData?.appName || "APP";

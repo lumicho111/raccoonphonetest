@@ -1,18 +1,18 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, X } from "lucide-react";
 import type { YtbMessage } from "@/lib/ytb-storage";
 import { Plane } from "./ytb-live-room";
 import s from "./ytb-app.module.css";
 
 type Props = {
- messages: YtbMessage[]; ownId: string; peerId: string; busy: boolean; group: boolean;
+ systemNotices?:ReactNode; messages: YtbMessage[]; ownId: string; peerId: string; busy: boolean; group: boolean;
  onChannel: (id: string) => void;
  onSend: (body: string, generate: boolean, quote?: YtbMessage["quote"]) => void;
  onUpdate: (messages: YtbMessage[]) => void;
  onRetry: (id: string) => void;
 };
-export function YtbConversation({ messages, ownId, peerId, busy, onChannel, onSend, onUpdate, onRetry }: Props) {
+export function YtbConversation({ messages, ownId, peerId, busy, onChannel, onSend, onUpdate, onRetry,systemNotices }: Props) {
  const [input,setInput]=useState("");
  const [collapsed,setCollapsed]=useState<Record<string,boolean>>({});
  const [target,setTarget]=useState<YtbMessage|null>(null),[edit,setEdit]=useState<YtbMessage|null>(null);
@@ -32,6 +32,7 @@ export function YtbConversation({ messages, ownId, peerId, busy, onChannel, onSe
  return <>
  {selected&&<div className={s.selectionBar}><button onClick={()=>setSelected(null)}><X size={17}/></button><b>已选 {selected.length} 条</b><button disabled={!selected.length||busy} onClick={()=>void copy(messages.filter(m=>selected.includes(m.id)).map(m=>`${m.name}：${m.original}${m.translated&&m.translated!==m.original?`\n${m.translated}`:""}`).join("\n\n"))}>复制</button><button disabled={!selected.length||busy} onClick={()=>remove(selected)}>删除</button></div>}
  <div ref={box} className={s.chatThread} onScroll={e=>{const x=e.currentTarget;follow.current=x.scrollHeight-x.scrollTop-x.clientHeight<35;}}>
+ {systemNotices}
  {messages.length===0&&<p className={s.empty}>这里还没有消息</p>}
  {messages.map(m=><div key={m.id} className={`${s.bubbleRow} ${m.senderId===ownId?s.myBubble:""}`}>
  {selected&&<button className={s.selectMessage} aria-label={`选择 ${m.name} 的消息`} onClick={()=>toggle(m.id)}>{selected.includes(m.id)&&<Check size={14}/>}</button>}
@@ -41,9 +42,9 @@ export function YtbConversation({ messages, ownId, peerId, busy, onChannel, onSe
  onPointerDown={e=>{if(e.button!==0||selected||busy)return;pressed.current=false;origin.current={x:e.clientX,y:e.clientY};clearPress();timer.current=setTimeout(()=>{pressed.current=true;setTarget(m);},480);}}
  onPointerMove={e=>{if(Math.hypot(e.clientX-origin.current.x,e.clientY-origin.current.y)>9)clearPress();}}
  onPointerUp={clearPress} onPointerCancel={clearPress} onPointerLeave={clearPress}
- onClick={()=>{if(pressed.current){pressed.current=false;return;}if(selected)toggle(m.id);else setCollapsed(p=>({...p,[m.id]:!p[m.id]}));}}>
+ onClick={()=>{if(pressed.current){pressed.current=false;return;}if(selected)toggle(m.id);else if(m.videoSnapshot)window.dispatchEvent(new CustomEvent('youtube-open-video',{detail:{id:m.videoId}}));else setCollapsed(p=>({...p,[m.id]:!p[m.id]}));}}>
  {m.quote&&<span className={s.quotedMessage}><b>{m.quote.name}</b><span>{m.quote.original}</span>{!collapsed[m.id]&&m.quote.translated&&m.quote.translated!==m.quote.original&&<span>{m.quote.translated}</span>}</span>}
- <span>{m.original}</span>{!collapsed[m.id]&&m.translated&&m.translated!==m.original&&<span className={s.bubbleTranslation}>{m.translated}</span>}
+ {m.videoSnapshot?.cover&&<img className={s.videoMessageCover} src={m.videoSnapshot.cover} alt="视频封面"/>}<span>{m.original}</span>{!collapsed[m.id]&&m.translated&&m.translated!==m.original&&<span className={s.bubbleTranslation}>{m.translated}</span>}
  </button></div></div>)}
  </div>
  {quote&&<div className={s.quoteComposer}><div><b>回复 {quote.name}</b><span>{quote.original}</span></div><button onClick={()=>setQuote(undefined)} aria-label="取消引用"><X size={15}/></button></div>}
